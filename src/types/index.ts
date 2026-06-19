@@ -2,7 +2,7 @@
 // Shared TypeScript types
 // ============================================================
 
-export type UserRole = 'owner' | 'manager' | 'staff';
+export type UserRole = 'admin' | 'staff';
 
 export type ItemCondition = 'new' | 'like_new' | 'used_good' | 'used_fair' | 'refurbished';
 

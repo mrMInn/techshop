@@ -98,10 +98,10 @@ async function main() {
     const dummyId = '77777777-7777-7777-7777-777777777777';
     await db.insert(schema.profiles).values({
       id: dummyId,
-      fullName: 'Nguyễn Minh (Owner)',
+      fullName: 'Nguyễn Minh',
       email: 'owner@techshop.vn',
       phone: '0909123456',
-      role: 'owner',
+      role: 'admin',
       isActive: true,
     });
     profileId = dummyId;

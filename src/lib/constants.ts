@@ -25,7 +25,7 @@ export interface NavItem {
   icon: LucideIcon;
   badge?: string;
   children?: NavItem[];
-  roles?: ('owner' | 'manager' | 'staff')[];
+  roles?: ('admin' | 'staff')[];
 }
 
 export const NAV_ITEMS: NavItem[] = [
@@ -33,7 +33,7 @@ export const NAV_ITEMS: NavItem[] = [
     title: 'Dashboard',
     href: '/dashboard',
     icon: LayoutDashboard,
-    roles: ['owner', 'manager'],
+    roles: ['admin'],
   },
   {
     title: 'Kho hàng',
@@ -74,7 +74,7 @@ export const NAV_ITEMS: NavItem[] = [
     title: 'Kế toán',
     href: '/accounting',
     icon: Wallet,
-    roles: ['owner', 'manager'],
+    roles: ['admin'],
     children: [
       { title: 'Tổng quan', href: '/accounting', icon: Wallet },
       { title: 'Chi phí', href: '/accounting/expenses', icon: Wallet },
@@ -82,16 +82,10 @@ export const NAV_ITEMS: NavItem[] = [
     ],
   },
   {
-    title: 'Thuế',
-    href: '/tax',
-    icon: Receipt,
-    roles: ['owner'],
-  },
-  {
     title: 'Báo cáo',
     href: '/reports',
     icon: BarChart3,
-    roles: ['owner', 'manager'],
+    roles: ['admin'],
   },
   {
     title: 'Cài đặt',

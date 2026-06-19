@@ -8,8 +8,7 @@ import { getCurrentUserAction, logoutAction } from "@/app/actions/auth";
 import { toast } from "sonner";
 
 const ROLE_MAP: Record<string, string> = {
-  owner: "Quản trị viên",
-  manager: "Quản lý",
+  admin: "Quản trị viên",
   staff: "Nhân viên",
 };
 
@@ -79,7 +78,7 @@ export default function DashboardLayout({
   };
 
 
-  const isOwner = !loading && (profile?.role === "owner" || profile?.role === "manager");
+  const isAdmin = !loading && profile?.role === "admin";
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50 antialiased font-sans">
@@ -108,7 +107,7 @@ export default function DashboardLayout({
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2 mb-2">Chọn chức năng</p>
             
             <nav className="space-y-1">
-              {isOwner && (
+              {isAdmin && (
                 <SidebarLink 
                   href="/" 
                   bgColor="bg-gradient-to-br from-blue-500 to-blue-600 shadow-[0_2px_6px_rgba(0,113,227,0.15)]"
@@ -159,7 +158,7 @@ export default function DashboardLayout({
                 label="Tra cứu" 
                 active={pathname?.startsWith("/lookup")} 
               />
-              {isOwner && (
+              {isAdmin && (
                 <SidebarLink 
                   href="/accounting" 
                   bgColor="bg-gradient-to-br from-emerald-500 to-green-600 shadow-[0_2px_6px_rgba(48,209,88,0.15)]"
@@ -174,7 +173,7 @@ export default function DashboardLayout({
 
         {/* Sidebar Footer: System Config & Profile */}
         <div className="space-y-3.5 border-t border-slate-200/50 pt-4">
-          {isOwner && (
+          {isAdmin && (
             <SidebarLink 
               href="/settings" 
               bgColor="bg-gradient-to-br from-slate-400 to-slate-500 shadow-[0_2px_6px_rgba(142,142,147,0.15)]"

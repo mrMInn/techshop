@@ -66,7 +66,7 @@ async function main() {
           fullName: 'Quản trị viên Hệ thống',
           email: 'admin@techshop.vn',
           phone: '0987654321',
-          role: 'owner',
+          role: 'admin',
           isActive: true,
         });
         profileId = dummyId;

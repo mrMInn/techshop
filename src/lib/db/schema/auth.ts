@@ -4,7 +4,7 @@ import { pgTable, uuid, varchar, text, boolean, timestamp, pgEnum } from 'drizzl
 // ENUMS
 // ============================================================
 
-export const userRoleEnum = pgEnum('user_role', ['owner', 'manager', 'staff']);
+export const userRoleEnum = pgEnum('user_role', ['admin', 'staff']);
 
 // ============================================================
 // PROFILES — Quản lý người dùng & phân quyền
