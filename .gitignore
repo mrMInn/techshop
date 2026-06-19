@@ -1,0 +1,27 @@
+# Dependency directories
+node_modules/
+/dist/
+/coverage/
+
+# Next.js build output
+.next/
+out/
+tsconfig.tsbuildinfo
+
+# Playwright & test results
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Operating System files
+.DS_Store
+Thumbs.db
