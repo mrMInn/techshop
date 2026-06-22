@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, text, boolean, timestamp, integer, decimal, date, pgEnum } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, text, boolean, timestamp, integer, decimal, date, pgEnum, index } from 'drizzle-orm/pg-core';
 import { products } from './products';
 import { profiles } from './auth';
 
@@ -50,7 +50,9 @@ export const purchaseOrders = pgTable('purchase_orders', {
   createdBy: uuid('created_by').references(() => profiles.id),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => [
+  index('idx_purchase_orders_supplier').on(table.supplierId),
+]);
 
 // ============================================================
 // PURCHASE_ORDER_ITEMS — Chi tiết đơn nhập
@@ -65,4 +67,7 @@ export const purchaseOrderItems = pgTable('purchase_order_items', {
   totalCost: decimal('total_cost', { precision: 15, scale: 2 }).notNull(),
   receivedQuantity: integer('received_quantity').default(0).notNull(),
   notes: text('notes'),
-});
+}, (table) => [
+  index('idx_po_items_po').on(table.purchaseOrderId),
+  index('idx_po_items_product').on(table.productId),
+]);

@@ -8,6 +8,8 @@ import { Dialog } from "@/components/ui/dialog";
 import { createSupplier, updateSupplier } from "@/app/actions/suppliers";
 import { toast } from "sonner";
 import { CustomSelect } from "@/components/ui/custom-select";
+import { getCountriesList } from "@/app/actions/shipping-countries";
+import { CountryManagerDialog } from "@/components/inventory/country-manager-dialog";
 
 const supplierSchema = z.object({
   name: z.string().min(1, "Vui lòng nhập tên nhà cung cấp"),
@@ -46,6 +48,25 @@ interface SupplierDialogProps {
 
 export function SupplierDialog({ isOpen, onClose, onSuccess, supplier }: SupplierDialogProps) {
   const [isPending, setIsPending] = useState(false);
+  const [countriesList, setCountriesList] = useState<{ id: string; code: string; name: string; isActive: boolean; createdAt?: Date }[]>([]);
+  const [loadingCountries, setLoadingCountries] = useState(false);
+  const [isCountryManagerOpen, setIsCountryManagerOpen] = useState(false);
+
+  const loadCountries = async () => {
+    setLoadingCountries(true);
+    try {
+      const data = await getCountriesList();
+      let activeCountries: { id: string; code: string; name: string; isActive: boolean; createdAt?: Date }[] = data.filter((c) => c.isActive);
+      if (!activeCountries.some((c) => c.code === "VN")) {
+        activeCountries = [{ id: "vn-default", code: "VN", name: "Việt Nam", isActive: true }, ...activeCountries];
+      }
+      setCountriesList(activeCountries);
+    } catch (error) {
+      console.error("Lỗi lấy danh sách quốc gia", error);
+    } finally {
+      setLoadingCountries(false);
+    }
+  };
 
   const {
     register,
@@ -70,6 +91,7 @@ export function SupplierDialog({ isOpen, onClose, onSuccess, supplier }: Supplie
 
   useEffect(() => {
     if (isOpen) {
+      loadCountries();
       if (supplier) {
         reset({
           name: supplier.name,
@@ -122,20 +144,16 @@ export function SupplierDialog({ isOpen, onClose, onSuccess, supplier }: Supplie
     }
   };
 
-  const countries = [
-    
-    { value: "US", label: "Mỹ" },
-    
-  ];
 
   return (
-    <Dialog
-      isOpen={isOpen}
-      onClose={onClose}
-      title={supplier ? "Chỉnh sửa Nhà cung cấp" : "Thêm Nhà cung cấp mới"}
-      description={supplier ? `Chỉnh sửa thông tin đối tác "${supplier.name}".` : "Tạo nhà cung cấp mới."}
-      size="lg"
-    >
+    <>
+      <Dialog
+        isOpen={isOpen}
+        onClose={onClose}
+        title={supplier ? "Chỉnh sửa Nhà cung cấp" : "Thêm Nhà cung cấp mới"}
+        description={supplier ? `Chỉnh sửa thông tin đối tác "${supplier.name}".` : "Tạo nhà cung cấp mới."}
+        size="lg"
+      >
       <form onSubmit={handleSubmit(onSubmitHandler)} className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Tên nhà cung cấp */}
@@ -197,17 +215,32 @@ export function SupplierDialog({ isOpen, onClose, onSuccess, supplier }: Supplie
 
           {/* Quốc gia */}
           <div className="space-y-1">
-            <label className="block text-[13px] font-semibold text-[#1d1d1f]">Quốc gia</label>
+            <div className="flex justify-between items-center">
+              <label className="block text-[13px] font-semibold text-[#1d1d1f]">Quốc gia</label>
+              <button 
+                type="button" 
+                onClick={() => setIsCountryManagerOpen(true)}
+                className="text-[11px] font-semibold text-[#0066cc] hover:underline cursor-pointer"
+              >
+                Quản lý
+              </button>
+            </div>
             <Controller
               name="country"
               control={control}
               render={({ field }) => (
                 <CustomSelect
-                  options={countries}
+                  options={countriesList.map((c) => ({
+                    value: c.code,
+                    label: c.name,
+                  }))}
                   value={field.value}
                   onChange={field.onChange}
                   size="sm"
                   dropdownWidth="full"
+                  disabled={loadingCountries}
+                  placeholder="Chọn quốc gia..."
+                  searchable={true}
                 />
               )}
             />
@@ -272,5 +305,12 @@ export function SupplierDialog({ isOpen, onClose, onSuccess, supplier }: Supplie
         </div>
       </form>
     </Dialog>
+
+    <CountryManagerDialog
+      isOpen={isCountryManagerOpen}
+      onClose={() => setIsCountryManagerOpen(false)}
+      onUpdate={loadCountries}
+    />
+  </>
   );
 }

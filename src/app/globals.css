@@ -20,6 +20,9 @@
   
   --color-divider-soft: var(--divider-soft);
   --color-hairline: var(--hairline);
+  
+  --font-sans: SF Pro Text, -apple-system, BlinkMacSystemFont, system-ui, "Inter", sans-serif;
+  --font-mono: SF Mono, SFMono-Regular, ui-monospace, Menlo, Monaco, Consolas, monospace;
 }
 
 :root {
@@ -51,10 +54,14 @@
 body {
   background: var(--canvas-parchment);
   color: var(--ink);
-  font-family: SF Pro Text, system-ui, -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
   margin: 0;
+}
+
+input, button, select, textarea {
+  font-family: inherit;
 }
 
 /* Custom Scrollbar */

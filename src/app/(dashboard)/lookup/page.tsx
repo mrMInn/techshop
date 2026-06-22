@@ -20,32 +20,32 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { GlassCard } from "@/components/ui/glass-card";
 
-// Status mappings for machines and orders
-const statusMapping: Record<string, { label: string; bg: string; text: string; border: string }> = {
-  incoming: { label: "Đang về", bg: "bg-indigo-50", text: "text-indigo-700", border: "border-indigo-200/50" },
-  in_stock: { label: "Sẵn hàng", bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200/50" },
-  sold: { label: "Đã bán", bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200/50" },
-  warranty_repair: { label: "Bảo hành", bg: "bg-teal-50", text: "text-teal-700", border: "border-teal-200/50" },
-  returned: { label: "Đã trả NCC", bg: "bg-orange-50", text: "text-orange-700", border: "border-orange-200/50" },
-  defective: { label: "Hàng lỗi", bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200/50" },
-  deleted: { label: "Đã ẩn", bg: "bg-slate-50", text: "text-slate-600", border: "border-slate-200" },
+// Status mappings for machines and orders (Apple style colors - text-only)
+const statusMapping: Record<string, { label: string; color: string }> = {
+  incoming: { label: "Đang về", color: "text-[#0066cc]" },
+  in_stock: { label: "Sẵn hàng", color: "text-emerald-600" },
+  sold: { label: "Đã bán", color: "text-slate-500" },
+  warranty_repair: { label: "Bảo hành", color: "text-amber-600" },
+  returned: { label: "Đã trả NCC", color: "text-orange-600" },
+  defective: { label: "Hàng lỗi", color: "text-red-600" },
+  deleted: { label: "Đã ẩn", color: "text-slate-400" },
 };
 
-const orderStatusMapping: Record<string, { label: string; bg: string }> = {
-  draft: { label: "Nháp", bg: "bg-slate-100 text-slate-700" },
-  confirmed: { label: "Đã xác nhận", bg: "bg-blue-100 text-blue-700" },
-  processing: { label: "Đang xử lý", bg: "bg-amber-100 text-amber-700" },
-  completed: { label: "Hoàn thành", bg: "bg-emerald-100 text-emerald-700" },
-  cancelled: { label: "Đã hủy", bg: "bg-rose-100 text-rose-700" },
-  refunded: { label: "Đã hoàn tiền", bg: "bg-violet-100 text-violet-700" },
+const orderStatusMapping: Record<string, { label: string; color: string }> = {
+  draft: { label: "Nháp", color: "text-slate-500" },
+  confirmed: { label: "Đã xác nhận", color: "text-[#0066cc]" },
+  processing: { label: "Đang xử lý", color: "text-amber-600" },
+  completed: { label: "Hoàn thành", color: "text-emerald-600" },
+  cancelled: { label: "Đã hủy", color: "text-red-600" },
+  refunded: { label: "Đã hoàn tiền", color: "text-purple-600" },
 };
 
-const milestoneColors: Record<string, { bg: string; text: string; border: string; icon: React.ReactNode }> = {
-  purchase: { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200/60", icon: <SFSymbolLandmark size={14} className="text-amber-600" /> },
-  sale: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200/60", icon: <SFSymbolShoppingBag size={14} className="text-emerald-600" /> },
-  warranty: { bg: "bg-teal-50", text: "text-teal-700", border: "border-teal-200/60", icon: <SFSymbolWrench size={14} className="text-teal-600" /> },
-  return: { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200/60", icon: <SFSymbolArrowClockwise size={14} className="text-rose-600" /> },
-  movement: { bg: "bg-slate-50", text: "text-slate-700", border: "border-slate-200", icon: <SFSymbolActivity size={14} className="text-slate-500" /> },
+const milestoneColors: Record<string, { icon: React.ReactNode }> = {
+  purchase: { icon: <SFSymbolLandmark size={14} className="text-slate-600" /> },
+  sale: { icon: <SFSymbolShoppingBag size={14} className="text-slate-600" /> },
+  warranty: { icon: <SFSymbolWrench size={14} className="text-slate-600" /> },
+  return: { icon: <SFSymbolArrowClockwise size={14} className="text-slate-600" /> },
+  movement: { icon: <SFSymbolActivity size={14} className="text-slate-500" /> },
 };
 
 const formatToDDMMYYYY = (dateString: string | Date | null) => {
@@ -299,18 +299,18 @@ export default function LookupPage() {
   const renderCustomerTab = () => {
     if (phoneLoading) {
       return (
-        <GlassCard className="flex flex-col items-center justify-center py-24 text-[#7a7a7a]">
-          <Loader2 className="animate-spin mb-3 text-[#0066cc]" size={24} />
-          <p className="text-[14px] font-bold text-[#1d1d1f]">Đang tra cứu dữ liệu khách hàng...</p>
+        <GlassCard className="flex flex-col items-center justify-center py-28 text-[#86868b] border border-[#e5e5e7]">
+          <Loader2 className="animate-spin mb-3.5 text-[#0066cc]" size={26} />
+          <p className="text-[15px] font-semibold text-[#1d1d1f]">Đang tra cứu dữ liệu khách hàng...</p>
         </GlassCard>
       );
     }
 
     if (searchResults.length > 1 && !selectedCustomerId) {
       return (
-        <div className="space-y-4">
-          <h3 className="text-[14px] font-bold text-[#7a7a7a] uppercase tracking-wider pl-1">Kết quả tìm kiếm trùng khớp ({searchResults.length})</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="space-y-5">
+          <h3 className="text-[13px] font-bold text-[#86868b] uppercase tracking-wider pl-1">Kết quả tìm kiếm trùng khớp ({searchResults.length})</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {searchResults.map((cust) => (
               <GlassCard 
                 key={cust.id}
@@ -318,23 +318,23 @@ export default function LookupPage() {
                   setSelectedCustomerId(cust.id);
                   fetchCustomerDetail(cust.id);
                 }}
-                className="p-5 hover:border-[#0066cc] hover:shadow-md cursor-pointer transition-all duration-200 group"
+                className="p-6 hover:border-[#0066cc] hover:shadow-md cursor-pointer transition-all duration-200 group bg-white border border-[#e5e5e7] rounded-2xl"
               >
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-full bg-blue-50 text-[#0066cc] flex items-center justify-center font-bold">
+                <div className="flex items-center gap-3.5 mb-4">
+                  <div className="w-11 h-11 rounded-full bg-[#f5f5f7] text-[#1d1d1f] flex items-center justify-center font-bold text-[16px] border border-[#e5e5e7]">
                     {cust.fullName.charAt(0).toUpperCase()}
                   </div>
                   <div>
-                    <h4 className="font-semibold text-slate-800 group-hover:text-[#0066cc] transition-colors">{cust.fullName}</h4>
-                    <p className="text-[12px] text-[#7a7a7a]">{cust.phone}</p>
+                    <h4 className="text-[15px] font-bold text-[#1d1d1f] group-hover:text-[#0066cc] transition-colors">{cust.fullName}</h4>
+                    <p className="text-[13px] text-[#86868b] font-medium mt-0.5">{cust.phone}</p>
                   </div>
                 </div>
-                <div className="space-y-1 text-[12px] text-[#515154] border-t border-slate-100 pt-2 mt-2">
+                <div className="space-y-1.5 text-[13px] text-[#515154] border-t border-slate-100 pt-3 mt-3 font-medium">
                   {cust.email && <p className="truncate">📧 {cust.email}</p>}
                   {cust.address && <p className="truncate">📍 {cust.address}</p>}
-                  <div className="flex justify-between font-bold text-slate-700 mt-1">
-                    <span>Đơn hàng: {cust.orderCount}</span>
-                    <span>Đã tiêu: {formatPrice(cust.totalSpent)}</span>
+                  <div className="flex justify-between font-bold text-[#1d1d1f] pt-1.5 mt-1 border-t border-slate-50">
+                    <span className="text-[12.5px]">Đơn hàng: <span className="text-[#0066cc]">{cust.orderCount}</span></span>
+                    <span className="text-[12.5px]">Đã tiêu: <span>{formatPrice(cust.totalSpent)}</span></span>
                   </div>
                 </div>
               </GlassCard>
@@ -347,9 +347,9 @@ export default function LookupPage() {
     if (selectedCustomerId) {
       if (detailLoading) {
         return (
-          <GlassCard className="flex flex-col items-center justify-center py-24 text-[#7a7a7a]">
-            <Loader2 className="animate-spin mb-3 text-[#0066cc]" size={24} />
-            <p className="text-[14px] font-bold text-[#1d1d1f]">Đang tải hồ sơ khách hàng...</p>
+          <GlassCard className="flex flex-col items-center justify-center py-28 text-[#86868b] border border-[#e5e5e7]">
+            <Loader2 className="animate-spin mb-3.5 text-[#0066cc]" size={26} />
+            <p className="text-[15px] font-semibold text-[#1d1d1f]">Đang tải hồ sơ khách hàng...</p>
           </GlassCard>
         );
       }
@@ -360,57 +360,56 @@ export default function LookupPage() {
             
             {/* Left Column: Customer Profile */}
             <div className="lg:col-span-4 space-y-6">
-              <GlassCard className="p-6 space-y-6 relative overflow-hidden">
-                <div className="absolute right-0 top-0 w-24 h-24 bg-blue-50/50 blur-3xl rounded-full" />
+              <GlassCard className="p-6 space-y-6 relative overflow-hidden bg-white border border-[#e5e5e7] rounded-2xl">
                 
                 {/* Top Avatar Box */}
-                <div className="flex flex-col items-center text-center space-y-3 pb-4 border-b border-slate-100 z-10 relative">
-                  <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-blue-500 to-blue-600 text-white flex items-center justify-center text-[22px] font-extrabold shadow-md">
+                <div className="flex flex-col items-center text-center space-y-3 pb-5 border-b border-slate-100 relative">
+                  <div className="w-16 h-16 rounded-full bg-[#f5f5f7] text-[#1d1d1f] flex items-center justify-center text-[22px] font-bold border border-[#e5e5e7] shadow-sm">
                     {customerDetail.customer.fullName.charAt(0).toUpperCase()}
                   </div>
                   <div>
-                    <h3 className="text-[18px] font-extrabold text-[#1d1d1f] tracking-tight leading-tight">
+                    <h3 className="text-[18px] font-bold text-[#1d1d1f] tracking-tight leading-tight">
                       {customerDetail.customer.fullName}
                     </h3>
-                    <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider leading-none mt-2 bg-slate-100 border-slate-200 text-slate-700">
+                    <span className="text-[12px] font-semibold text-[#86868b] block mt-1.5">
                       {customerDetail.customer.customerType === "business" ? "Doanh nghiệp" : "Cá nhân"}
                     </span>
                   </div>
                 </div>
 
                 {/* Profile Specs */}
-                <div className="space-y-3 text-[13px] font-semibold text-slate-800">
-                  <div className="flex items-start gap-2.5">
-                    <Phone className="text-slate-400 shrink-0 mt-0.5" size={14} />
-                    <div>
-                      <span className="text-[10px] text-slate-400 font-bold uppercase block tracking-wider">Số điện thoại</span>
-                      <span className="text-[13px]">{customerDetail.customer.phone}</span>
+                <div className="space-y-4 text-[13.5px] text-[#1d1d1f]">
+                  <div className="flex items-start gap-3">
+                    <Phone className="text-[#86868b] shrink-0 mt-0.5" size={14.5} />
+                    <div className="space-y-0.5">
+                      <span className="text-[10px] text-[#86868b] font-bold uppercase tracking-wider block">Số điện thoại</span>
+                      <span className="font-semibold">{customerDetail.customer.phone}</span>
                     </div>
                   </div>
                   {customerDetail.customer.email && (
-                    <div className="flex items-start gap-2.5">
-                      <Mail className="text-slate-400 shrink-0 mt-0.5" size={14} />
-                      <div>
-                        <span className="text-[10px] text-slate-400 font-bold uppercase block tracking-wider">Email</span>
-                        <span>{customerDetail.customer.email}</span>
+                    <div className="flex items-start gap-3">
+                      <Mail className="text-[#86868b] shrink-0 mt-0.5" size={14.5} />
+                      <div className="space-y-0.5">
+                        <span className="text-[10px] text-[#86868b] font-bold uppercase tracking-wider block">Email</span>
+                        <span className="font-semibold">{customerDetail.customer.email}</span>
                       </div>
                     </div>
                   )}
                   {customerDetail.customer.address && (
-                    <div className="flex items-start gap-2.5">
-                      <MapPin className="text-slate-400 shrink-0 mt-0.5" size={14} />
-                      <div>
-                        <span className="text-[10px] text-slate-400 font-bold uppercase block tracking-wider">Địa chỉ giao dịch</span>
+                    <div className="flex items-start gap-3">
+                      <MapPin className="text-[#86868b] shrink-0 mt-0.5" size={14.5} />
+                      <div className="space-y-0.5">
+                        <span className="text-[10px] text-[#86868b] font-bold uppercase tracking-wider block">Địa chỉ giao dịch</span>
                         <span className="font-medium text-[#515154] leading-relaxed">{customerDetail.customer.address}</span>
                       </div>
                     </div>
                   )}
                   {customerDetail.customer.leadSourceName && (
-                    <div className="flex items-start gap-2.5">
-                      <User className="text-slate-400 shrink-0 mt-0.5" size={14} />
-                      <div>
-                        <span className="text-[10px] text-slate-400 font-bold uppercase block tracking-wider">Nguồn thu hút</span>
-                        <span>
+                    <div className="flex items-start gap-3">
+                      <User className="text-[#86868b] shrink-0 mt-0.5" size={14.5} />
+                      <div className="space-y-0.5">
+                        <span className="text-[10px] text-[#86868b] font-bold uppercase tracking-wider block">Nguồn thu hút</span>
+                        <span className="font-semibold">
                           {customerDetail.customer.leadSourceIcon || ""} {customerDetail.customer.leadSourceName}
                         </span>
                       </div>
@@ -419,16 +418,16 @@ export default function LookupPage() {
                 </div>
 
                 {/* Financial Stats */}
-                <div className="pt-4 border-t border-slate-100 grid grid-cols-2 gap-3 text-center">
-                  <div className="p-3 bg-slate-50 border border-slate-200/50 rounded-2xl space-y-1">
-                    <span className="text-slate-400 font-bold text-[10px] uppercase block">Tổng chi tiêu</span>
-                    <p className="text-[15px] font-black text-[#0066cc] leading-none">
+                <div className="pt-5 border-t border-slate-100 grid grid-cols-2 gap-3 text-center">
+                  <div className="p-3 bg-[#f5f5f7] border border-slate-200/30 rounded-xl space-y-1">
+                    <span className="text-[#86868b] font-bold text-[10px] uppercase block">Tổng chi tiêu</span>
+                    <p className="text-[15px] font-bold text-[#0066cc] leading-none">
                       {formatPrice(customerDetail.customer.totalSpent)}
                     </p>
                   </div>
-                  <div className="p-3 bg-slate-50 border border-slate-200/50 rounded-2xl space-y-1">
-                    <span className="text-slate-400 font-bold text-[10px] uppercase block">Tổng đơn mua</span>
-                    <p className="text-[15px] font-black text-slate-800 leading-none">
+                  <div className="p-3 bg-[#f5f5f7] border border-slate-200/30 rounded-xl space-y-1">
+                    <span className="text-[#86868b] font-bold text-[10px] uppercase block">Tổng đơn mua</span>
+                    <p className="text-[15px] font-bold text-[#1d1d1f] leading-none">
                       {customerDetail.customer.orderCount}
                     </p>
                   </div>
@@ -438,7 +437,7 @@ export default function LookupPage() {
                 {searchResults.length > 1 && (
                   <button
                     onClick={() => setSelectedCustomerId(null)}
-                    className="w-full h-9 bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-[12px] font-bold rounded-full border border-slate-200/60 transition-all cursor-pointer active:scale-95 duration-200"
+                    className="w-full h-[36px] bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#1d1d1f] text-[13px] font-semibold rounded-full border border-slate-200/50 transition-all cursor-pointer active:scale-95 duration-200"
                   >
                     Quay lại danh sách kết quả
                   </button>
@@ -450,59 +449,57 @@ export default function LookupPage() {
             <div className="lg:col-span-8 space-y-6">
               
               {/* Purchased Machines list */}
-              <GlassCard className="p-5 space-y-4">
-                <h4 className="text-[13px] font-bold text-[#1d1d1f] uppercase tracking-wider pb-2 border-b border-slate-100 flex items-center gap-2">
-                  <ShoppingBag size={14} className="text-[#0066cc]" />
+              <GlassCard className="p-6 space-y-4 bg-white border border-[#e5e5e7] rounded-2xl">
+                <h4 className="text-[14px] font-bold text-[#1d1d1f] uppercase tracking-wider pb-2.5 border-b border-slate-100 flex items-center gap-2">
+                  <ShoppingBag size={15} className="text-[#0066cc]" />
                   Thiết bị đã mua ({customerDetail.purchasedItems.length})
                 </h4>
 
                 {customerDetail.purchasedItems.length === 0 ? (
-                  <div className="text-center py-10 text-slate-400 text-[13px]">Khách hàng chưa sở hữu thiết bị nào thành công.</div>
+                  <div className="text-center py-10 text-[#86868b] text-[13.5px]">Khách hàng chưa sở hữu thiết bị nào thành công.</div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
+                    <table className="w-full text-left border-collapse min-w-[550px]">
                       <thead>
-                        <tr className="border-b border-[#e0e0e0] text-[11px] font-bold text-[#7a7a7a] uppercase tracking-wider">
-                          <th className="pb-3 pr-4">Tên máy & Cấu hình</th>
-                          <th className="pb-3 px-3">Số Serial</th>
-                          <th className="pb-3 px-3">Hóa đơn mua</th>
-                          <th className="pb-3 px-3 text-right">Giá bán</th>
-                          <th className="pb-3 px-3">Trạng thái kho</th>
+                        <tr className="border-b border-[#e5e5e7] text-[12px] font-bold text-[#86868b] uppercase tracking-wider">
+                          <th className="pb-3.5 pr-4">Tên máy & Cấu hình</th>
+                          <th className="pb-3.5 px-3">Số Serial</th>
+                          <th className="pb-3.5 px-3">Hóa đơn mua</th>
+                          <th className="pb-3.5 px-3 text-right">Giá bán</th>
+                          <th className="pb-3.5 px-3 text-center">Trạng thái</th>
                         </tr>
                       </thead>
-                      <tbody className="text-[13px] text-slate-800 font-semibold">
+                      <tbody className="text-[13.5px] text-[#1d1d1f] font-medium">
                         {customerDetail.purchasedItems.map((item: any, idx: number) => {
                           const badge = statusMapping[item.status] || {
                             label: item.status,
-                            bg: "bg-slate-50",
-                            text: "text-slate-700",
-                            border: "border-slate-200",
+                            color: "text-[#1d1d1f]",
                           };
                           return (
-                            <tr key={idx} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
+                            <tr key={idx} className="border-b border-slate-100 last:border-0 hover:bg-[#f5f5f7]/30 transition-colors">
                               <td className="py-3.5 pr-4 align-top max-w-[220px]">
-                                <p className="font-bold text-[#1d1d1f] leading-tight">{item.productName}</p>
-                                <span className="text-[11px] text-[#7a7a7a] block mt-1 font-medium truncate max-w-[210px]">{formatSpecs(item.productSpecs)}</span>
+                                <p className="font-semibold text-[#1d1d1f] leading-tight">{item.productName}</p>
+                                <span className="text-[11.5px] text-[#86868b] block mt-1 font-medium leading-relaxed">{formatSpecs(item.productSpecs)}</span>
                               </td>
                               <td className="py-3.5 px-3 align-top">
                                 <button
                                   onClick={() => triggerSerialLookup(item.serialNumber)}
-                                  className="text-[11px] font-bold text-[#0066cc] hover:scale-105 active:scale-95 duration-200 bg-[#0066cc]/5 border border-[#0066cc]/10 px-2.5 py-0.5 rounded-full cursor-pointer uppercase tracking-wider flex items-center gap-1 leading-none transition-all"
+                                  className="text-[13px] font-semibold text-[#0066cc] hover:underline flex items-center gap-1.5 leading-none transition-all cursor-pointer uppercase"
                                   title="Nhấn để xem dòng vòng đời máy"
                                 >
                                   {item.serialNumber}
-                                  <ExternalLink size={10} />
+                                  <ExternalLink size={11} />
                                 </button>
                               </td>
                               <td className="py-3.5 px-3 align-top">
-                                <p className="text-slate-800">{item.orderNumber}</p>
-                                <span className="text-[11px] text-[#7a7a7a] block mt-0.5 font-medium">{formatToDDMMYYYY(item.orderDate)}</span>
+                                <p className="font-semibold text-[#1d1d1f]">{item.orderNumber}</p>
+                                <span className="text-[11.5px] text-[#86868b] block mt-0.5">{formatToDDMMYYYY(item.orderDate)}</span>
                               </td>
-                              <td className="py-3.5 px-3 align-top text-right text-[#0066cc] font-extrabold">
+                              <td className="py-3.5 px-3 align-top text-right text-[#0066cc] font-bold">
                                 {formatPrice(item.sellingPrice)}
                               </td>
-                              <td className="py-3.5 px-3 align-top">
-                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wide leading-none ${badge.bg} ${badge.text} ${badge.border}`}>
+                              <td className="py-3.5 px-3 align-top text-center">
+                                <span className={`text-[13px] font-semibold ${badge.color}`}>
                                   {badge.label}
                                 </span>
                               </td>
@@ -516,47 +513,47 @@ export default function LookupPage() {
               </GlassCard>
 
               {/* Order History */}
-              <GlassCard className="p-5 space-y-4">
-                <h4 className="text-[13px] font-bold text-[#1d1d1f] uppercase tracking-wider pb-2 border-b border-slate-100 flex items-center gap-2">
-                  <FileText size={14} className="text-[#0066cc]" />
+              <GlassCard className="p-6 space-y-4 bg-white border border-[#e5e5e7] rounded-2xl">
+                <h4 className="text-[14px] font-bold text-[#1d1d1f] uppercase tracking-wider pb-2.5 border-b border-slate-100 flex items-center gap-2">
+                  <FileText size={15} className="text-[#0066cc]" />
                   Lịch sử toàn bộ Đơn hàng ({customerDetail.orders.length})
                 </h4>
 
                 {customerDetail.orders.length === 0 ? (
-                  <div className="text-center py-8 text-slate-400 text-[13px]">Không ghi nhận hóa đơn nào.</div>
+                  <div className="text-center py-8 text-[#86868b] text-[13.5px]">Không ghi nhận hóa đơn nào.</div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
+                    <table className="w-full text-left border-collapse min-w-[550px]">
                       <thead>
-                        <tr className="border-b border-[#e0e0e0] text-[11px] font-bold text-[#7a7a7a] uppercase tracking-wider">
-                          <th className="pb-3 pr-4">Mã Đơn hàng</th>
-                          <th className="pb-3 px-3">Ngày lên đơn</th>
-                          <th className="pb-3 px-3">Kênh bán</th>
-                          <th className="pb-3 px-3 text-right">Tổng thanh toán</th>
-                          <th className="pb-3 px-3 text-center">Thanh toán</th>
-                          <th className="pb-3 px-3 text-center">Trạng thái đơn</th>
+                        <tr className="border-b border-[#e5e5e7] text-[12px] font-bold text-[#86868b] uppercase tracking-wider">
+                          <th className="pb-3.5 pr-4">Mã Đơn hàng</th>
+                          <th className="pb-3.5 px-3">Ngày lên đơn</th>
+                          <th className="pb-3.5 px-3">Kênh bán</th>
+                          <th className="pb-3.5 px-3 text-right">Tổng thanh toán</th>
+                          <th className="pb-3.5 px-3 text-center">Thanh toán</th>
+                          <th className="pb-3.5 px-3 text-center">Trạng thái đơn</th>
                         </tr>
                       </thead>
-                      <tbody className="text-[13px] text-slate-800 font-semibold">
+                      <tbody className="text-[13.5px] text-[#1d1d1f] font-medium">
                         {customerDetail.orders.map((ord: any) => {
-                          const stBadge = orderStatusMapping[ord.status] || { label: ord.status, bg: "bg-slate-100 text-slate-700" };
+                          const stBadge = orderStatusMapping[ord.status] || { label: ord.status, color: "text-slate-500" };
                           return (
-                            <tr key={ord.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
-                              <td className="py-3 px-4 pl-0 align-middle font-bold text-slate-900">{ord.orderNumber}</td>
-                              <td className="py-3 px-3 align-middle text-[12px]">{formatToDDMMYYYY(ord.createdAt)}</td>
-                              <td className="py-3 px-3 align-middle text-[12px] text-slate-600 capitalize">{ord.saleChannel}</td>
-                              <td className="py-3 px-3 align-middle text-right font-bold text-slate-900">{formatPrice(ord.totalAmount)}</td>
-                              <td className="py-3 px-3 align-middle text-center">
+                            <tr key={ord.id} className="border-b border-slate-100 last:border-0 hover:bg-[#f5f5f7]/30 transition-colors">
+                              <td className="py-3.5 pr-4 align-middle font-bold text-[#1d1d1f]">{ord.orderNumber}</td>
+                              <td className="py-3.5 px-3 align-middle text-[#86868b]">{formatToDDMMYYYY(ord.createdAt)}</td>
+                              <td className="py-3.5 px-3 align-middle text-slate-600 capitalize">{ord.saleChannel}</td>
+                              <td className="py-3.5 px-3 align-middle text-right font-bold text-[#1d1d1f]">{formatPrice(ord.totalAmount)}</td>
+                              <td className="py-3.5 px-3 align-middle text-center">
                                 {ord.paymentStatus === 'paid' ? (
-                                  <span className="bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border border-emerald-200/60 leading-none inline-block">Đã trả đủ</span>
+                                  <span className="text-emerald-600 text-[13px] font-semibold">Đã trả đủ</span>
                                 ) : ord.paymentStatus === 'partial' ? (
-                                  <span className="bg-amber-50 text-amber-700 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border border-amber-200/60 leading-none inline-block">Trả 1 phần</span>
+                                  <span className="text-amber-600 text-[13px] font-semibold">Trả 1 phần</span>
                                 ) : (
-                                  <span className="bg-rose-50 text-rose-700 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border border-rose-200/60 leading-none inline-block">Chưa trả</span>
+                                  <span className="text-red-600 text-[13px] font-semibold">Chưa trả</span>
                                 )}
                               </td>
-                              <td className="py-3 px-3 align-middle text-center">
-                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider leading-none inline-block ${stBadge.bg}`}>
+                              <td className="py-3.5 px-3 align-middle text-center">
+                                <span className={`text-[13px] font-semibold ${stBadge.color}`}>
                                   {stBadge.label}
                                 </span>
                               </td>
@@ -571,52 +568,52 @@ export default function LookupPage() {
 
               {/* Return History */}
               {customerDetail.returns && customerDetail.returns.length > 0 && (
-                <GlassCard className="p-5 space-y-4">
-                  <h4 className="text-[13px] font-bold text-[#1d1d1f] uppercase tracking-wider pb-2 border-b border-slate-100 flex items-center gap-2">
-                    <RefreshCw size={14} className="text-rose-600" />
+                <GlassCard className="p-6 space-y-4 bg-white border border-[#e5e5e7] rounded-2xl">
+                  <h4 className="text-[14px] font-bold text-[#1d1d1f] uppercase tracking-wider pb-2.5 border-b border-slate-100 flex items-center gap-2">
+                    <RefreshCw size={15} className="text-red-600" />
                     Lịch sử yêu cầu Đổi / Trả hàng ({customerDetail.returns.length})
                   </h4>
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
+                    <table className="w-full text-left border-collapse min-w-[550px]">
                       <thead>
-                        <tr className="border-b border-[#e0e0e0] text-[11px] font-bold text-[#7a7a7a] uppercase tracking-wider">
-                          <th className="pb-3 pr-4">Mã Phiếu đổi trả</th>
-                          <th className="pb-3 px-3">Loại</th>
-                          <th className="pb-3 px-3">Sản phẩm đổi/trả</th>
-                          <th className="pb-3 px-3">Serial cũ ➔ mới</th>
-                          <th className="pb-3 px-3 text-right">Giá hoàn trả</th>
+                        <tr className="border-b border-[#e5e5e7] text-[12px] font-bold text-[#86868b] uppercase tracking-wider">
+                          <th className="pb-3.5 pr-4">Mã Phiếu đổi trả</th>
+                          <th className="pb-3.5 px-3">Loại</th>
+                          <th className="pb-3.5 px-3">Sản phẩm đổi/trả</th>
+                          <th className="pb-3.5 px-3">Serial cũ ➔ mới</th>
+                          <th className="pb-3.5 px-3 text-right">Giá hoàn trả</th>
                         </tr>
                       </thead>
-                      <tbody className="text-[13px] text-slate-800 font-semibold">
+                      <tbody className="text-[13.5px] text-[#1d1d1f] font-medium">
                         {customerDetail.returns.map((ret: any) => (
-                          <tr key={ret.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
-                            <td className="py-3 px-4 pl-0 align-middle">
-                              <p className="font-bold text-slate-900">{ret.returnNumber}</p>
-                              <span className="text-[11px] text-[#7a7a7a] block mt-0.5 font-medium">{formatToDDMMYYYY(ret.createdAt)}</span>
+                          <tr key={ret.id} className="border-b border-slate-100 last:border-0 hover:bg-[#f5f5f7]/30 transition-colors">
+                            <td className="py-3.5 pr-4 align-middle">
+                              <p className="font-bold text-[#1d1d1f]">{ret.returnNumber}</p>
+                              <span className="text-[11.5px] text-[#86868b] block mt-0.5 font-medium">{formatToDDMMYYYY(ret.createdAt)}</span>
                             </td>
-                            <td className="py-3 px-3 align-middle">
-                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                                ret.type === "return" ? "bg-rose-50 text-rose-700 border border-rose-200" : "bg-teal-50 text-teal-700 border border-teal-200"
+                            <td className="py-3.5 px-3 align-middle">
+                              <span className={`text-[13px] font-semibold ${
+                                ret.type === "return" ? "text-red-600" : "text-teal-600"
                               }`}>
                                 {ret.type === "return" ? "Trả hàng" : "Đổi hàng"}
                               </span>
                             </td>
-                            <td className="py-3 px-3 align-middle max-w-[200px] truncate">{ret.productName}</td>
-                            <td className="py-3 px-3 align-middle text-[12px] whitespace-nowrap">
-                              <span className="text-rose-600 line-through bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full uppercase text-[11px] font-semibold">{ret.oldSerialNumber}</span>
+                            <td className="py-3.5 px-3 align-middle max-w-[200px] truncate">{ret.productName}</td>
+                            <td className="py-3.5 px-3 align-middle text-[13px] whitespace-nowrap">
+                              <span className="text-[13px] font-semibold text-red-500 line-through">{ret.oldSerialNumber}</span>
                               {ret.newSerialNumber && (
                                 <>
-                                  <span className="mx-1 text-[#7a7a7a]">➔</span>
+                                  <span className="mx-1.5 text-[#86868b]">➔</span>
                                   <button 
                                     onClick={() => triggerSerialLookup(ret.newSerialNumber)}
-                                    className="text-emerald-700 font-bold hover:scale-105 active:scale-95 duration-200 transition-all bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full cursor-pointer uppercase text-[11px]"
+                                    className="text-[13px] font-semibold text-emerald-600 hover:underline cursor-pointer"
                                   >
                                     {ret.newSerialNumber}
                                   </button>
                                 </>
                               )}
                             </td>
-                            <td className="py-3 px-3 align-middle text-right text-rose-600 font-bold">
+                            <td className="py-3.5 px-3 align-middle text-right text-red-600 font-bold">
                               {formatPrice(ret.refundAmount)}
                             </td>
                           </tr>
@@ -633,7 +630,7 @@ export default function LookupPage() {
       }
 
       return (
-        <GlassCard className="py-20 text-center text-slate-400 text-[14px]">
+        <GlassCard className="py-20 text-center text-[#86868b] text-[14px] border border-[#e5e5e7]">
           Không có dữ liệu chi tiết khách hàng để hiển thị.
         </GlassCard>
       );
@@ -641,12 +638,12 @@ export default function LookupPage() {
 
     // No results Empty State
     return (
-      <GlassCard className="py-28 text-center flex flex-col items-center justify-center">
-        <div className="w-14 h-14 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 mb-4">
+      <GlassCard className="py-28 text-center flex flex-col items-center justify-center bg-white border border-[#e5e5e7] rounded-2xl shadow-sm">
+        <div className="w-14 h-14 rounded-full bg-red-50 border border-red-100 flex items-center justify-center text-red-500 mb-4">
           <Phone size={24} />
         </div>
-        <h4 className="text-[14px] font-bold text-[#1d1d1f]">Không tìm thấy Khách hàng</h4>
-        <p className="text-[12px] text-[#7a7a7a] mt-2 max-w-sm mx-auto leading-relaxed">
+        <h4 className="text-[15px] font-bold text-[#1d1d1f]">Không tìm thấy Khách hàng</h4>
+        <p className="text-[13px] text-[#86868b] mt-2 max-w-sm mx-auto leading-relaxed font-medium">
           Không tìm thấy khách hàng nào khớp với số điện thoại này trong cơ sở dữ liệu.
         </p>
       </GlassCard>
@@ -656,27 +653,27 @@ export default function LookupPage() {
   const renderSerialTab = () => {
     if (serialLoading) {
       return (
-        <GlassCard className="flex flex-col items-center justify-center py-32 text-[#7a7a7a]">
-          <Loader2 className="animate-spin mb-3 text-[#0066cc]" size={26} />
-          <p className="text-[14px] font-bold text-[#1d1d1f]">Đang kết nối liên phân hệ...</p>
-          <p className="text-[12px] text-[#7a7a7a] mt-0.5">Truy quét lịch sử chứng từ PO, bán hàng, sửa chữa và đổi trả</p>
+        <GlassCard className="flex flex-col items-center justify-center py-28 text-[#86868b] border border-[#e5e5e7]">
+          <Loader2 className="animate-spin mb-3.5 text-[#0066cc]" size={26} />
+          <p className="text-[15px] font-semibold text-[#1d1d1f]">Đang kết nối liên phân hệ...</p>
+          <p className="text-[13px] text-[#86868b] mt-1 font-medium">Truy quét lịch sử chứng từ PO, bán hàng, sửa chữa và đổi trả</p>
         </GlassCard>
       );
     }
 
     if (lifecycleData) {
       return (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start animate-scale-up">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           
           {/* Left Panel: Hardware configuration overview & stats */}
           <div className="lg:col-span-4 space-y-5">
             
             {/* Configuration Card */}
-            <GlassCard className="p-5 space-y-4 relative overflow-hidden">
+            <GlassCard className="p-6 space-y-5 relative overflow-hidden bg-white border border-[#e5e5e7] rounded-2xl shadow-sm">
               <div className="absolute right-0 top-0 w-24 h-24 bg-[#0066cc]/5 blur-3xl rounded-full" />
               
-              <div className="flex justify-between items-start z-10 relative">
-                <span className="text-[10px] font-extrabold text-[#7a7a7a] uppercase tracking-widest bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200">
+              <div className="flex justify-between items-center relative z-10">
+                <span className="text-[13px] font-semibold text-[#515154]">
                   {lifecycleData.item.condition === 'new' ? "Mới 100%" : "Đã qua sử dụng"}
                 </span>
                 
@@ -684,47 +681,44 @@ export default function LookupPage() {
                 {(() => {
                   const badge = statusMapping[lifecycleData.item.status] || {
                     label: lifecycleData.item.status,
-                    bg: "bg-slate-50",
-                    text: "text-slate-700",
-                    border: "border-slate-200",
+                    color: "text-slate-700",
                   };
                   return (
-                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border uppercase tracking-wide leading-none ${badge.bg} ${badge.text} ${badge.border}`}>
+                    <span className={`text-[13px] font-semibold ${badge.color}`}>
                       {badge.label}
                     </span>
                   );
                 })()}
               </div>
 
-              <div className="space-y-1.5 z-10 relative">
-                <h3 className="text-[16px] font-extrabold text-[#1d1d1f] tracking-tight leading-tight">
+              <div className="space-y-1.5 relative z-10">
+                <h3 className="text-[18px] font-bold text-[#1d1d1f] tracking-tight leading-tight">
                   {lifecycleData.item.productName}
                 </h3>
-                <p className="text-[11px] font-bold text-slate-400">SKU: {lifecycleData.item.productSku}</p>
-                <p className="text-[12px] text-[#7a7a7a] font-semibold font-sans">Thương hiệu: {lifecycleData.item.brandName} - {lifecycleData.item.categoryName}</p>
+                <p className="text-[12px] font-bold text-[#86868b]">SKU: {lifecycleData.item.productSku}</p>
+                <p className="text-[13px] text-[#515154] font-semibold">Thương hiệu: {lifecycleData.item.brandName} - {lifecycleData.item.categoryName}</p>
               </div>
 
               {/* Hardware specifications list */}
-              <div className="pt-3 border-t border-slate-100 space-y-2 text-[12px]">
-                <div className="flex justify-between">
-                  <span className="font-bold text-[#7a7a7a]">Serial thiết bị:</span>
-                  <span className="font-extrabold text-[#1d1d1f] tracking-wider uppercase bg-[#f5f5f7] px-2.5 py-0.5 rounded-full border border-slate-200/50">
+              <div className="pt-4 border-t border-slate-100 space-y-3.5 text-[13.5px]">
+                <div className="flex justify-between items-center">
+                  <span className="font-semibold text-[#86868b]">Serial thiết bị:</span>
+                  <span className="text-[13.5px] font-semibold text-[#1d1d1f]">
                     {lifecycleData.item.serialNumber}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="font-bold text-[#7a7a7a]">Thời hạn bảo hành:</span>
-                  <span className="font-bold text-[#1d1d1f] flex items-center gap-1">
-                    <SFSymbolCalendar size={11} className="text-emerald-600" />
+                <div className="flex justify-between items-center">
+                  <span className="font-semibold text-[#86868b]">Thời hạn bảo hành:</span>
+                  <span className="font-bold text-[#1d1d1f] text-[13px]">
                     {lifecycleData.item.warrantyStart 
                       ? `${formatToDDMMYYYY(lifecycleData.item.warrantyStart)} - ${formatToDDMMYYYY(lifecycleData.item.warrantyEnd)}`
                       : "Chưa kích hoạt bán hàng"
                     }
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="font-bold text-[#7a7a7a]">Nguyên giá bán lẻ:</span>
-                  <span className="font-extrabold text-[#0066cc]">
+                <div className="flex justify-between items-center">
+                  <span className="font-semibold text-[#86868b]">Nguyên giá bán lẻ:</span>
+                  <span className="font-bold text-[#0066cc]">
                     {formatPrice(lifecycleData.item.sellingPrice || 0)}
                   </span>
                 </div>
@@ -734,11 +728,11 @@ export default function LookupPage() {
                   const saleMilestone = lifecycleData.milestones.find((m: any) => m.type === "sale");
                   if (saleMilestone && saleMilestone.meta) {
                     return (
-                      <div className="flex justify-between items-center pt-1">
-                        <span className="font-bold text-[#7a7a7a]">Khách hàng sở hữu:</span>
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold text-[#86868b]">Khách hàng sở hữu:</span>
                         <button
                           onClick={() => triggerPhoneLookup(saleMilestone.meta.customerPhone || saleMilestone.meta.customerName)}
-                          className="font-bold text-[#0066cc] bg-[#0066cc]/5 border border-[#0066cc]/10 px-2.5 py-0.5 rounded-full flex items-center gap-1 text-[11px] cursor-pointer hover:scale-105 active:scale-95 duration-200 transition-all"
+                          className="font-semibold text-[#0066cc] hover:underline flex items-center gap-1 text-[13px] cursor-pointer transition-all"
                           title="Bấm để tra cứu thông tin khách hàng này"
                         >
                           👤 {saleMilestone.meta.customerName}
@@ -750,37 +744,37 @@ export default function LookupPage() {
                 })()}
 
                 {lifecycleData.item.supplierName && (
-                  <div className="flex justify-between">
-                    <span className="font-bold text-[#7a7a7a]">Nhà cung cấp:</span>
+                  <div className="flex justify-between items-center">
+                    <span className="font-semibold text-[#86868b]">Nhà cung cấp:</span>
                     <span className="font-bold text-[#1d1d1f]">
                       {lifecycleData.item.supplierName}
                     </span>
                   </div>
                 )}
                 {(lifecycleData.item.trackingNumber || lifecycleData.item.shippingMethod) && (
-                  <div className="space-y-1.5 pt-1">
+                  <div className="space-y-2 pt-1 border-t border-slate-50 mt-1">
                     {lifecycleData.item.shippingMethod && (
                       <div className="flex justify-between items-center">
-                        <span className="font-bold text-[#7a7a7a]">Đơn vị vận chuyển:</span>
-                        <span className="font-bold text-[#0066cc] bg-[#0066cc]/5 border border-[#0066cc]/10 px-2.5 py-0.5 rounded-full text-[11px]">
+                        <span className="font-semibold text-[#86868b]">Đơn vị vận chuyển:</span>
+                        <span className="font-semibold text-[#1d1d1f]">
                           🚚 {lifecycleData.item.shippingMethod}
                         </span>
                       </div>
                     )}
                     {lifecycleData.item.trackingNumber && (
                       <div className="flex justify-between items-center">
-                        <span className="font-bold text-[#7a7a7a]">Mã vận đơn:</span>
+                        <span className="font-semibold text-[#86868b]">Mã vận đơn:</span>
                         {lifecycleData.item.trackingUrl ? (
                           <a 
                             href={lifecycleData.item.trackingUrl} 
                             target="_blank" 
                             rel="noopener noreferrer" 
-                            className="font-bold text-[#0066cc] bg-[#0066cc]/5 border border-[#0066cc]/10 px-2.5 py-0.5 rounded-full flex items-center gap-1 text-[11px] hover:scale-105 active:scale-95 duration-200 transition-all"
+                            className="font-semibold text-[#0066cc] hover:underline flex items-center gap-1"
                           >
                             📦 {lifecycleData.item.trackingNumber} ↗
                           </a>
                         ) : (
-                          <span className="font-bold text-[#1d1d1f] bg-slate-100 border border-slate-200 px-2.5 py-0.5 rounded-full text-[11px]">
+                          <span className="font-semibold text-[#1d1d1f]">
                             📦 {lifecycleData.item.trackingNumber}
                           </span>
                         )}
@@ -792,9 +786,9 @@ export default function LookupPage() {
 
               {/* Specs overrides detailed notes */}
               {lifecycleData.item.productSpecs && (
-                <div className="pt-3 border-t border-slate-100 space-y-1">
-                  <span className="text-[10px] font-bold text-[#7a7a7a] uppercase tracking-wider block font-sans">Cấu hình chi tiết</span>
-                  <p className="text-[12px] text-[#515154] leading-relaxed bg-[#f5f5f7] p-2.5 rounded-xl border border-slate-200/60 font-semibold select-all font-sans">
+                <div className="pt-4 border-t border-slate-100 space-y-1">
+                  <span className="text-[11px] font-bold text-[#86868b] uppercase tracking-wider block">Cấu hình chi tiết</span>
+                  <p className="text-[13px] text-[#515154] leading-relaxed font-medium select-all">
                     {formatSpecs(lifecycleData.item.productSpecs)}
                   </p>
                 </div>
@@ -802,20 +796,20 @@ export default function LookupPage() {
             </GlassCard>
 
             {/* Quick summary metrics */}
-            <GlassCard className="p-5 space-y-3">
-              <h4 className="text-[12px] font-bold text-[#1d1d1f] uppercase tracking-wider flex items-center gap-1.5 font-sans">
-                <SFSymbolActivity size={13} className="text-[#0066cc]" /> Tóm tắt giao dịch
+            <GlassCard className="p-6 space-y-4 bg-white border border-[#e5e5e7] rounded-2xl shadow-sm">
+              <h4 className="text-[13px] font-bold text-[#1d1d1f] uppercase tracking-wider flex items-center gap-1.5">
+                <SFSymbolActivity size={14} className="text-[#0066cc]" /> Tóm tắt giao dịch
               </h4>
-              <div className="grid grid-cols-2 gap-2 text-center text-[12px] font-sans">
-                <div className="p-3 bg-slate-50 border border-slate-200/50 rounded-xl space-y-1">
-                  <span className="text-[#7a7a7a] font-semibold text-[10px] uppercase">Thẻ kho phát sinh</span>
-                  <p className="text-[18px] font-extrabold text-slate-800 leading-none">
+              <div className="grid grid-cols-2 gap-3 text-center text-[13px]">
+                <div className="p-3 bg-[#f5f5f7] border border-slate-200/30 rounded-xl space-y-1">
+                  <span className="text-[#86868b] font-bold text-[10px] uppercase block">Thẻ kho phát sinh</span>
+                  <p className="text-[18px] font-bold text-slate-800 leading-none">
                     {lifecycleData.milestones.length}
                   </p>
                 </div>
-                <div className="p-3 bg-slate-50 border border-slate-200/50 rounded-xl space-y-1">
-                  <span className="text-[#7a7a7a] font-semibold text-[10px] uppercase">Lần bảo hành</span>
-                  <p className="text-[18px] font-extrabold text-teal-600 leading-none">
+                <div className="p-3 bg-[#f5f5f7] border border-slate-200/30 rounded-xl space-y-1">
+                  <span className="text-[#86868b] font-bold text-[10px] uppercase block">Lần bảo hành</span>
+                  <p className="text-[18px] font-bold text-teal-600 leading-none">
                     {lifecycleData.milestones.filter((m: any) => m.type === "warranty").length}
                   </p>
                 </div>
@@ -825,124 +819,124 @@ export default function LookupPage() {
           </div>
 
           {/* Right Panel: Chronological Timeline Milestones */}
-          <GlassCard className="lg:col-span-8 p-6 space-y-6">
-            <h4 className="text-[13px] font-bold text-[#1d1d1f] uppercase tracking-wider pb-2 border-b border-slate-100 flex items-center gap-1.5 font-sans">
-              <SFSymbolFileSpreadsheet size={14} className="text-[#0066cc]" />
+          <GlassCard className="lg:col-span-8 p-6 space-y-6 bg-white border border-[#e5e5e7] rounded-2xl shadow-sm">
+            <h4 className="text-[14px] font-bold text-[#1d1d1f] uppercase tracking-wider pb-2.5 border-b border-slate-100 flex items-center gap-1.5">
+              <SFSymbolFileSpreadsheet size={15} className="text-[#0066cc]" />
               Dòng thời gian Vòng đời Thiết bị (Milestones)
             </h4>
 
             {/* Chronological Vertical Timeline path */}
-            <div className="relative border-l border-slate-200 ml-4.5 md:ml-6 pl-6 space-y-8 py-2">
+            <div className="relative border-l border-[#e5e5e7] ml-4.5 md:ml-6 pl-6 space-y-8 py-2">
               
               {lifecycleData.milestones.map((m: any, idx: number) => {
                 const colors = milestoneColors[m.type] || milestoneColors.movement;
 
                 return (
-                  <div key={idx} className="relative group animate-fade-in font-sans">
+                  <div key={idx} className="relative group">
                     
                     {/* Absolute timeline circular node indicator with matching color icons */}
-                    <div className={`absolute -left-[37.5px] top-0 w-8.5 h-8.5 rounded-full flex items-center justify-center shrink-0 border shadow-sm transition-all duration-300 origin-center bg-white group-hover:scale-110 z-10 ${colors.border}`}>
+                    <div className="absolute -left-[38px] top-0.5 w-8 h-8 rounded-full flex items-center justify-center shrink-0 border border-[#e5e5e7] bg-[#f5f5f7] shadow-sm transition-all duration-300 origin-center bg-white group-hover:scale-110 z-10">
                       {colors.icon}
                     </div>
 
-                    {/* Milestone body card */}
-                    <div className="bg-slate-50 hover:bg-slate-100/55 border border-slate-200/70 rounded-2xl p-4 transition-all duration-200 space-y-2 relative shadow-inner">
+                    {/* Milestone body - Apple text-only style */}
+                    <div className="transition-all duration-200 space-y-1.5 relative pl-1">
                       
                       {/* Ribbon Header with exact event date */}
-                      <div className="flex items-center justify-between pb-1.5 border-b border-slate-200/50">
-                        <h5 className="text-[13px] font-extrabold text-[#1d1d1f] leading-none">
+                      <div className="flex items-center justify-between">
+                        <h5 className="text-[15px] font-bold text-[#1d1d1f] leading-none">
                           {m.title}
                         </h5>
-                        <div className="flex items-center gap-1 text-[#7a7a7a]">
-                          <SFSymbolCalendar size={11} className="text-slate-400" />
-                          <span className="text-[11px] font-bold tracking-tight">
+                        <div className="flex items-center gap-1 text-[#86868b]">
+                          <SFSymbolCalendar size={12} className="text-slate-400" />
+                          <span className="text-[12px] font-semibold tracking-tight">
                             {formatToDDMMYYYY(m.date)}
                           </span>
                         </div>
                       </div>
 
                       {/* Event description details text */}
-                      <p className="text-[12.5px] text-[#515154] leading-relaxed font-semibold">
+                      <p className="text-[13.5px] text-[#515154] leading-relaxed font-medium">
                         {m.description}
                       </p>
 
                       {/* Dynamic metadata badges tailored per event type */}
                       {m.meta && (
-                        <div className="pt-2 flex flex-wrap gap-2 text-[11px] font-bold">
+                        <div className="pt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px] font-medium text-[#86868b]">
                           {m.type === "purchase" && (
                             <>
-                              <span className="bg-amber-100/50 text-amber-800 border border-amber-200 px-2.5 py-0.5 rounded-full">
-                                Giá gốc nhập: {formatPrice(m.meta.costPrice)}
-                              </span>
-                              <span className="bg-slate-100 text-slate-700 border border-slate-200 px-2.5 py-0.5 rounded-full">
-                                Vị trí lưu: {m.meta.location}
+                              <span className="font-semibold text-slate-700">
+                                Giá nhập: {formatPrice(m.meta.costPrice)}
                               </span>
                               {m.meta.shippingMethod && (
-                                <span className="bg-indigo-100/50 text-indigo-800 border border-indigo-200 px-2.5 py-0.5 rounded-full flex items-center gap-1 font-sans">
-                                  🚚 Đơn vị VC: {m.meta.shippingMethod}
-                                </span>
+                                <>
+                                  <span>•</span>
+                                  <span>🚚 VC: {m.meta.shippingMethod}</span>
+                                </>
                               )}
                               {m.meta.trackingNumber && (
-                                <span className="bg-blue-100/50 text-blue-800 border border-blue-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                                <>
+                                  <span>•</span>
                                   {m.meta.trackingUrl ? (
-                                    <a href={m.meta.trackingUrl} target="_blank" rel="noopener noreferrer" className="hover:underline flex items-center gap-1">
+                                    <a href={m.meta.trackingUrl} target="_blank" rel="noopener noreferrer" className="text-[#0066cc] hover:underline font-semibold">
                                       📦 Vận đơn: {m.meta.trackingNumber} ↗
                                     </a>
                                   ) : (
-                                    <span>📦 Vận đơn: {m.meta.trackingNumber}</span>
+                                    <span className="font-semibold text-slate-700">📦 Vận đơn: {m.meta.trackingNumber}</span>
                                   )}
-                                </span>
+                                </>
                               )}
                             </>
                           )}
                           {m.type === "sale" && (
                             <>
-                              <span className="bg-emerald-100/50 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                              <span className="font-semibold text-slate-700">
                                 Doanh thu: {formatPrice(m.meta.sellingPrice)}
                               </span>
+                              <span>•</span>
                               <button
                                 onClick={() => triggerPhoneLookup(m.meta.customerPhone || m.meta.customerName)}
-                                className="bg-blue-100/50 text-blue-800 border border-blue-200 px-2.5 py-0.5 rounded-full hover:scale-105 active:scale-95 duration-200 transition-all cursor-pointer"
+                                className="text-[#0066cc] hover:underline cursor-pointer font-semibold"
                                 title="Nhấn để xem lịch sử mua hàng của khách này"
                               >
                                 👤 Khách: {m.meta.customerName}
                               </button>
-                              <span className="bg-slate-100 text-slate-600 border border-slate-200 px-2.5 py-0.5 rounded-full">
-                                Đơn: {m.meta.orderNumber}
-                              </span>
+                              <span>•</span>
+                              <span className="font-semibold text-slate-700">Đơn: {m.meta.orderNumber}</span>
                             </>
                           )}
                           {m.type === "return" && (
                             <>
-                              <span className="bg-rose-100/50 text-rose-800 border border-rose-200 px-2.5 py-0.5 rounded-full">
+                              <span className="font-semibold text-slate-700">
                                 Khấu trừ hoàn trả: {formatPrice(m.meta.refundPrice)}
                               </span>
                               {m.meta.isDefective && (
-                                <span className="bg-red-100/50 text-red-800 border border-red-200 px-2.5 py-0.5 rounded-full">
-                                  Xác nhận lỗi phần cứng
-                                </span>
+                                <>
+                                  <span>•</span>
+                                  <span className="font-semibold text-red-600">Lỗi phần cứng</span>
+                                </>
                               )}
                             </>
                           )}
                           {m.type === "warranty" && (
                             <>
-                              <span className="bg-teal-100/50 text-teal-800 border border-teal-200 px-2.5 py-0.5 rounded-full">
+                              <span className="font-semibold text-slate-700">
                                 Phí sửa bảo hành: {formatPrice(m.meta.repairCost)}
                               </span>
-                              <span className="bg-slate-100 text-slate-700 border border-slate-200 px-2.5 py-0.5 rounded-full">
-                                Phiếu bảo hành: {m.meta.claimNumber}
-                              </span>
+                              <span>•</span>
+                              <span className="font-semibold text-slate-700">Phiếu bảo hành: {m.meta.claimNumber}</span>
                               {m.meta.actualReturnDate && (
-                                <span className="bg-emerald-100/50 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-full">
-                                  Đã trả khách: {formatToDDMMYYYY(m.meta.actualReturnDate)}
-                                </span>
+                                <>
+                                  <span>•</span>
+                                  <span className="font-semibold text-slate-700">Đã trả khách: {formatToDDMMYYYY(m.meta.actualReturnDate)}</span>
+                                </>
                               )}
                             </>
                           )}
                           {m.type === "movement" && (
                             <>
-                              <span className="bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded-full font-mono text-[10px]">
-                                Trạng thái: {m.meta.fromStatus || "N/A"} ➔ {m.meta.toStatus}
+                              <span className="font-medium text-[12.5px]">
+                                Trạng thái: <span className="font-semibold text-slate-500">{m.meta.fromStatus || "N/A"}</span> ➔ <span className="font-semibold text-slate-800">{m.meta.toStatus}</span>
                               </span>
                             </>
                           )}
@@ -956,8 +950,8 @@ export default function LookupPage() {
 
               {/* Initializing activity start node */}
               <div className="relative">
-                <div className="absolute -left-[30px] top-1.5 w-5 h-5 rounded-full bg-slate-200 border-4 border-white shrink-0 z-10" />
-                <div className="pl-4.5 pt-1 text-[11px] font-extrabold text-[#7a7a7a] uppercase tracking-wider font-sans">
+                <div className="absolute -left-[30px] top-1.5 w-5 h-5 rounded-full bg-[#e5e5e7] border-4 border-white shrink-0 z-10" />
+                <div className="pl-4.5 pt-1.5 text-[11.5px] font-bold text-[#86868b] uppercase tracking-wider">
                   Bắt đầu hoạt động kinh doanh vòng đời máy
                 </div>
               </div>
@@ -971,12 +965,12 @@ export default function LookupPage() {
 
     // No results Empty State
     return (
-      <GlassCard className="py-28 text-center flex flex-col items-center justify-center font-sans">
-        <div className="w-14 h-14 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 mb-4">
+      <GlassCard className="py-28 text-center flex flex-col items-center justify-center bg-white border border-[#e5e5e7] rounded-2xl shadow-sm">
+        <div className="w-14 h-14 rounded-full bg-red-50 border border-red-100 flex items-center justify-center text-red-500 mb-4">
           <SFSymbolQRCode size={26} />
         </div>
-        <h4 className="text-[14px] font-bold text-[#1d1d1f]">Không tìm thấy thiết bị</h4>
-        <p className="text-[12px] text-[#7a7a7a] mt-2 max-w-sm mx-auto leading-relaxed">
+        <h4 className="text-[15px] font-bold text-[#1d1d1f]">Không tìm thấy thiết bị</h4>
+        <p className="text-[13px] text-[#86868b] mt-2 max-w-sm mx-auto leading-relaxed font-medium">
           Không tìm thấy thiết bị nào khớp với số Serial này trong cơ sở dữ liệu.
         </p>
       </GlassCard>
@@ -985,13 +979,13 @@ export default function LookupPage() {
 
   const renderInitialState = () => {
     return (
-      <GlassCard className="py-28 text-center flex flex-col items-center justify-center font-sans">
+      <GlassCard className="py-28 text-center flex flex-col items-center justify-center bg-white border border-[#e5e5e7] rounded-2xl shadow-sm">
         <div className="w-14 h-14 rounded-full bg-[#0066cc]/5 border border-[#0066cc]/10 flex items-center justify-center text-[#0066cc] mb-4">
           <SFSymbolMagnifyingGlass size={26} />
         </div>
-        <h4 className="text-[14px] font-bold text-[#1d1d1f]">Sẵn sàng Tra cứu thông tin</h4>
-        <p className="text-[12px] text-[#7a7a7a] mt-2 max-w-sm mx-auto leading-relaxed">
-          Nhập **số điện thoại khách hàng** hoặc **mã Serial sản phẩm** để truy xuất hồ sơ mua bán hoặc sơ đồ vòng đời thiết bị.
+        <h4 className="text-[15px] font-bold text-[#1d1d1f]">Sẵn sàng Tra cứu thông tin</h4>
+        <p className="text-[13px] text-[#86868b] mt-2 max-w-sm mx-auto leading-relaxed font-medium">
+          Nhập số điện thoại khách hàng hoặc mã Serial sản phẩm để truy xuất hồ sơ mua bán hoặc sơ đồ vòng đời thiết bị.
         </p>
       </GlassCard>
     );
@@ -1001,37 +995,37 @@ export default function LookupPage() {
     <div className="space-y-8 pb-10">
       
       {/* 1. Header with inline Search Console */}
-      <div className="pb-6 border-b border-[#e0e0e0] flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <div className="pb-6 border-b border-[#e5e5e7] flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="text-[40px] font-semibold tracking-tight leading-[1.10] bg-clip-text text-transparent select-none animate-fade-in" style={{ backgroundImage: "linear-gradient(90deg, #2997ff, #a855f7, #ec4899)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+          <h1 className="text-[40px] font-semibold tracking-tight leading-[1.10] bg-clip-text text-transparent select-none" style={{ backgroundImage: "linear-gradient(90deg, #2997ff, #a855f7, #ec4899)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
             Tra cứu thông tin
           </h1>
-        
+          <p className="text-[14px] text-[#86868b] font-medium">Tìm kiếm dữ liệu khách hàng hoặc thiết bị trong hệ thống</p>
         </div>
 
         {/* Search Console */}
-        <form onSubmit={(e) => { e.preventDefault(); handleSearch(searchQuery); }} className="w-full md:max-w-md font-sans">
+        <form onSubmit={(e) => { e.preventDefault(); handleSearch(searchQuery); }} className="w-full md:max-w-md">
           <div className="flex gap-2">
             <div className="relative flex-1">
-              <SFSymbolMagnifyingGlass className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+              <SFSymbolMagnifyingGlass className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#86868b]" size={15} />
               <input
                 ref={searchInputRef}
                 type="text"
                 placeholder="Nhập số điện thoại hoặc mã serial..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 h-[40px] rounded-full bg-[#f5f5f7] border border-slate-200 text-[13px] font-medium text-[#1d1d1f] focus:outline-none focus:border-[#0066cc] focus:bg-white focus:ring-2 focus:ring-[#0066cc]/10 transition-all font-sans"
+                className="w-full pl-10 pr-4 h-[42px] rounded-full bg-[#f5f5f7] border border-[#e5e5e7] text-[13.5px] font-medium text-[#1d1d1f] focus:outline-none focus:border-[#0066cc] focus:bg-white focus:ring-4 focus:ring-[#0066cc]/10 transition-all"
               />
             </div>
             <button
               type="submit"
               disabled={phoneLoading || serialLoading}
-              className="h-[40px] px-6 bg-[#0066cc] hover:bg-[#0071e3] text-white rounded-full text-[13px] font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-1.5 shrink-0 cursor-pointer shadow-sm active:scale-95 duration-200"
+              className="h-[42px] px-6 bg-[#0066cc] hover:bg-[#0071e3] text-white rounded-full text-[13.5px] font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-1.5 shrink-0 cursor-pointer shadow-sm active:scale-95 duration-200"
             >
               {phoneLoading || serialLoading ? (
                 <Loader2 className="animate-spin" size={14} />
               ) : (
-                <SFSymbolMagnifyingGlass size={14} />
+                <SFSymbolMagnifyingGlass size={14.5} />
               )}
               <span>Tìm kiếm</span>
             </button>

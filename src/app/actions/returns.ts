@@ -13,7 +13,7 @@ import {
   cashBookEntries,
   orderItems
 } from "@/lib/db/schema";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc, and, sql, inArray } from "drizzle-orm";
 
 export async function getReturnsList() {
   try {
@@ -502,43 +502,52 @@ export async function deleteReturnAction(id: string) {
       }
 
       // 2. Revert inventory item statuses back to 'sold' (as they were before the return)
-      for (const item of items) {
-        // Hoàn tác máy cũ: chuyển về sold
+      const oldItemIds = items.map(item => item.inventoryItemId);
+      if (oldItemIds.length > 0) {
         await tx
           .update(inventoryItems)
           .set({
             status: "sold",
             updatedAt: new Date(),
           })
-          .where(eq(inventoryItems.id, item.inventoryItemId));
+          .where(inArray(inventoryItems.id, oldItemIds));
+      }
 
-        // Hoàn tác máy mới (nếu có): chuyển lại về in_stock, xóa ngày bán và bảo hành
+      const newItemIds = items.map(item => item.newInventoryItemId).filter(Boolean) as string[];
+      if (newItemIds.length > 0) {
+        await tx
+          .update(inventoryItems)
+          .set({
+            status: "in_stock",
+            soldDate: null,
+            warrantyStart: null,
+            warrantyEnd: null,
+            updatedAt: new Date(),
+          })
+          .where(inArray(inventoryItems.id, newItemIds));
+      }
+
+      const orderItemRevertPromises = [];
+      for (const item of items) {
         if (item.newInventoryItemId) {
-          await tx
-            .update(inventoryItems)
-            .set({
-              status: "in_stock",
-              soldDate: null,
-              warrantyStart: null,
-              warrantyEnd: null,
-              updatedAt: new Date(),
-            })
-            .where(eq(inventoryItems.id, item.newInventoryItemId));
-
-          // Hoàn tác chi tiết đơn hàng cũ: gán lại máy cũ và giá bán, giá vốn cũ
-          await tx
-            .update(orderItems)
-            .set({
-              inventoryItemId: item.inventoryItemId,
-              sellingPrice: item.originalPrice,
-              costPrice: sql<string>`(SELECT cost_price FROM inventory_items WHERE id = ${item.inventoryItemId})`,
-              profit: sql<string>`(${item.originalPrice} - (SELECT cost_price FROM inventory_items WHERE id = ${item.inventoryItemId}) - discount)`,
-            })
-            .where(and(
-              eq(orderItems.orderId, returnRow[0].orderId),
-              eq(orderItems.inventoryItemId, item.newInventoryItemId)
-            ));
+          orderItemRevertPromises.push(
+            tx
+              .update(orderItems)
+              .set({
+                inventoryItemId: item.inventoryItemId,
+                sellingPrice: item.originalPrice,
+                costPrice: sql<string>`(SELECT cost_price FROM inventory_items WHERE id = ${item.inventoryItemId})`,
+                profit: sql<string>`(${item.originalPrice} - (SELECT cost_price FROM inventory_items WHERE id = ${item.inventoryItemId}) - discount)`,
+              })
+              .where(and(
+                eq(orderItems.orderId, returnRow[0].orderId),
+                eq(orderItems.inventoryItemId, item.newInventoryItemId)
+              ))
+          );
         }
+      }
+      if (orderItemRevertPromises.length > 0) {
+        await Promise.all(orderItemRevertPromises);
       }
 
       // 4. Delete inventoryMovements linked to this return

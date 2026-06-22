@@ -390,14 +390,17 @@ export async function createOrderAction(data: {
         })
         .returning();
 
-      // 6. Thêm các item của đơn hàng và cập nhật kho
-      for (const item of itemsToInsert) {
-        await tx.insert(orderItems).values({
-          orderId: newOrder.id,
-          ...item,
-        });
+      // 6. Thêm các item của đơn hàng và cập nhật kho hàng loạt
+      const orderItemsToInsert = itemsToInsert.map(item => ({
+        orderId: newOrder.id,
+        ...item,
+      }));
+      await tx.insert(orderItems).values(orderItemsToInsert);
 
-        // Đổi trạng thái máy sang 'sold', điền ngày bán và kích hoạt thời hạn bảo hành bán lẻ
+      const movementsToInsert = [];
+      const updatePromises = [];
+
+      for (const item of itemsToInsert) {
         const startDate = new Date();
         const endDate = new Date();
         endDate.setMonth(startDate.getMonth() + (item.warrantyMonths || 0));
@@ -405,30 +408,34 @@ export async function createOrderAction(data: {
         const warrantyStartStr = startDate.toISOString().split("T")[0];
         const warrantyEndStr = endDate.toISOString().split("T")[0];
 
-        await tx
-          .update(inventoryItems)
-          .set({
-            status: "sold",
-            soldDate: startDate.toISOString().split("T")[0],
-            warrantyStart: warrantyStartStr,
-            warrantyEnd: warrantyEndStr,
-            updatedAt: new Date(),
-          })
-          .where(eq(inventoryItems.id, item.inventoryItemId));
+        updatePromises.push(
+          tx
+            .update(inventoryItems)
+            .set({
+              status: "sold",
+              soldDate: startDate.toISOString().split("T")[0],
+              warrantyStart: warrantyStartStr,
+              warrantyEnd: warrantyEndStr,
+              updatedAt: new Date(),
+            })
+            .where(eq(inventoryItems.id, item.inventoryItemId))
+        );
 
-        // Thêm bản ghi Thẻ kho (Stock Movement)
-        await tx.insert(inventoryMovements).values({
+        movementsToInsert.push({
           inventoryItemId: item.inventoryItemId,
-          movementType: "sold",
+          movementType: "sold" as const,
           fromStatus: "in_stock",
           toStatus: "sold",
-          referenceType: "order",
+          referenceType: "order" as const,
           referenceId: newOrder.id,
           quantityChange: -1,
           notes: `Bán sản phẩm theo Đơn hàng ${orderNumber}`,
           performedBy: soldById,
         });
       }
+
+      await Promise.all(updatePromises);
+      await tx.insert(inventoryMovements).values(movementsToInsert);
 
       // 7. Cập nhật thống kê chi tiêu của Khách hàng
       const customer = await tx
@@ -579,8 +586,9 @@ export async function cancelOrderAction(orderId: string) {
       // 2. Lấy danh sách item của đơn hàng
       const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, orderId));
 
-      // 3. Khôi phục trạng thái máy về sẵn kho
-      for (const item of items) {
+      // 3. Khôi phục trạng thái máy về sẵn kho hàng loạt
+      const inventoryItemIds = items.map((i) => i.inventoryItemId);
+      if (inventoryItemIds.length > 0) {
         await tx
           .update(inventoryItems)
           .set({
@@ -590,20 +598,21 @@ export async function cancelOrderAction(orderId: string) {
             warrantyEnd: null,
             updatedAt: new Date(),
           })
-          .where(eq(inventoryItems.id, item.inventoryItemId));
+          .where(inArray(inventoryItems.id, inventoryItemIds));
 
-        // Ghi nhận thẻ kho loại 'returned' để khôi phục số lượng
-        await tx.insert(inventoryMovements).values({
+        const movementsToInsert = items.map((item) => ({
           inventoryItemId: item.inventoryItemId,
-          movementType: "returned",
+          movementType: "returned" as const,
           fromStatus: "sold",
           toStatus: "in_stock",
-          referenceType: "order",
+          referenceType: "order" as const,
           referenceId: orderId,
           quantityChange: 1,
           notes: `Khôi phục máy vào kho hàng do hủy Đơn hàng ${orderData.orderNumber}`,
           performedBy: performedById,
-        });
+        }));
+
+        await tx.insert(inventoryMovements).values(movementsToInsert);
       }
 
       // 4. Khấu trừ tích lũy mua hàng của khách hàng

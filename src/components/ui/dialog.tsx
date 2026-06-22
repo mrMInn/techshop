@@ -54,7 +54,7 @@ export function Dialog({
   if (!mounted || !isOpen) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-[#1d1d1f]/40 backdrop-blur-sm transition-opacity"

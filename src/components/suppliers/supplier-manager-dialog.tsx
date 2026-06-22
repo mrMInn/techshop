@@ -3,10 +3,11 @@
 import { useState, useEffect } from "react";
 import { Dialog } from "@/components/ui/dialog";
 import { getSuppliersList, deleteSupplier } from "@/app/actions/suppliers";
-import { Trash2, Plus, Users, Globe, Phone, Mail, Edit2, ShieldAlert } from "lucide-react";
+import { Trash2, Plus, Users, Phone, Mail, Edit2, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SupplierDialog } from "@/components/suppliers/supplier-dialog";
+import { getCountriesList } from "@/app/actions/shipping-countries";
 
 interface SupplierManagerDialogProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ interface SupplierManagerDialogProps {
 
 export function SupplierManagerDialog({ isOpen, onClose, onUpdate }: SupplierManagerDialogProps) {
   const [suppliersList, setSuppliersList] = useState<any[]>([]);
+  const [countries, setCountries] = useState<{ code: string; name: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<any | null>(null);
@@ -32,9 +34,19 @@ export function SupplierManagerDialog({ isOpen, onClose, onUpdate }: SupplierMan
     }
   };
 
+  const loadCountries = async () => {
+    try {
+      const data = await getCountriesList();
+      setCountries(data);
+    } catch (error) {
+      console.error("Lỗi lấy danh sách quốc gia", error);
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
       loadSuppliers();
+      loadCountries();
     }
   }, [isOpen]);
 
@@ -68,12 +80,9 @@ export function SupplierManagerDialog({ isOpen, onClose, onUpdate }: SupplierMan
   };
 
   const getCountryName = (code: string | null) => {
-    const countryMap: Record<string, string> = {
-      
-      US: "Mỹ",
-    
-    };
-    return countryMap[code || "VN"] || code || "Việt Nam";
+    if (!code) return "Việt Nam";
+    const found = countries.find((c) => c.code === code);
+    return found ? found.name : code;
   };
 
   return (
@@ -109,15 +118,15 @@ export function SupplierManagerDialog({ isOpen, onClose, onUpdate }: SupplierMan
             </div>
           ) : (
             <div className="max-h-[390px] overflow-y-auto space-y-2.5 pr-1 scrollbar-thin">
-              {suppliersList.map((sup) => {
+              {suppliersList.map((sup, index) => {
                 return (
                   <div
                     key={sup.id}
                     className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl bg-[#f5f5f7] border border-transparent hover:border-[#e0e0e0] transition-all gap-3"
                   >
                     <div className="flex items-start gap-3.5 min-w-0">
-                      <div className="w-10 h-10 rounded-full bg-white border border-[#e0e0e0] flex items-center justify-center text-[#7a7a7a] shrink-0">
-                        <Globe size={18} className="text-[#0066cc]" />
+                      <div className="w-10 h-10 rounded-full bg-white border border-[#e0e0e0] flex items-center justify-center text-[14px] font-bold text-[#0066cc] bg-[#0066cc]/5 shrink-0">
+                        {index + 1}
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">

@@ -26,6 +26,7 @@ import {
 import { db, recalculateRunningBalances } from "@/lib/db";
 import { eq, desc, inArray, sql, and, or } from "drizzle-orm";
 import { syncHistoricalData } from "./accounting";
+import { after } from "next/server";
 
 // Helper function: Đồng bộ số lượng thực nhận và trạng thái của Đơn nhập hàng (Purchase Order)
 export async function syncPurchaseOrderStatus(tx: any, purchaseOrderId: string) {
@@ -91,6 +92,17 @@ export async function syncPurchaseOrderStatus(tx: any, purchaseOrderId: string) 
 
 export async function getInventoryItems() {
   console.log("SERVER: getInventoryItems called");
+  
+  const poCounts = db
+    .select({
+      purchaseOrderId: purchaseOrderItems.purchaseOrderId,
+      totalItems: sql<number>`cast(count(${inventoryItems.id}) as integer)`.as('total_items'),
+    })
+    .from(inventoryItems)
+    .innerJoin(purchaseOrderItems, eq(inventoryItems.purchaseOrderItemId, purchaseOrderItems.id))
+    .groupBy(purchaseOrderItems.purchaseOrderId)
+    .as('po_counts');
+
   const items = await db
     .select({
       id: inventoryItems.id,
@@ -99,6 +111,8 @@ export async function getInventoryItems() {
       status: inventoryItems.status,
       costPrice: inventoryItems.costPrice,
       sellingPrice: inventoryItems.sellingPrice,
+      accessoryCost: inventoryItems.accessoryCost,
+      accessoryNotes: inventoryItems.accessoryNotes,
       stockedDate: inventoryItems.stockedDate,
       expectedArrivalDate: inventoryItems.expectedArrivalDate,
       receivedDate: inventoryItems.receivedDate,
@@ -120,12 +134,14 @@ export async function getInventoryItems() {
       supplierName: suppliers.name,
       supplierId: suppliers.id,
       poNumber: purchaseOrders.poNumber,
+      purchaseOrderId: purchaseOrders.id,
       trackingNumber: purchaseOrders.trackingNumber,
       trackingUrl: purchaseOrders.trackingUrl,
       shippingMethod: purchaseOrders.shippingMethod,
       shippingCost: purchaseOrders.shippingCost,
       taxImport: purchaseOrders.taxImport,
       poStatus: purchaseOrders.status,
+      poItemsCount: sql<number>`coalesce(${poCounts.totalItems}, 0)`,
     })
     .from(inventoryItems)
     .innerJoin(products, eq(inventoryItems.productId, products.id))
@@ -134,6 +150,7 @@ export async function getInventoryItems() {
     .leftJoin(purchaseOrderItems, eq(inventoryItems.purchaseOrderItemId, purchaseOrderItems.id))
     .leftJoin(purchaseOrders, eq(purchaseOrderItems.purchaseOrderId, purchaseOrders.id))
     .leftJoin(suppliers, eq(purchaseOrders.supplierId, suppliers.id))
+    .leftJoin(poCounts, eq(purchaseOrders.id, poCounts.purchaseOrderId))
     .where(inArray(inventoryItems.status, ['incoming', 'in_stock', 'sold', 'warranty_repair', 'returned', 'defective', 'deleted']))
     .orderBy(desc(inventoryItems.createdAt), desc(inventoryItems.id));
 
@@ -288,7 +305,13 @@ export async function createInventoryItem(data: {
     });
 
     if (result.success) {
-      await syncHistoricalData();
+      try {
+        after(() => {
+          syncHistoricalData().catch(err => console.error("Lỗi đồng bộ lịch sử tài chính:", err));
+        });
+      } catch (e) {
+        syncHistoricalData().catch(err => console.error("Lỗi đồng bộ lịch sử tài chính:", err));
+      }
     }
     return result;
   } catch (error: any) {
@@ -412,53 +435,51 @@ export async function createInventoryItemsBatch(data: {
         purchaseOrderItemId = newPoItem.id;
       }
 
-      const insertedItems = [];
+      // 1. Kiểm tra trùng lặp hàng loạt trên database trong 1 câu query
+      const existing = await tx
+        .select({ serialNumber: inventoryItems.serialNumber })
+        .from(inventoryItems)
+        .where(inArray(inventoryItems.serialNumber, cleanSerials));
 
-      for (const serial of cleanSerials) {
-        // Kiểm tra trùng lặp trên database
-        const existing = await tx
-          .select()
-          .from(inventoryItems)
-          .where(eq(inventoryItems.serialNumber, serial))
-          .limit(1);
-
-        if (existing.length > 0) {
-          throw new Error(`Serial Number "${serial}" đã tồn tại trên hệ thống`);
-        }
-
-        // Tạo item
-        const [newItem] = await tx.insert(inventoryItems).values({
-          productId: data.productId,
-          serialNumber: serial,
-          condition: data.condition,
-          status: data.status,
-          costPrice: data.costPrice,
-          sellingPrice: data.sellingPrice || null,
-          purchaseOrderItemId: purchaseOrderItemId || null,
-          originCountry: data.originCountry || 'VN',
-          stockedDate: data.status === 'incoming' ? null : (data.stockedDate || new Date().toISOString().split('T')[0]),
-          expectedArrivalDate: data.status === 'incoming' ? (data.expectedArrivalDate || null) : null,
-          notes: data.notes || null,
-          images: data.images || null,
-        }).returning();
-
-        insertedItems.push(newItem);
-
-        // Ghi nhận thẻ kho
-        await tx.insert(inventoryMovements).values({
-          inventoryItemId: newItem.id,
-          movementType: 'stocked',
-          fromStatus: null,
-          toStatus: data.status,
-          referenceType: purchaseOrderItemId ? 'purchase_order' : 'manual',
-          referenceId: purchaseOrderItemId || null,
-          quantityChange: 1,
-          performedBy: performedById,
-          notes: purchaseOrderItemId ? 'Nhập kho theo lô từ đơn hàng NCC' : 'Tạo mới sản phẩm vào kho theo lô (Thủ công hàng loạt)',
-        });
+      if (existing.length > 0) {
+        const dupSerials = existing.map(e => e.serialNumber).join(", ");
+        throw new Error(`Serial Number đã tồn tại trên hệ thống: ${dupSerials}`);
       }
 
-      // 3. Đồng bộ trạng thái đơn nhập hàng
+      // 2. Tạo các items hàng loạt (Bulk Insert)
+      const itemsToInsert = cleanSerials.map(serial => ({
+        productId: data.productId,
+        serialNumber: serial,
+        condition: data.condition,
+        status: data.status,
+        costPrice: data.costPrice,
+        sellingPrice: data.sellingPrice || null,
+        purchaseOrderItemId: purchaseOrderItemId || null,
+        originCountry: data.originCountry || 'VN',
+        stockedDate: data.status === 'incoming' ? null : (data.stockedDate || new Date().toISOString().split('T')[0]),
+        expectedArrivalDate: data.status === 'incoming' ? (data.expectedArrivalDate || null) : null,
+        notes: data.notes || null,
+        images: data.images || null,
+      }));
+
+      const insertedItems = await tx.insert(inventoryItems).values(itemsToInsert).returning();
+
+      // 3. Ghi nhận thẻ kho hàng loạt (Bulk Insert)
+      const movementsToInsert = insertedItems.map(item => ({
+        inventoryItemId: item.id,
+        movementType: 'stocked' as const,
+        fromStatus: null,
+        toStatus: data.status,
+        referenceType: (purchaseOrderItemId ? 'purchase_order' : 'manual') as any,
+        referenceId: purchaseOrderItemId || null,
+        quantityChange: 1,
+        performedBy: performedById,
+        notes: purchaseOrderItemId ? 'Nhập kho theo lô từ đơn hàng NCC' : 'Tạo mới sản phẩm vào kho theo lô (Thủ công hàng loạt)',
+      }));
+
+      await tx.insert(inventoryMovements).values(movementsToInsert);
+
+      // 4. Đồng bộ trạng thái đơn nhập hàng
       if (purchaseOrderItemId) {
         const poItem = await tx.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.id, purchaseOrderItemId)).limit(1);
         if (poItem.length > 0) {
@@ -474,7 +495,13 @@ export async function createInventoryItemsBatch(data: {
     });
 
     if (result.success) {
-      await syncHistoricalData();
+      try {
+        after(() => {
+          syncHistoricalData().catch(err => console.error("Lỗi đồng bộ lịch sử tài chính:", err));
+        });
+      } catch (e) {
+        syncHistoricalData().catch(err => console.error("Lỗi đồng bộ lịch sử tài chính:", err));
+      }
     }
     return result;
   } catch (error: any) {
@@ -702,7 +729,13 @@ export async function updateInventoryItem(
     });
 
     if (result.success) {
-      await syncHistoricalData();
+      try {
+        after(() => {
+          syncHistoricalData().catch(err => console.error("Lỗi đồng bộ lịch sử tài chính:", err));
+        });
+      } catch (e) {
+        syncHistoricalData().catch(err => console.error("Lỗi đồng bộ lịch sử tài chính:", err));
+      }
     }
     return result;
   } catch (error: any) {
@@ -877,7 +910,13 @@ export async function bulkConfirmArrival(ids: string[]) {
     });
 
     if (result.success) {
-      await syncHistoricalData();
+      try {
+        after(() => {
+          syncHistoricalData().catch(err => console.error("Lỗi đồng bộ lịch sử tài chính:", err));
+        });
+      } catch (e) {
+        syncHistoricalData().catch(err => console.error("Lỗi đồng bộ lịch sử tài chính:", err));
+      }
     }
     return result;
   } catch (error: any) {
@@ -951,6 +990,8 @@ export async function getInventoryItemLifecycle(serialNumber: string) {
         status: inventoryItems.status,
         costPrice: inventoryItems.costPrice,
         sellingPrice: inventoryItems.sellingPrice,
+        accessoryCost: inventoryItems.accessoryCost,
+        accessoryNotes: inventoryItems.accessoryNotes,
         stockedDate: inventoryItems.stockedDate,
         expectedArrivalDate: inventoryItems.expectedArrivalDate,
         receivedDate: inventoryItems.receivedDate,
@@ -968,6 +1009,7 @@ export async function getInventoryItemLifecycle(serialNumber: string) {
         productId: inventoryItems.productId,
         supplierName: suppliers.name,
         poNumber: purchaseOrders.poNumber,
+        purchaseOrderId: purchaseOrders.id,
         trackingNumber: purchaseOrders.trackingNumber,
         trackingUrl: purchaseOrders.trackingUrl,
         shippingMethod: purchaseOrders.shippingMethod,

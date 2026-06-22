@@ -29,6 +29,13 @@
       "when": 1780736880982,
       "tag": "0003_add_income_categories",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1782115880830,
+      "tag": "0004_add_po_indexes",
+      "breakpoints": true
     }
   ]
 }

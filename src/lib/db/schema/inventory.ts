@@ -38,6 +38,8 @@ export const inventoryItems = pgTable('inventory_items', {
   status: itemStatusEnum('status').default('incoming').notNull(),
   costPrice: decimal('cost_price', { precision: 15, scale: 2 }).notNull(),
   sellingPrice: decimal('selling_price', { precision: 15, scale: 2 }),
+  accessoryCost: decimal('accessory_cost', { precision: 15, scale: 2 }).default('0').notNull(),
+  accessoryNotes: text('accessory_notes'),
   specsOverride: jsonb('specs_override'), // Override specs if different from product model
   originCountry: varchar('origin_country', { length: 50 }).default('VN'),
   location: varchar('location', { length: 100 }),
@@ -57,6 +59,7 @@ export const inventoryItems = pgTable('inventory_items', {
   index('idx_inventory_status').on(table.status),
   index('idx_inventory_product').on(table.productId),
   index('idx_inventory_stocked').on(table.stockedDate),
+  index('idx_inventory_po_item').on(table.purchaseOrderItemId),
 ]);
 
 // ============================================================
