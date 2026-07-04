@@ -14,7 +14,7 @@ export type PaymentStatus = 'unpaid' | 'partial' | 'paid' | 'refunded';
 
 export type SaleChannel = 'online' | 'offline' | 'phone';
 
-export type POStatus = 'draft' | 'ordered' | 'in_transit' | 'partially_received' | 'received' | 'cancelled';
+export type POStatus = 'draft' | 'ordered' | 'in_transit' | 'partially_received' | 'received' | 'cancelled' | 'warranty_supplier' | 'returned_supplier';
 
 export type WarrantyStatus = 'pending' | 'inspecting' | 'repairing' | 'waiting_parts' | 'completed' | 'rejected' | 'replaced';
 

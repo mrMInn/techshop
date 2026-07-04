@@ -12,7 +12,8 @@ import {
   TrendingUp, AlertCircle, Eye, Trash2, 
   Banknote
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useRealtimeSubscription } from "@/hooks/use-realtime";
 import { toast } from "sonner";
 import { Dialog } from "@/components/ui/dialog";
@@ -27,7 +28,7 @@ import {
   SFSymbolXmarkCircle 
 } from "@/components/ui/apple-icons";
 
-export default function OrdersPage() {
+function OrdersPageContent() {
   const queryClient = useQueryClient();
   
   // Kích hoạt realtime đồng bộ đơn hàng
@@ -61,7 +62,21 @@ export default function OrdersPage() {
   
   // Dialog controls
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [selectedOrderIdForDetails, setSelectedOrderIdForDetails] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  // Sync selectedOrderIdForDetails with URL query param 'orderId'
+  const selectedOrderIdForDetails = searchParams.get("orderId");
+  const setSelectedOrderIdForDetails = (orderId: string | null) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (orderId) {
+      params.set("orderId", orderId);
+    } else {
+      params.delete("orderId");
+    }
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  };
   const [orderToCancel, setOrderToCancel] = useState<any | null>(null);
 
   // Phân trang & bộ lọc
@@ -213,14 +228,7 @@ export default function OrdersPage() {
     <div className="space-y-8">
       {/* 1. Header Section - Apple premium single-row layout */}
       <div className="pb-6 border-b border-[#e0e0e0]">
-        <div className="flex flex-col xl:flex-row gap-6 items-start xl:items-center justify-between">
-          <div>
-            <h1 className="text-[40px] font-semibold tracking-tight leading-[1.10] bg-clip-text text-transparent select-none" style={{ backgroundImage: "linear-gradient(90deg, #2997ff, #a855f7, #ec4899)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-              Đơn hàng
-            </h1>
-          </div>
-          
-          <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto justify-start xl:justify-end">
+        <div className="flex flex-wrap items-center gap-3 justify-start">
             {/* Search Input - Leftmost */}
             <div className="relative w-full sm:w-48">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7a7a7a]" size={14} />
@@ -292,8 +300,7 @@ export default function OrdersPage() {
             >
               <Plus size={14} />
               <span>Tạo đơn hàng</span>
-            </button>
-          </div>
+          </button>
         </div>
       </div>
 
@@ -705,5 +712,18 @@ export default function OrdersPage() {
         isLoading={cancelMutation.isPending}
       />
     </div>
+  );
+}
+
+export default function OrdersPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center py-32 text-[#86868b]">
+        <RefreshCw className="animate-spin mb-4 text-[#0066cc]" size={28} />
+        <p className="text-[16px] font-semibold text-[#1d1d1f]">Đang tải danh sách đơn hàng...</p>
+      </div>
+    }>
+      <OrdersPageContent />
+    </Suspense>
   );
 }

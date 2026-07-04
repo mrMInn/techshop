@@ -20,7 +20,7 @@ import {
   quotations,
   purchaseOrders
 } from "@/lib/db/schema";
-import { eq, desc, and, sql, or, like } from "drizzle-orm";
+import { eq, desc, and, sql, or, like, gte } from "drizzle-orm";
 import { sendTelegramNotification } from "@/lib/telegram/notifier";
 async function requireOwner() {
   // Bỏ qua kiểm tra quyền khi chạy ở chế độ không đăng nhập
@@ -81,7 +81,7 @@ export async function syncHistoricalData() {
   try {
     let needRecalc = false;
 
-    // A. Quét toàn bộ lịch sử thanh toán đơn hàng thành công
+    // A. Quét toàn bộ lịch sử thanh toán đơn hàng thành công chưa có sổ quỹ
     const dbPayments = await db
       .select({
         paymentId: payments.id,
@@ -95,181 +95,222 @@ export async function syncHistoricalData() {
       })
       .from(payments)
       .innerJoin(orders, eq(payments.orderId, orders.id))
-      .where(eq(orders.status, "completed"));
-
-    // Tối ưu hóa: Lấy tất cả cashbook entries dạng 'order' để đối chiếu trong bộ nhớ, tránh truy vấn N+1
-    const existingOrderEntries = await db
-      .select({
-        referenceId: cashBookEntries.referenceId,
-        amount: cashBookEntries.amount,
-      })
-      .from(cashBookEntries)
-      .where(eq(cashBookEntries.referenceType, "order"));
-
-    const existingOrderSet = new Set(
-      existingOrderEntries.map((ent) => `${ent.referenceId}_${ent.amount}`)
-    );
-
-    for (const pay of dbPayments) {
-      if (!existingOrderSet.has(`${pay.orderId}_${pay.amount}`)) {
-        // Đồng bộ ngược vào sổ quỹ
-        const dateStr = new Date(pay.paymentDate).toISOString().slice(0, 10).replace(/-/g, "");
-        const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
-        const entryNumber = `CB${dateStr}-${randomSuffix}`;
-        
-        const cashBookPaymentMethod = 
-          pay.paymentMethod === "bank_transfer" || pay.paymentMethod === "card" || pay.paymentMethod === "vnpay" || pay.paymentMethod === "momo"
-            ? "bank_transfer" 
-            : "cash";
-
-        await db.insert(cashBookEntries).values({
-          entryNumber,
-          type: "income",
-          category: "sales",
-          amount: pay.amount,
-          runningBalance: "0",
-          paymentMethod: cashBookPaymentMethod,
-          referenceType: "order",
-          referenceId: pay.orderId,
-          description: `[Đồng bộ] Thu tiền thanh toán đơn hàng ${pay.orderNumber} - ${pay.notes || ""}`,
-          entryDate: new Date(pay.paymentDate).toISOString().split("T")[0],
-          createdBy: pay.createdBy,
-        });
-        
-        needRecalc = true;
-      }
-    }
-
-    // B. Quét toàn bộ phí sửa chữa bảo hành thành công
-    const dbClaims = await db
-      .select()
-      .from(warrantyClaims)
+      .leftJoin(
+        cashBookEntries,
+        and(
+          eq(cashBookEntries.referenceType, "order"),
+          eq(cashBookEntries.referenceId, payments.orderId),
+          eq(cashBookEntries.amount, payments.amount)
+        )
+      )
       .where(
         and(
-          sql`${warrantyClaims.repairCost} IS NOT NULL`,
-          sql`CAST(${warrantyClaims.repairCost} AS DECIMAL) > 0`
+          eq(orders.status, "completed"),
+          sql`${cashBookEntries.id} IS NULL`
         )
       );
 
-    // Tối ưu hóa: Lấy tất cả cashbook entries dạng 'other' để kiểm tra tồn tại cho cả bảo hành và phiếu đổi trả
-    const existingOtherEntries = await db
-      .select({
-        referenceId: cashBookEntries.referenceId,
-        type: cashBookEntries.type,
-      })
-      .from(cashBookEntries)
-      .where(eq(cashBookEntries.referenceType, "other"));
+    for (const pay of dbPayments) {
+      // Đồng bộ ngược vào sổ quỹ
+      const dateStr = new Date(pay.paymentDate).toISOString().slice(0, 10).replace(/-/g, "");
+      const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const entryNumber = `CB${dateStr}-${randomSuffix}`;
+      
+      const cashBookPaymentMethod = 
+        pay.paymentMethod === "bank_transfer" || pay.paymentMethod === "card" || pay.paymentMethod === "vnpay" || pay.paymentMethod === "momo"
+          ? "bank_transfer" 
+          : "cash";
 
-    const otherEntriesMap = new Map<string, Set<string>>();
-    existingOtherEntries.forEach((ent) => {
-      if (ent.referenceId) {
-        if (!otherEntriesMap.has(ent.referenceId)) {
-          otherEntriesMap.set(ent.referenceId, new Set());
-        }
-        otherEntriesMap.get(ent.referenceId)!.add(ent.type);
-      }
-    });
-
-    for (const claim of dbClaims) {
-      const hasEntry = otherEntriesMap.has(claim.id);
-
-      if (!hasEntry) {
-        const dateStr = new Date(claim.receivedDate).toISOString().slice(0, 10).replace(/-/g, "");
-        const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
-        const entryNumber = `CB${dateStr}-${randomSuffix}`;
-
-        await db.insert(cashBookEntries).values({
-          entryNumber,
-          type: "income",
-          category: "warranty_repair",
-          amount: claim.repairCost!,
-          runningBalance: "0",
-          paymentMethod: "cash",
-          referenceType: "other",
-          referenceId: claim.id,
-          description: `[Đồng bộ] Thu phí sửa chữa bảo hành - Phiếu: ${claim.claimNumber}`,
-          entryDate: claim.actualReturnDate || claim.receivedDate,
-          createdBy: claim.createdBy,
-        });
-
-        needRecalc = true;
-      }
+      await db.insert(cashBookEntries).values({
+        entryNumber,
+        type: "income",
+        category: "sales",
+        amount: pay.amount,
+        runningBalance: "0",
+        paymentMethod: cashBookPaymentMethod,
+        referenceType: "order",
+        referenceId: pay.orderId,
+        description: `[Đồng bộ] Thu tiền thanh toán đơn hàng ${pay.orderNumber} - ${pay.notes || ""}`,
+        entryDate: new Date(pay.paymentDate).toISOString().split("T")[0],
+        createdBy: pay.createdBy,
+      });
+      
+      needRecalc = true;
     }
 
-    // C. Quét toàn bộ phiếu Đổi/Trả thành công
-    const dbReturns = await db
-      .select()
+    // B. Quét toàn bộ phí sửa chữa bảo hành thành công chưa có sổ quỹ
+    const dbClaims = await db
+      .select({
+        id: warrantyClaims.id,
+        claimNumber: warrantyClaims.claimNumber,
+        receivedDate: warrantyClaims.receivedDate,
+        actualReturnDate: warrantyClaims.actualReturnDate,
+        repairCost: warrantyClaims.repairCost,
+        createdBy: warrantyClaims.createdBy,
+      })
+      .from(warrantyClaims)
+      .leftJoin(
+        cashBookEntries,
+        and(
+          eq(cashBookEntries.referenceType, "other"),
+          eq(cashBookEntries.referenceId, warrantyClaims.id),
+          eq(cashBookEntries.type, "income")
+        )
+      )
+      .where(
+        and(
+          sql`${warrantyClaims.repairCost} IS NOT NULL`,
+          sql`CAST(${warrantyClaims.repairCost} AS DECIMAL) > 0`,
+          sql`${cashBookEntries.id} IS NULL`
+        )
+      );
+
+    for (const claim of dbClaims) {
+      const dateStr = new Date(claim.receivedDate).toISOString().slice(0, 10).replace(/-/g, "");
+      const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const entryNumber = `CB${dateStr}-${randomSuffix}`;
+
+      await db.insert(cashBookEntries).values({
+        entryNumber,
+        type: "income",
+        category: "warranty_repair",
+        amount: claim.repairCost!,
+        runningBalance: "0",
+        paymentMethod: "cash",
+        referenceType: "other",
+        referenceId: claim.id,
+        description: `[Đồng bộ] Thu phí sửa chữa bảo hành - Phiếu: ${claim.claimNumber}`,
+        entryDate: claim.actualReturnDate || claim.receivedDate,
+        createdBy: claim.createdBy,
+      });
+
+      needRecalc = true;
+    }
+
+    // C. Quét toàn bộ phiếu Đổi/Trả thành công chưa có sổ quỹ
+    // C.1. Thu phí dịch vụ đổi trả (nếu có và chưa có dòng THU QUỸ)
+    const missingIncomeReturns = await db
+      .select({
+        id: returns.id,
+        returnNumber: returns.returnNumber,
+        createdAt: returns.createdAt,
+        feeAmount: returns.feeAmount,
+        hasFee: returns.hasFee,
+        processedBy: returns.processedBy,
+        orderId: returns.orderId,
+        paymentMethod: orders.paymentMethod,
+      })
       .from(returns)
-      .where(eq(returns.status, "completed"));
+      .innerJoin(orders, eq(returns.orderId, orders.id))
+      .leftJoin(
+        cashBookEntries,
+        and(
+          eq(cashBookEntries.referenceType, "other"),
+          eq(cashBookEntries.referenceId, returns.id),
+          eq(cashBookEntries.type, "income")
+        )
+      )
+      .where(
+        and(
+          eq(returns.status, "completed"),
+          eq(returns.hasFee, true),
+          sql`CAST(${returns.feeAmount} AS DECIMAL) > 0`,
+          sql`${cashBookEntries.id} IS NULL`
+        )
+      );
 
-    // Tối ưu hóa: Lấy tất cả orders liên kết để tránh truy vấn orders N+1 trong vòng lặp phiếu đổi trả
-    const dbOrders = await db.select().from(orders);
-    const ordersMap = new Map(dbOrders.map((o) => [o.id, o]));
-
-    for (const ret of dbReturns) {
-      const types = otherEntriesMap.get(ret.id);
-      const hasIncomeEntry = types?.has("income") || false;
-      const hasExpenseEntry = types?.has("expense") || false;
-
-      const refundVal = Number(ret.refundAmount || 0); // e.g. 18.000.000đ
-      const feeVal = Number(ret.feeAmount || 0);       // Phí dịch vụ thu được, e.g. 500.000đ
-
-      const originalOrder = ordersMap.get(ret.orderId);
-      const mappedMethod = originalOrder?.paymentMethod || 'cash';
+    for (const ret of missingIncomeReturns) {
+      const feeVal = Number(ret.feeAmount || 0);
+      const mappedMethod = ret.paymentMethod || 'cash';
       const cashBookPaymentMethod = 
         mappedMethod === "bank_transfer" || mappedMethod === "card" 
           ? mappedMethod 
           : "cash";
 
       const dateStrCB = new Date(ret.createdAt).toISOString().slice(0, 10).replace(/-/g, "");
+      const randomSuffixCB1 = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const entryNumber1 = `CB${dateStrCB}-${randomSuffixCB1}`;
 
-      // A. Nếu có phí dịch vụ thu được và chưa có dòng THU QUỸ
-      if (ret.hasFee && feeVal > 0 && !hasIncomeEntry) {
-        const randomSuffixCB1 = Math.random().toString(36).substring(2, 6).toUpperCase();
-        const entryNumber1 = `CB${dateStrCB}-${randomSuffixCB1}`;
-
-        await db.insert(cashBookEntries).values({
-          entryNumber: entryNumber1,
-          type: "income",
-          category: "other",
-          amount: feeVal.toString(),
-          runningBalance: "0",
-          paymentMethod: cashBookPaymentMethod,
-          referenceType: "other",
-          referenceId: ret.id,
-          description: `[Đồng bộ] Thu phí dịch vụ đổi trả (máy không lỗi) - Phiếu: ${ret.returnNumber}`,
-          entryDate: new Date(ret.createdAt).toISOString().split("T")[0],
-          createdBy: ret.processedBy,
-        });
-        
-        needRecalc = true;
-      }
-
-      // B. Nếu chưa có dòng CHI QUỸ hoàn trả giá trị máy gốc cho khách
-      const totalOriginalPrice = refundVal + feeVal; // e.g. 18.500.000đ
-      if (totalOriginalPrice > 0 && !hasExpenseEntry) {
-        const randomSuffixCB2 = Math.random().toString(36).substring(2, 6).toUpperCase();
-        const entryNumber2 = `CB${dateStrCB}-${randomSuffixCB2}`;
-
-        await db.insert(cashBookEntries).values({
-          entryNumber: entryNumber2,
-          type: "expense",
-          category: "other",
-          amount: totalOriginalPrice.toString(),
-          runningBalance: "0",
-          paymentMethod: cashBookPaymentMethod,
-          referenceType: "other",
-          referenceId: ret.id,
-          description: `[Đồng bộ] Chi hoàn giá trị sản phẩm từ phiếu Đổi/Trả ${ret.returnNumber}`,
-          entryDate: new Date(ret.createdAt).toISOString().split("T")[0],
-          createdBy: ret.processedBy,
-        });
-
-        needRecalc = true;
-      }
+      await db.insert(cashBookEntries).values({
+        entryNumber: entryNumber1,
+        type: "income",
+        category: "other",
+        amount: feeVal.toString(),
+        runningBalance: "0",
+        paymentMethod: cashBookPaymentMethod,
+        referenceType: "other",
+        referenceId: ret.id,
+        description: `[Đồng bộ] Thu phí dịch vụ đổi trả (máy không lỗi) - Phiếu: ${ret.returnNumber}`,
+        entryDate: new Date(ret.createdAt).toISOString().split("T")[0],
+        createdBy: ret.processedBy,
+      });
+      
+      needRecalc = true;
     }
 
-    // D. Quét toàn bộ đơn nhập hàng (purchase_orders) thành công
+    // C.2. Chi hoàn tiền cho khách (nếu chưa có dòng CHI QUỸ)
+    const missingExpenseReturns = await db
+      .select({
+        id: returns.id,
+        returnNumber: returns.returnNumber,
+        createdAt: returns.createdAt,
+        feeAmount: returns.feeAmount,
+        refundAmount: returns.refundAmount,
+        processedBy: returns.processedBy,
+        orderId: returns.orderId,
+        paymentMethod: orders.paymentMethod,
+      })
+      .from(returns)
+      .innerJoin(orders, eq(returns.orderId, orders.id))
+      .leftJoin(
+        cashBookEntries,
+        and(
+          eq(cashBookEntries.referenceType, "other"),
+          eq(cashBookEntries.referenceId, returns.id),
+          eq(cashBookEntries.type, "expense")
+        )
+      )
+      .where(
+        and(
+          eq(returns.status, "completed"),
+          sql`(CAST(${returns.refundAmount} AS DECIMAL) + CAST(${returns.feeAmount} AS DECIMAL)) > 0`,
+          sql`${cashBookEntries.id} IS NULL`
+        )
+      );
+
+    for (const ret of missingExpenseReturns) {
+      const refundVal = Number(ret.refundAmount || 0);
+      const feeVal = Number(ret.feeAmount || 0);
+      const totalOriginalPrice = refundVal + feeVal;
+
+      const mappedMethod = ret.paymentMethod || 'cash';
+      const cashBookPaymentMethod = 
+        mappedMethod === "bank_transfer" || mappedMethod === "card" 
+          ? mappedMethod 
+          : "cash";
+
+      const dateStrCB = new Date(ret.createdAt).toISOString().slice(0, 10).replace(/-/g, "");
+      const randomSuffixCB2 = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const entryNumber2 = `CB${dateStrCB}-${randomSuffixCB2}`;
+
+      await db.insert(cashBookEntries).values({
+        entryNumber: entryNumber2,
+        type: "expense",
+        category: "other",
+        amount: totalOriginalPrice.toString(),
+        runningBalance: "0",
+        paymentMethod: cashBookPaymentMethod,
+        referenceType: "other",
+        referenceId: ret.id,
+        description: `[Đồng bộ] Chi hoàn giá trị sản phẩm từ phiếu Đổi/Trả ${ret.returnNumber}`,
+        entryDate: new Date(ret.createdAt).toISOString().split("T")[0],
+        createdBy: ret.processedBy,
+      });
+
+      needRecalc = true;
+    }
+
+    // D. Quét toàn bộ đơn nhập hàng (purchase_orders) thành công chưa có sổ quỹ
     const dbPos = await db
       .select({
         id: purchaseOrders.id,
@@ -281,44 +322,45 @@ export async function syncHistoricalData() {
         createdAt: purchaseOrders.createdAt,
       })
       .from(purchaseOrders)
+      .leftJoin(
+        cashBookEntries,
+        and(
+          eq(cashBookEntries.referenceType, "purchase_order"),
+          eq(cashBookEntries.referenceId, purchaseOrders.id)
+        )
+      )
       .where(
-        or(
-          eq(purchaseOrders.status, "received"),
-          eq(purchaseOrders.status, "partially_received")
+        and(
+          or(
+            eq(purchaseOrders.status, "received"),
+            eq(purchaseOrders.status, "partially_received"),
+            eq(purchaseOrders.status, "warranty_supplier"),
+            eq(purchaseOrders.status, "returned_supplier")
+          ),
+          sql`${cashBookEntries.id} IS NULL`
         )
       );
 
-    const existingPoEntries = await db
-      .select({
-        referenceId: cashBookEntries.referenceId,
-      })
-      .from(cashBookEntries)
-      .where(eq(cashBookEntries.referenceType, "purchase_order"));
-
-    const existingPoSet = new Set(existingPoEntries.map(e => e.referenceId).filter(Boolean));
-
     for (const po of dbPos) {
-      if (!existingPoSet.has(po.id)) {
-        const dateStr = new Date(po.actualArrival || po.createdAt).toISOString().slice(0, 10).replace(/-/g, "");
-        const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
-        const entryNumber = `CB${dateStr}-${randomSuffix}`;
+      const dateStr = new Date(po.actualArrival || po.createdAt).toISOString().slice(0, 10).replace(/-/g, "");
+      const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const entryNumber = `CB${dateStr}-${randomSuffix}`;
 
-        await db.insert(cashBookEntries).values({
-          entryNumber,
-          type: "expense",
-          category: "purchase",
-          amount: po.totalCost,
-          runningBalance: "0",
-          paymentMethod: "bank_transfer",
-          referenceType: "purchase_order",
-          referenceId: po.id,
-          description: `[Đồng bộ] Thanh toán đơn nhập hàng ${po.poNumber}`,
-          entryDate: po.actualArrival || new Date(po.createdAt).toISOString().split("T")[0],
-          createdBy: po.createdBy,
-        });
+      await db.insert(cashBookEntries).values({
+        entryNumber,
+        type: "expense",
+        category: "purchase",
+        amount: po.totalCost,
+        runningBalance: "0",
+        paymentMethod: "bank_transfer",
+        referenceType: "purchase_order",
+        referenceId: po.id,
+        description: `[Đồng bộ] Thanh toán đơn nhập hàng ${po.poNumber}`,
+        entryDate: po.actualArrival || new Date(po.createdAt).toISOString().split("T")[0],
+        createdBy: po.createdBy,
+      });
 
-        needRecalc = true;
-      }
+      needRecalc = true;
     }
 
     // Nếu có dữ liệu mới phát sinh, thực hiện tính toán lại số dư lũy kế
@@ -342,7 +384,41 @@ export async function getFinancialSummary() {
   console.log("SERVER: getFinancialSummary called");
   await requireOwner();
   try {
-    const entries = await db.select().from(cashBookEntries);
+    const totals = await db
+      .select({
+        type: cashBookEntries.type,
+        sum: sql<string>`sum(${cashBookEntries.amount})`
+      })
+      .from(cashBookEntries)
+      .groupBy(cashBookEntries.type);
+
+    let totalIncome = 0;
+    let totalExpense = 0;
+    totals.forEach((t) => {
+      if (t.type === 'income') totalIncome = Number(t.sum || 0);
+      else if (t.type === 'expense') totalExpense = Number(t.sum || 0);
+    });
+
+    const catStats = await db
+      .select({
+        category: cashBookEntries.category,
+        type: cashBookEntries.type,
+        sum: sql<string>`sum(${cashBookEntries.amount})`
+      })
+      .from(cashBookEntries)
+      .groupBy(cashBookEntries.category, cashBookEntries.type);
+
+    const categoryStats: Record<string, number> = {};
+    catStats.forEach((c) => {
+      const cat = c.category || "other";
+      const amt = Number(c.sum || 0);
+      if (c.type === 'income') {
+        categoryStats[cat] = (categoryStats[cat] || 0) + amt;
+      } else {
+        categoryStats[cat] = (categoryStats[cat] || 0) - amt;
+      }
+    });
+
     const ordersStats = await db
       .select({
         totalProfit: sql<string>`sum(${orders.profit})`
@@ -366,6 +442,12 @@ export async function getFinancialSummary() {
       })
       .from(returns)
       .where(eq(returns.status, "completed"));
+
+    // Lọc lấy 7 ngày gần nhất cho biểu đồ hàng ngày
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const sevenDaysAgoStr = sevenDaysAgo.toISOString().split("T")[0];
+
     const daysData = await db
       .select({
         date: cashBookEntries.entryDate,
@@ -373,25 +455,9 @@ export async function getFinancialSummary() {
         totalAmount: sql<string>`sum(${cashBookEntries.amount})`,
       })
       .from(cashBookEntries)
+      .where(gte(cashBookEntries.entryDate, sevenDaysAgoStr))
       .groupBy(cashBookEntries.entryDate, cashBookEntries.type)
       .orderBy(cashBookEntries.entryDate);
-
-    let totalIncome = 0;
-    let totalExpense = 0;
-    const categoryStats: Record<string, number> = {};
-
-    entries.forEach((entry) => {
-      const amt = Number(entry.amount || 0);
-      const cat = entry.category || "other";
-      
-      if (entry.type === "income") {
-        totalIncome += amt;
-        categoryStats[cat] = (categoryStats[cat] || 0) + amt;
-      } else {
-        totalExpense += amt;
-        categoryStats[cat] = (categoryStats[cat] || 0) - amt;
-      }
-    });
 
     // Tính toán lợi nhuận kinh doanh ròng thực tế (Lợi nhuận gộp đơn hàng + Doanh thu bảo hành - Chi vận hành - Hoàn tiền khách trả)
     const salesProfit = Number(ordersStats[0]?.totalProfit || 0);
@@ -402,7 +468,7 @@ export async function getFinancialSummary() {
 
     const netProfit = salesProfit + warrantyIncome + returnServiceFees - operationalExpenses - returnsRefund;
 
-    // Chuẩn hóa dữ liệu biểu đồ
+    // Chuẩn hóa dữ liệu biểu đồ hàng ngày
     const chartMap: Record<string, { date: string; fullDate: string; thu: number; chi: number; loiNhuan: number }> = {};
     
     // Khởi tạo 7 ngày gần nhất nếu chưa có dữ liệu để biểu đồ trông mượt mà hơn
@@ -418,7 +484,6 @@ export async function getFinancialSummary() {
       const dateStr = item.date;
       const amt = Number(item.totalAmount || 0);
       
-      // Nếu ngày nằm ngoài map 7 ngày, ta có thể hiển thị ngày đó dưới dạng dd/mm
       const formattedDate = new Date(dateStr).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
       
       if (!chartMap[dateStr]) {
@@ -447,20 +512,33 @@ export async function getFinancialSummary() {
       monthlyMap[yearMonth] = { date: formattedMonth, thu: 0, chi: 0, loiNhuan: 0 };
     }
 
-    entries.forEach((entry) => {
-      if (!entry.entryDate) return;
-      const amt = Number(entry.amount || 0);
-      const parts = entry.entryDate.split("-");
-      if (parts.length >= 2) {
-        const yearMonth = `${parts[0]}-${parts[1]}`;
-        if (monthlyMap[yearMonth]) {
-          if (entry.type === "income") {
-            monthlyMap[yearMonth].thu += amt;
-          } else {
-            monthlyMap[yearMonth].chi += amt;
-          }
-          monthlyMap[yearMonth].loiNhuan = monthlyMap[yearMonth].thu - monthlyMap[yearMonth].chi;
+    // Lọc 12 tháng gần nhất từ database bằng SQL aggregation
+    const twelveMonthsAgo = new Date();
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+    twelveMonthsAgo.setDate(1); // Ngày đầu tiên của tháng đó
+    const twelveMonthsAgoStr = twelveMonthsAgo.toISOString().split("T")[0];
+
+    const monthlyData = await db
+      .select({
+        month: sql<string>`to_char(${cashBookEntries.entryDate}, 'YYYY-MM')`,
+        type: cashBookEntries.type,
+        sum: sql<string>`sum(${cashBookEntries.amount})`
+      })
+      .from(cashBookEntries)
+      .where(gte(cashBookEntries.entryDate, twelveMonthsAgoStr))
+      .groupBy(sql`to_char(${cashBookEntries.entryDate}, 'YYYY-MM')`, cashBookEntries.type);
+
+    monthlyData.forEach((m) => {
+      if (!m.month) return;
+      const amt = Number(m.sum || 0);
+      const yearMonth = m.month;
+      if (monthlyMap[yearMonth]) {
+        if (m.type === "income") {
+          monthlyMap[yearMonth].thu += amt;
+        } else {
+          monthlyMap[yearMonth].chi += amt;
         }
+        monthlyMap[yearMonth].loiNhuan = monthlyMap[yearMonth].thu - monthlyMap[yearMonth].chi;
       }
     });
 

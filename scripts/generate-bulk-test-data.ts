@@ -59,7 +59,7 @@ async function generateBulkSystemTestData() {
       id: crypto.randomUUID(),
       fullName: 'Minh Chỉ Huy Tổng Lực',
       email: 'owner.command@techstore.vn',
-      role: 'owner',
+      role: 'admin',
       isActive: true
     }).returning();
 

@@ -251,15 +251,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
       {/* 1. Header Section - Apple Premium Photography-first */}
-      <div className="flex flex-col md:flex-row gap-6 items-start md:items-center justify-between pb-6 border-b border-[#e0e0e0]">
-        <div>
-          <h1 className="text-[40px] font-semibold tracking-tight leading-[1.10] bg-clip-text text-transparent select-none" style={{ backgroundImage: "linear-gradient(90deg, #2997ff, #a855f7, #ec4899)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-            Cấu hình hệ thống
-          </h1>
-          <p className="text-[14px] text-[#7a7a7a] mt-1.5 leading-relaxed max-w-xl">
-            Tùy chỉnh thông tin liên hệ cửa hàng, thiết lập VietQR tự động sinh mã thanh toán động và bật/tắt động cơ thông báo thông minh Telegram.
-          </p>
-        </div>
+      <div className="flex flex-col md:flex-row gap-6 items-start md:items-center justify-end pb-6 border-b border-[#e0e0e0]">
         
         <div className="flex items-center gap-3 w-full md:w-auto shrink-0">
           <button

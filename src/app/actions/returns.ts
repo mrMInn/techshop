@@ -11,7 +11,8 @@ import {
   profiles,
   inventoryMovements,
   cashBookEntries,
-  orderItems
+  orderItems,
+  accessoryItems
 } from "@/lib/db/schema";
 import { eq, desc, and, sql, inArray } from "drizzle-orm";
 
@@ -56,6 +57,7 @@ export async function createReturn(data: {
   refundAmount: string;
   exchangeDifference: string;
   notes?: string;
+  returnedAccessoryIds?: string[];
   items: {
     inventoryItemId: string;
     productId: string;
@@ -268,10 +270,45 @@ export async function createReturn(data: {
           newInvStatus = 'defective';
         }
 
+        // Lấy các phụ kiện được bán kèm với máy này (trạng thái đang là sold và được liên kết với máy)
+        const machineAccessories = await tx
+          .select()
+          .from(accessoryItems)
+          .where(and(eq(accessoryItems.inventoryItemId, item.inventoryItemId), eq(accessoryItems.status, 'sold')));
+
+        let totalDeduction = 0;
+        const returnedAccessoryIds = data.returnedAccessoryIds || [];
+
+        for (const acc of machineAccessories) {
+          const isAccReturned = returnedAccessoryIds.includes(acc.id);
+          const newStatus = isAccReturned ? 'in_stock' : 'sold';
+          
+          await tx
+            .update(accessoryItems)
+            .set({
+              status: newStatus,
+              inventoryItemId: null, // unlink in both cases
+              updatedAt: new Date(),
+            })
+            .where(eq(accessoryItems.id, acc.id));
+
+          totalDeduction += Number(acc.unitCost);
+        }
+
+        // Load machine's current costPrice to reduce it by totalDeduction
+        const currentMachine = await tx
+          .select({ costPrice: inventoryItems.costPrice })
+          .from(inventoryItems)
+          .where(eq(inventoryItems.id, item.inventoryItemId))
+          .limit(1);
+        const currentCost = Number(currentMachine[0]?.costPrice || 0);
+        const finalCostPrice = Math.max(0, currentCost - totalDeduction).toFixed(2);
+
         await tx
           .update(inventoryItems)
           .set({
             status: newInvStatus,
+            costPrice: finalCostPrice,
             soldDate: null, 
             warrantyStart: null,
             warrantyEnd: null,
@@ -372,6 +409,19 @@ export async function createReturn(data: {
             })
             .where(and(eq(orderItems.orderId, data.orderId), eq(orderItems.inventoryItemId, item.inventoryItemId)));
         }
+      }
+
+      // Xử lý các phụ kiện bán lẻ độc lập được trả lại
+      const returnedAccessoryIds = data.returnedAccessoryIds || [];
+      if (returnedAccessoryIds.length > 0) {
+        await tx
+          .update(accessoryItems)
+          .set({
+            status: 'in_stock',
+            inventoryItemId: null,
+            updatedAt: new Date(),
+          })
+          .where(and(eq(accessoryItems.status, 'sold'), inArray(accessoryItems.id, returnedAccessoryIds)));
       }
 
       // Cập nhật lại tổng tiền/lợi nhuận của đơn hàng gốc & thống kê chi tiêu khách hàng
@@ -600,16 +650,18 @@ export async function deleteReturnAction(id: string) {
 }
 
 async function recalculateOrderTotals(tx: any, orderId: string) {
-  // Query all order items joined with inventoryItems to get their current status
+  // Query all order items joined with inventoryItems and accessoryItems to get their current status
   const allOrderItems = await tx
     .select({
       sellingPrice: orderItems.sellingPrice,
       costPrice: orderItems.costPrice,
       discount: orderItems.discount,
-      status: inventoryItems.status,
+      machineStatus: inventoryItems.status,
+      accessoryStatus: accessoryItems.status,
     })
     .from(orderItems)
-    .innerJoin(inventoryItems, eq(orderItems.inventoryItemId, inventoryItems.id))
+    .leftJoin(inventoryItems, eq(orderItems.inventoryItemId, inventoryItems.id))
+    .leftJoin(accessoryItems, eq(orderItems.accessoryItemId, accessoryItems.id))
     .where(eq(orderItems.orderId, orderId));
 
   let subtotal = 0;
@@ -618,8 +670,11 @@ async function recalculateOrderTotals(tx: any, orderId: string) {
   let activeItemsCount = 0;
 
   for (const oi of allOrderItems) {
+    const isMachineActive = oi.machineStatus === 'sold' || oi.machineStatus === 'warranty_repair';
+    const isAccessoryActive = oi.accessoryStatus === 'sold';
+
     // Only count items that are sold or in warranty repair (meaning they are still with the customer)
-    if (oi.status === 'sold' || oi.status === 'warranty_repair') {
+    if (isMachineActive || isAccessoryActive) {
       subtotal += Number(oi.sellingPrice || 0);
       totalCost += Number(oi.costPrice || 0);
       totalItemDiscounts += Number(oi.discount || 0);

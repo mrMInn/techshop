@@ -14,7 +14,8 @@ import {
   getIncomeCategories,
   createIncomeCategory,
   updateIncomeCategory,
-  deleteIncomeCategory
+  deleteIncomeCategory,
+  getFinancialSummary
 } from "@/app/actions/accounting";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useRealtimeSubscription } from "@/hooks/use-realtime";
@@ -53,10 +54,11 @@ import {
 import { CustomSelect } from "@/components/ui/custom-select";
 import { CustomDatePicker } from "@/components/ui/custom-date-picker";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Dialog } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import Link from "next/link";
 import { CashBookDonut } from "@/components/accounting/cashbook-donut";
-import { SFSymbolWallet, SFSymbolArrowUpRight, SFSymbolArrowDownRight } from "@/components/ui/apple-icons";
+import { SFSymbolArrowUpRight, SFSymbolArrowDownRight } from "@/components/ui/apple-icons";
 
 const categoryLabels: Record<string, string> = {
   sales: "Doanh thu bán lẻ",
@@ -289,6 +291,11 @@ export default function CashBookPage() {
       startDate: startDate || undefined,
       endDate: endDate || undefined,
     }),
+  });
+
+  const { data: financialSummary } = useQuery({
+    queryKey: ["financial_summary"],
+    queryFn: getFinancialSummary,
   });
 
   const { data: incomeCategoriesData } = useQuery({
@@ -580,7 +587,7 @@ export default function CashBookPage() {
 
   // Real-time KPI Card summary calculations based on fetched list
   const totals = useMemo(() => {
-    if (!entries) return { income: 0, expense: 0, balance: 0 };
+    if (!entries) return { income: 0, expense: 0 };
     let income = 0;
     let expense = 0;
     entries.forEach((e) => {
@@ -594,7 +601,6 @@ export default function CashBookPage() {
     return {
       income,
       expense,
-      balance: income - expense,
     };
   }, [entries]);
 
@@ -607,6 +613,12 @@ export default function CashBookPage() {
       expense: (totals.expense / total) * 100,
     };
   }, [totals]);
+
+  // Số dư lũy kế thực tế (Toàn thời gian, không bị ảnh hưởng bởi filter khoảng thời gian)
+  const cumulativeBalance = useMemo(() => {
+    if (!financialSummary) return 0;
+    return Number(financialSummary.totalIncome || 0) - Number(financialSummary.totalExpense || 0);
+  }, [financialSummary]);
 
 
 
@@ -651,23 +663,23 @@ export default function CashBookPage() {
     >
       {/* 1. Executive Summary Financial Banner */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
-        
-        {/* Card 1: Số dư khả dụng */}
+
+        {/* Card 1: Số dư quỹ (Lũy kế) */}
         <div 
-          className="group relative overflow-hidden rounded-[22px] p-5 h-[120px] flex flex-col justify-between transition-all duration-300 select-none border border-white/10 bg-gradient-to-br from-[#2ea1ff] to-[#0066cc] shadow-[0_4px_12px_rgba(0,0,0,0.05)] hover:scale-[1.02] hover:shadow-[0_8px_20px_rgba(0,102,204,0.15)]"
+          className="group relative overflow-hidden rounded-[22px] p-5 h-[120px] flex flex-col justify-between transition-all duration-300 select-none border border-white/10 bg-gradient-to-br from-[#007aff] to-[#0056b3] shadow-[0_4px_12px_rgba(0,0,0,0.05)] hover:scale-[1.02] hover:shadow-[0_8px_20px_rgba(0,122,255,0.15)]"
         >
           {/* Top Row with Label and Icon */}
           <div className="relative z-20 flex justify-between items-start">
             <span className="text-[12px] font-bold uppercase tracking-wider text-white/70">
-              Số dư khả dụng
+              Số dư quỹ (Lũy kế)
             </span>
             <div className="w-8 h-8 rounded-[9px] bg-white/20 flex items-center justify-center text-white backdrop-blur-md border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
-              <SFSymbolWallet size={16} />
+              <Wallet size={16} />
             </div>
           </div>
           {/* Bottom Value */}
           <div className="relative z-20 text-[28px] font-black text-white tracking-tight leading-none tabular-nums mt-auto">
-            {formatPrice(totals.balance)}
+            {formatPrice(cumulativeBalance)}
           </div>
           <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
         </div>
@@ -727,20 +739,20 @@ export default function CashBookPage() {
             <div className="w-full h-3 rounded-full bg-slate-200/50 overflow-hidden flex border border-white/60 shadow-inner">
               <div 
                 style={{ width: `${flowPercentages.income}%` }} 
-                className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.2)] transition-all duration-500" 
+                className="h-full bg-gradient-to-r from-[#007aff] to-[#0056b3] shadow-[0_0_10px_rgba(0,122,255,0.2)] transition-all duration-500" 
                 title="Tỷ lệ dòng tiền thu"
               />
               <div 
                 style={{ width: `${flowPercentages.expense}%` }} 
-                className="h-full bg-gradient-to-r from-rose-400 to-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.2)] transition-all duration-500" 
+                className="h-full bg-gradient-to-r from-[#ff9500] to-[#e68100] shadow-[0_0_10px_rgba(255,149,0,0.2)] transition-all duration-500" 
                 title="Tỷ lệ dòng tiền chi"
               />
             </div>
 
             {/* Legend indicators */}
             <div className="flex items-center justify-between text-[10px] text-slate-400 font-semibold pt-0.5 select-none">
-              <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"/> Thu (Inflow)</span>
-              <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block"/> Chi (Outflow)</span>
+              <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-[#007aff] inline-block"/> Thu</span>
+              <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-[#ff9500] inline-block"/> Chi</span>
             </div>
           </div>
         </KinhPanel>
@@ -1382,9 +1394,13 @@ export default function CashBookPage() {
                         <span className="font-semibold text-slate-500 text-right">
                           {selectedEntry.referenceType === "order" ? (
                             "Đơn hàng (Tự động)"
+                          ) : selectedEntry.referenceType === "purchase_order" ? (
+                            "Nhập hàng PO (Tự động)"
                           ) : selectedEntry.referenceType === "other" ? (
                             "Đổi trả bảo hành (Tự động)"
                           ) : selectedEntry.referenceType === "expense" ? (
+                            "Chi phí thủ công"
+                          ) : selectedEntry.type === "expense" ? (
                             "Chi phí thủ công"
                           ) : (
                             "Thu nhập thủ công"
@@ -1582,242 +1598,229 @@ export default function CashBookPage() {
       )}
 
       {/* Elegant Income Category Management Dialog Modal */}
-      {isIncomeCategoryDialogOpen && (
-        <div className="fixed inset-0 bg-[#1d1d1f]/45 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in p-4">
-          <div className="bg-white rounded-2xl border border-[#e0e0e0] w-full max-w-xl shadow-2xl overflow-hidden animate-scale-up flex flex-col max-h-[85vh]">
-            {/* Dialog Header */}
-            <div className="px-6 py-4 bg-[#f5f5f7] border-b border-[#e0e0e0] flex items-center justify-between shrink-0">
-              <h3 className="text-[15px] font-bold text-[#1d1d1f]">Quản Lý Danh Mục Thu Nhập</h3>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsIncomeCategoryDialogOpen(false);
-                  setEditingIncCategoryId(null);
-                }}
-                className="p-1 hover:bg-[#e0e0e0]/40 rounded-lg text-[#7a7a7a] hover:text-[#1d1d1f] transition-all cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Dialog Body - Scrollable content */}
-            <div className="p-6 overflow-y-auto space-y-6 flex-1 text-[13px] leading-relaxed">
+      <Dialog
+        isOpen={isIncomeCategoryDialogOpen}
+        onClose={() => {
+          setIsIncomeCategoryDialogOpen(false);
+          setEditingIncCategoryId(null);
+        }}
+        title="Quản Lý Danh Mục Thu Nhập"
+        size="xl"
+      >
+        <div className="space-y-6 text-[13px] leading-relaxed">
+          
+          {/* SECTION 1: FORM (CREATE OR EDIT) */}
+          {editingIncCategoryId ? (
+            // Edit Category Form
+            <div className="p-4 rounded-xl border border-[#0066cc]/20 bg-[#0066cc]/5 space-y-4">
+              <div className="flex justify-between items-center">
+                <h4 className="font-bold text-[#1d1d1f] text-[14px]">Chỉnh sửa danh mục thu nhập</h4>
+                <button
+                  type="button"
+                  onClick={() => setEditingIncCategoryId(null)}
+                  className="text-[11px] font-semibold text-[#7a7a7a] hover:underline"
+                >
+                  Hủy sửa
+                </button>
+              </div>
               
-              {/* SECTION 1: FORM (CREATE OR EDIT) */}
-              {editingIncCategoryId ? (
-                // Edit Category Form
-                <div className="p-4 rounded-xl border border-[#0066cc]/20 bg-[#0066cc]/5 space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h4 className="font-bold text-[#1d1d1f] text-[14px]">Chỉnh sửa danh mục thu nhập</h4>
-                    <button
-                      type="button"
-                      onClick={() => setEditingIncCategoryId(null)}
-                      className="text-[11px] font-semibold text-[#7a7a7a] hover:underline"
-                    >
-                      Hủy sửa
-                    </button>
-                  </div>
-                  
-                  <div className="space-y-3">
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-[#7a7a7a] uppercase pl-0.5">Tên danh mục *</label>
-                      <input
-                        type="text"
-                        value={editIncCatName}
-                        onChange={(e) => setEditIncCatName(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl bg-white border border-[#e0e0e0] text-[13px] font-semibold focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40"
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-[#7a7a7a] uppercase pl-0.5">Mô tả</label>
-                      <textarea
-                        value={editIncCatDesc}
-                        onChange={(e) => setEditIncCatDesc(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl bg-white border border-[#e0e0e0] text-[13px] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40"
-                        rows={2}
-                      />
-                    </div>
-
-                    <div className="pt-1 flex justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setEditingIncCategoryId(null)}
-                        className="px-4 py-1.5 bg-white border border-[#e0e0e0] text-[#1d1d1f] font-semibold rounded-lg text-[12px]"
-                      >
-                        Hủy
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!editIncCatName.trim()) {
-                            toast.error("Vui lòng nhập tên danh mục");
-                            return;
-                          }
-                          updateIncomeCategoryMutation.mutate({
-                            id: editingIncCategoryId,
-                            payload: {
-                              name: editIncCatName,
-                              description: editIncCatDesc,
-                            }
-                          });
-                        }}
-                        disabled={updateIncomeCategoryMutation.isPending}
-                        className="px-4 py-1.5 bg-[#0066cc] text-white hover:bg-[#0071e3] font-semibold rounded-lg text-[12px] flex items-center gap-1 cursor-pointer"
-                      >
-                        <Check size={14} className="w-3.5 h-3.5" />
-                        Lưu thay đổi
-                      </button>
-                    </div>
-                  </div>
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-[#7a7a7a] uppercase pl-0.5">Tên danh mục *</label>
+                  <input
+                    type="text"
+                    value={editIncCatName}
+                    onChange={(e) => setEditIncCatName(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-[#e0e0e0] text-[13px] font-semibold focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40"
+                    required
+                  />
                 </div>
-              ) : (
-                // Create Category Form
-                <div className="p-4 rounded-xl border border-[#e0e0e0] bg-[#f5f5f7]/55 space-y-4">
-                  <h4 className="font-bold text-[#1d1d1f] text-[14px]">Thêm danh mục thu nhập mới</h4>
-                  <form 
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      if (!newIncCatName.trim()) {
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-[#7a7a7a] uppercase pl-0.5">Mô tả</label>
+                  <textarea
+                    value={editIncCatDesc}
+                    onChange={(e) => setEditIncCatDesc(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-[#e0e0e0] text-[13px] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40"
+                    rows={2}
+                  />
+                </div>
+
+                <div className="pt-1 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingIncCategoryId(null)}
+                    className="px-4 h-[32px] bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#1d1d1f] font-semibold rounded-full text-[12px] transition-all cursor-pointer active:scale-95 duration-200 border border-[#e0e0e0]/40"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!editIncCatName.trim()) {
                         toast.error("Vui lòng nhập tên danh mục");
                         return;
                       }
-                      createIncomeCategoryMutation.mutate({
-                        name: newIncCatName,
-                        description: newIncCatDesc,
+                      updateIncomeCategoryMutation.mutate({
+                        id: editingIncCategoryId,
+                        payload: {
+                          name: editIncCatName,
+                          description: editIncCatDesc,
+                        }
                       });
-                    }} 
-                    className="space-y-3"
+                    }}
+                    disabled={updateIncomeCategoryMutation.isPending}
+                    className="px-4 h-[32px] bg-[#0066cc] hover:bg-[#0055b3] text-white font-semibold rounded-full text-[12px] flex items-center gap-1 cursor-pointer transition-all active:scale-95 duration-200 shadow-sm"
                   >
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-[#7a7a7a] uppercase pl-0.5">Tên danh mục *</label>
-                      <input
-                        type="text"
-                        value={newIncCatName}
-                        onChange={(e) => setNewIncCatName(e.target.value)}
-                        placeholder="Ví dụ: Thu thanh lý tài sản, Thu lãi tiền gửi..."
-                        className="w-full px-3 py-2 rounded-xl bg-white border border-[#e0e0e0] text-[13px] font-semibold focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40"
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-[#7a7a7a] uppercase pl-0.5">Mô tả (Không bắt buộc)</label>
-                      <textarea
-                        value={newIncCatDesc}
-                        onChange={(e) => setNewIncCatDesc(e.target.value)}
-                        placeholder="Mô tả chi tiết về danh mục thu nhập..."
-                        className="w-full px-3 py-2 rounded-xl bg-white border border-[#e0e0e0] text-[13px] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40"
-                        rows={2}
-                      />
-                    </div>
-
-                    <div className="pt-1 flex justify-end">
-                      <button
-                        type="submit"
-                        disabled={createIncomeCategoryMutation.isPending}
-                        className="px-4 h-[34px] bg-[#0066cc] text-white hover:bg-[#0071e3] rounded-lg font-semibold text-[12px] flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Plus size={14} />
-                        {createIncomeCategoryMutation.isPending ? "Đang tạo..." : "Thêm mới"}
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              )}
-
-              {/* SECTION 2: CATEGORIES LIST */}
-              <div className="space-y-3">
-                <h4 className="font-bold text-[#7a7a7a] uppercase tracking-wider pl-0.5 text-[11px]">
-                  Danh sách danh mục hiện có ({incomeCategoriesData?.length || 0})
-                </h4>
-
-                <div className="border border-[#e0e0e0] rounded-xl overflow-hidden bg-white max-h-[250px] overflow-y-auto pr-1 scrollbar-thin">
-                  {incomeCategoriesData && incomeCategoriesData.length > 0 ? (
-                    <div className="divide-y divide-[#e0e0e0]/70">
-                      {incomeCategoriesData.map((c) => {
-                        const isDefault = ["10000000-0000-0000-0000-000000000001", "10000000-0000-0000-0000-000000000002", "10000000-0000-0000-0000-000000000003"].includes(c.id);
-                        return (
-                          <div 
-                            key={c.id} 
-                            className={`p-3.5 flex items-start justify-between gap-4 transition-colors hover:bg-slate-50/50 ${
-                              editingIncCategoryId === c.id ? "bg-[#0066cc]/5" : ""
-                            }`}
-                          >
-                            <div className="space-y-1 min-w-0 flex-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-bold text-[#1d1d1f] text-[13px] truncate">{c.name}</span>
-                                {isDefault && (
-                                  <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500">Mặc định</span>
-                                )}
-                              </div>
-                              {c.description && (
-                                <p className="text-[11.5px] text-[#7a7a7a] font-normal leading-normal">{c.description}</p>
-                              )}
-                            </div>
-
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingIncCategoryId(c.id);
-                                  setEditIncCatName(c.name);
-                                  setEditIncCatDesc(c.description || "");
-                                }}
-                                className="p-1.5 rounded-lg bg-[#f5f5f7] hover:bg-[#e0e0e0] text-[#7a7a7a] hover:text-[#1d1d1f] transition-all cursor-pointer"
-                                title="Chỉnh sửa danh mục"
-                              >
-                                <Pencil size={12} className="w-3 h-3" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (isDefault) {
-                                    toast.error("Không thể xóa danh mục mặc định của hệ thống");
-                                    return;
-                                  }
-                                  setIncCategoryToDelete(c);
-                                }}
-                                disabled={deleteIncomeCategoryMutation.isPending}
-                                className={`p-1.5 rounded-lg transition-all ${
-                                  isDefault
-                                    ? "bg-slate-100/70 text-slate-400 cursor-not-allowed opacity-50"
-                                    : "bg-red-50 hover:bg-red-100 text-red-500 hover:text-red-700 cursor-pointer"
-                                }`}
-                                title={isDefault ? "Không thể xóa danh mục mặc định của hệ thống" : "Xóa danh mục"}
-                              >
-                                <Trash2 size={12} className="w-3 h-3" />
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="text-[12px] text-gray-500 text-center py-6">Chưa có danh mục nào được lập.</p>
-                  )}
+                    <Check size={14} className="w-3.5 h-3.5" />
+                    Lưu thay đổi
+                  </button>
                 </div>
               </div>
-
             </div>
-
-            {/* Dialog Footer */}
-            <div className="px-6 py-4 bg-[#f5f5f7] border-t border-[#e0e0e0] flex items-center justify-end shrink-0">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsIncomeCategoryDialogOpen(false);
-                  setEditingIncCategoryId(null);
-                }}
-                className="px-5 h-[36px] bg-[#0066cc] hover:bg-[#0071e3] text-white font-semibold rounded-xl text-[12px] transition-all cursor-pointer shadow-sm"
+          ) : (
+            // Create Category Form
+            <div className="p-4 rounded-xl border border-[#e0e0e0] bg-[#f5f5f7]/55 space-y-4">
+              <h4 className="font-bold text-[#1d1d1f] text-[14px]">Thêm danh mục thu nhập mới</h4>
+              <form 
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!newIncCatName.trim()) {
+                    toast.error("Vui lòng nhập tên danh mục");
+                    return;
+                  }
+                  createIncomeCategoryMutation.mutate({
+                    name: newIncCatName,
+                    description: newIncCatDesc,
+                  });
+                }} 
+                className="space-y-3"
               >
-                Đóng
-              </button>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-[#7a7a7a] uppercase pl-0.5">Tên danh mục *</label>
+                  <input
+                    type="text"
+                    value={newIncCatName}
+                    onChange={(e) => setNewIncCatName(e.target.value)}
+                    placeholder="Ví dụ: Thu thanh lý tài sản, Thu lãi tiền gửi..."
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-[#e0e0e0] text-[13px] font-semibold focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-[#7a7a7a] uppercase pl-0.5">Mô tả (Không bắt buộc)</label>
+                  <textarea
+                    value={newIncCatDesc}
+                    onChange={(e) => setNewIncCatDesc(e.target.value)}
+                    placeholder="Mô tả chi tiết về danh mục thu nhập..."
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-[#e0e0e0] text-[13px] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40"
+                    rows={2}
+                  />
+                </div>
+
+                <div className="pt-1 flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={createIncomeCategoryMutation.isPending}
+                    className="px-5 h-[36px] bg-[#0066cc] hover:bg-[#0055b3] text-white rounded-full font-semibold text-[12px] flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 duration-200 shadow-sm"
+                  >
+                    <Plus size={14} />
+                    {createIncomeCategoryMutation.isPending ? "Đang tạo..." : "Thêm mới"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* SECTION 2: CATEGORIES LIST */}
+          <div className="space-y-3">
+            <h4 className="font-bold text-[#7a7a7a] uppercase tracking-wider pl-0.5 text-[11px]">
+              Danh sách danh mục hiện có ({incomeCategoriesData?.length || 0})
+            </h4>
+
+            <div className="border border-[#e0e0e0] rounded-xl overflow-hidden bg-white max-h-[250px] overflow-y-auto pr-1 scrollbar-thin">
+              {incomeCategoriesData && incomeCategoriesData.length > 0 ? (
+                <div className="divide-y divide-[#e0e0e0]/70">
+                  {incomeCategoriesData.map((c) => {
+                    const isDefault = ["10000000-0000-0000-0000-000000000001", "10000000-0000-0000-0000-000000000002", "10000000-0000-0000-0000-000000000003"].includes(c.id);
+                    return (
+                      <div 
+                        key={c.id} 
+                        className={`p-3.5 flex items-start justify-between gap-4 transition-colors hover:bg-slate-50/50 ${
+                          editingIncCategoryId === c.id ? "bg-[#0066cc]/5" : ""
+                        }`}
+                      >
+                        <div className="space-y-1 min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-[#1d1d1f] text-[13px] truncate">{c.name}</span>
+                            {isDefault && (
+                              <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500">Mặc định</span>
+                            )}
+                          </div>
+                          {c.description && (
+                            <p className="text-[11.5px] text-[#7a7a7a] font-normal leading-normal">{c.description}</p>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingIncCategoryId(c.id);
+                              setEditIncCatName(c.name);
+                              setEditIncCatDesc(c.description || "");
+                            }}
+                            className="p-1.5 rounded-lg bg-[#f5f5f7] hover:bg-[#e0e0e0] text-[#7a7a7a] hover:text-[#1d1d1f] transition-all cursor-pointer"
+                            title="Chỉnh sửa danh mục"
+                          >
+                            <Pencil size={12} className="w-3 h-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (isDefault) {
+                                toast.error("Không thể xóa danh mục mặc định của hệ thống");
+                                return;
+                              }
+                              setIncCategoryToDelete(c);
+                            }}
+                            disabled={deleteIncomeCategoryMutation.isPending}
+                            className={`p-1.5 rounded-lg transition-all ${
+                              isDefault
+                                ? "bg-slate-100/70 text-slate-400 cursor-not-allowed opacity-50"
+                                : "bg-red-50 hover:bg-red-100 text-red-500 hover:text-red-700 cursor-pointer"
+                            }`}
+                            title={isDefault ? "Không thể xóa danh mục mặc định của hệ thống" : "Xóa danh mục"}
+                          >
+                            <Trash2 size={12} className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-[12px] text-gray-500 text-center py-6">Chưa có danh mục nào được lập.</p>
+              )}
             </div>
           </div>
+
+          {/* Footer Close Button */}
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#e0e0e0] mt-6">
+            <button
+              type="button"
+              onClick={() => {
+                setIsIncomeCategoryDialogOpen(false);
+                setEditingIncCategoryId(null);
+              }}
+              className="px-6 h-[36px] bg-[#0066cc] hover:bg-[#0055b3] text-white font-semibold rounded-full text-[13px] transition-all cursor-pointer active:scale-95 duration-200 shadow-sm"
+            >
+              Đóng
+            </button>
+          </div>
         </div>
-      )}
+      </Dialog>
 
       {/* Sleek Custom Confirm Dialog for Income Category Deletion */}
       <ConfirmDialog

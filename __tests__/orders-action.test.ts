@@ -30,6 +30,8 @@ const { mockDb } = vi.hoisted(() => {
     orderBy: vi.fn().mockImplementation(() => mockDbObj),
     offset: vi.fn().mockImplementation(() => mockDbObj),
     limit: vi.fn().mockImplementation(() => mockDbObj),
+    groupBy: vi.fn().mockImplementation(() => mockDbObj),
+    as: vi.fn().mockImplementation(() => mockDbObj),
     returning: vi.fn().mockImplementation(() => Promise.resolve([])),
     then: vi.fn().mockImplementation((cb: any) => Promise.resolve([]).then(cb)),
   };
@@ -64,6 +66,8 @@ const mockChain = (resolved: any) => {
     where: vi.fn().mockImplementation(() => obj),
     orderBy: vi.fn().mockImplementation(() => obj),
     offset: vi.fn().mockImplementation(() => obj),
+    groupBy: vi.fn().mockImplementation(() => obj),
+    as: vi.fn().mockImplementation(() => obj),
     limit: vi.fn().mockImplementation(() => Promise.resolve(resolved)),
     returning: vi.fn().mockImplementation(() => Promise.resolve(resolved)),
     then: vi.fn().mockImplementation((cb: any) => Promise.resolve(resolved).then(cb)),
@@ -83,6 +87,8 @@ const createTxMock = (selectResponses: any[], insertResponses: any[] = [], updat
     where: vi.fn().mockImplementation(() => chainObj),
     orderBy: vi.fn().mockImplementation(() => chainObj),
     offset: vi.fn().mockImplementation(() => chainObj),
+    groupBy: vi.fn().mockImplementation(() => chainObj),
+    as: vi.fn().mockImplementation(() => chainObj),
     limit: vi.fn().mockImplementation(() => Promise.resolve(chainObj.currentVal)),
     returning: vi.fn().mockImplementation(() => Promise.resolve(chainObj.currentVal)),
     set: vi.fn().mockImplementation(() => chainObj),
@@ -136,6 +142,8 @@ describe('Server Actions - Quản lý Đơn hàng (Orders Module)', () => {
     mockDb.orderBy.mockImplementation(() => mockDb);
     mockDb.offset.mockImplementation(() => mockDb);
     mockDb.limit.mockImplementation(() => mockDb);
+    mockDb.groupBy.mockImplementation(() => mockDb);
+    mockDb.as.mockImplementation(() => mockDb);
     mockDb.returning.mockImplementation(() => Promise.resolve([]));
     mockDb.then.mockImplementation((cb: any) => Promise.resolve([]).then(cb));
   });
@@ -259,6 +267,8 @@ describe('Server Actions - Quản lý Đơn hàng (Orders Module)', () => {
         [
           [{ id: 'guest-1', fullName: 'Khách vãng lai' }],
           [{ id: 'inv-1', status: 'in_stock', costPrice: '10000000', serialNumber: 'SN-001' }],
+          [{ id: 'acc-prod-1', name: 'Phụ kiện chung' }],
+          [], // attached accessories
           [{ id: 'profile-1', fullName: 'Staff' }],
           [{ id: 'guest-1', totalSpent: '0', orderCount: 0 }],
           [{ serialNumber: 'SN-001', productName: 'iPhone', sellingPrice: '12000000' }]
@@ -283,6 +293,8 @@ describe('Server Actions - Quản lý Đơn hàng (Orders Module)', () => {
         [
           [],
           [{ id: 'inv-1', status: 'in_stock', costPrice: '10000000', serialNumber: 'SN-001' }],
+          [{ id: 'acc-prod-1', name: 'Phụ kiện chung' }],
+          [], // attached accessories
           [{ id: 'profile-1', fullName: 'Staff' }],
           [{ id: 'guest-new', totalSpent: '0', orderCount: 0 }],
           [{ serialNumber: 'SN-001', productName: 'iPhone', sellingPrice: '12000000' }]
@@ -314,6 +326,8 @@ describe('Server Actions - Quản lý Đơn hàng (Orders Module)', () => {
         [
           [],
           [{ id: 'inv-1', status: 'in_stock', costPrice: '10000000', serialNumber: 'SN-001' }],
+          [{ id: 'acc-prod-1', name: 'Phụ kiện chung' }],
+          [], // attached accessories
           [{ id: 'profile-1', fullName: 'Staff' }],
           [{ id: 'guest-new', totalSpent: '0', orderCount: 0 }],
           [{ serialNumber: 'SN-001', productName: 'iPhone', sellingPrice: '12000000' }]
@@ -339,7 +353,7 @@ describe('Server Actions - Quản lý Đơn hàng (Orders Module)', () => {
     });
 
     it('báo lỗi nếu một số máy không tồn tại', async () => {
-      const txMock = createTxMock([[]]);
+      const txMock = createTxMock([[], []]);
 
       vi.mocked(db.transaction).mockImplementationOnce(async (cb: any) => {
         return cb(txMock);
@@ -351,7 +365,7 @@ describe('Server Actions - Quản lý Đơn hàng (Orders Module)', () => {
         items: [{ inventoryItemId: 'inv-1', productId: 'prod-1', sellingPrice: '12000000', warrantyMonths: 12 }],
       });
       expect(res.success).toBe(false);
-      expect(res.message).toContain('không tồn tại trong hệ thống');
+      expect(res.message).toContain('không tồn tại trong kho');
     });
 
     it('báo lỗi nếu máy đã bán', async () => {
@@ -369,13 +383,15 @@ describe('Server Actions - Quản lý Đơn hàng (Orders Module)', () => {
         items: [{ inventoryItemId: 'inv-1', productId: 'prod-1', sellingPrice: '12000000', warrantyMonths: 12 }],
       });
       expect(res.success).toBe(false);
-      expect(res.message).toContain('đã được bán hoặc không sẵn sàng');
+      expect(res.message).toContain('đã bán hoặc không sẵn sàng');
     });
 
     it('báo lỗi nếu chưa cấu hình tài khoản nhân viên', async () => {
       const txMock = createTxMock([
-        [{ id: 'inv-1', status: 'in_stock', costPrice: '10000000' }],
-        []
+        [{ id: 'inv-1', status: 'in_stock', costPrice: '10000000', serialNumber: 'SN-001' }],
+        [{ id: 'acc-prod-1', name: 'Phụ kiện chung' }],
+        [], // attachedAccs
+        [] // profile
       ]);
 
       vi.mocked(db.transaction).mockImplementationOnce(async (cb: any) => {
@@ -467,7 +483,7 @@ describe('Server Actions - Quản lý Đơn hàng (Orders Module)', () => {
 
       const res = await cancelOrderAction('order-1');
       expect(res.success).toBe(true);
-      expect(res.order?.status).toBe('cancelled');
+      expect((res as any).order?.status).toBe('cancelled');
     });
 
     it('phải hủy đơn hàng thành công nhưng gặp lỗi gửi Telegram', async () => {
@@ -544,7 +560,7 @@ describe('Server Actions - Quản lý Đơn hàng (Orders Module)', () => {
         notes: 'Pay part 2',
       });
       expect(res.success).toBe(true);
-      expect(res.payment?.amount).toBe('3000000');
+      expect((res as any).payment?.amount).toBe('3000000');
     });
 
     it('phải ghi nhận thanh toán bổ sung thành công và đổi status sang paid', async () => {
@@ -688,7 +704,7 @@ describe('Server Actions - Quản lý Đơn hàng (Orders Module)', () => {
       mockDb.limit.mockResolvedValueOnce([{ id: 'order-1', orderNumber: 'ORD-001' }]);
       
       let thenCallCount = 0;
-      mockDb.then.mockImplementation((onfulfilled) => {
+      mockDb.then.mockImplementation((onfulfilled: any) => {
         thenCallCount++;
         if (thenCallCount === 1) {
           return Promise.resolve([{ id: 'oi-1', productName: 'iPhone', serialNumber: 'SN-001' }]).then(onfulfilled);

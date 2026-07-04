@@ -16,6 +16,7 @@ export function useRealtimeSubscription(table: string, queryKeys: string[][]) {
 
   useEffect(() => {
     const supabase = createClient();
+    let timeoutId: NodeJS.Timeout | null = null;
 
     const channel = supabase
       .channel(`realtime-db-${table}`)
@@ -28,10 +29,17 @@ export function useRealtimeSubscription(table: string, queryKeys: string[][]) {
         },
         (payload) => {
           console.log(`📡 [Realtime] Postgres change detected on [${table}]:`, payload);
-          // Invalidate each of the specified React Query keys
-          keysRef.current.forEach((key) => {
-            queryClient.invalidateQueries({ queryKey: key });
-          });
+          
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+          }
+          
+          timeoutId = setTimeout(() => {
+            console.log(`📡 [Realtime] Debounced query invalidation triggered for [${table}]`);
+            keysRef.current.forEach((key) => {
+              queryClient.invalidateQueries({ queryKey: key });
+            });
+          }, 300);
         }
       )
       .subscribe((status) => {
@@ -40,6 +48,9 @@ export function useRealtimeSubscription(table: string, queryKeys: string[][]) {
 
     return () => {
       console.log(`📡 [Realtime] Unsubscribing from channel for [${table}]`);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       supabase.removeChannel(channel);
     };
   }, [table, queryClient]);

@@ -127,7 +127,7 @@ export function DefectiveActionsDialog({ isOpen, onClose, item, actionType }: De
 
       if (result.success) {
         toast.success(result.message);
-        queryClient.invalidateQueries({ queryKey: ["inventory"] });
+        await queryClient.refetchQueries({ queryKey: ["inventory"] });
         queryClient.invalidateQueries({ queryKey: ["cashbook_entries"] });
         queryClient.invalidateQueries({ queryKey: ["financial_summary"] });
         onClose();
@@ -147,7 +147,7 @@ export function DefectiveActionsDialog({ isOpen, onClose, item, actionType }: De
       onClose={onClose}
       title={getTitle()}
       description={`Thiết bị: ${item.productName} • Serial: ${item.serialNumber}${item.supplierName ? ` • NCC: ${item.supplierName}` : ""}`}
-      size="md"
+      size="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-5 pt-2">
         
@@ -182,6 +182,7 @@ export function DefectiveActionsDialog({ isOpen, onClose, item, actionType }: De
                 value={repairType}
                 onChange={(val) => setRepairType(val as any)}
                 dropdownWidth="full"
+                size="sm"
               />
             </div>
 
@@ -209,7 +210,7 @@ export function DefectiveActionsDialog({ isOpen, onClose, item, actionType }: De
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-[12px] font-semibold text-[#7a7a7a] uppercase tracking-wider pl-1">
+                <label className="text-[12px] font-semibold text-[#7a7a7a] uppercase tracking-wider pl-1 whitespace-nowrap">
                   Chi phí sửa chữa (VND)
                 </label>
                 <div className="relative">
@@ -225,7 +226,7 @@ export function DefectiveActionsDialog({ isOpen, onClose, item, actionType }: De
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[12px] font-semibold text-[#7a7a7a] uppercase tracking-wider pl-1">
+                <label className="text-[12px] font-semibold text-[#7a7a7a] uppercase tracking-wider pl-1 whitespace-nowrap">
                   Phương thức thanh toán
                 </label>
                 <CustomSelect
@@ -234,6 +235,7 @@ export function DefectiveActionsDialog({ isOpen, onClose, item, actionType }: De
                   onChange={(val) => setPaymentMethod(val as any)}
                   dropdownWidth="full"
                   disabled={!repairCost || parseVND(repairCost) === "0"}
+                  size="sm"
                 />
               </div>
             </div>
@@ -243,13 +245,9 @@ export function DefectiveActionsDialog({ isOpen, onClose, item, actionType }: De
         {/* REFUND ACTION (Trả hàng hoàn tiền) */}
         {actionType === "refund" && (
           <div className="space-y-4">
-            <div className="bg-[#f5f5f7] p-4 rounded-xl border border-[#e0e0e0]/50 text-[13px] text-[#7a7a7a] leading-relaxed">
-              ⚠️ Hành động này sẽ xuất trả máy cũ lỗi cho Nhà cung cấp (chuyển trạng thái sang <span className="font-semibold text-[#1d1d1f]">Đã trả hàng - returned</span>). Số tiền NCC hoàn lại sẽ được hạch toán ngay vào **Thu Quỹ** của Sổ quỹ.
-            </div>
-
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-[12px] font-semibold text-[#7a7a7a] uppercase tracking-wider pl-1">
+                <label className="text-[12px] font-semibold text-[#7a7a7a] uppercase tracking-wider pl-1 whitespace-nowrap">
                   Số tiền hoàn lại (VND)
                 </label>
                 <div className="relative">
@@ -266,7 +264,7 @@ export function DefectiveActionsDialog({ isOpen, onClose, item, actionType }: De
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[12px] font-semibold text-[#7a7a7a] uppercase tracking-wider pl-1">
+                <label className="text-[12px] font-semibold text-[#7a7a7a] uppercase tracking-wider pl-1 whitespace-nowrap">
                   Phương thức thanh toán
                 </label>
                 <CustomSelect
@@ -274,6 +272,7 @@ export function DefectiveActionsDialog({ isOpen, onClose, item, actionType }: De
                   value={paymentMethod}
                   onChange={(val) => setPaymentMethod(val as any)}
                   dropdownWidth="full"
+                  size="sm"
                 />
               </div>
             </div>

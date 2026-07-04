@@ -218,33 +218,47 @@ describe('Accounting Server Actions', () => {
       mockDb.then.mockImplementation((onfulfilled) => {
         selectCount++;
         if (selectCount === 1) {
-          // entries
+          // totals
           return Promise.resolve([
-            { amount: '10000000', category: 'sales', type: 'income', entryDate: '2026-06-01' },
-            { amount: '2000000', category: 'salary', type: 'expense', entryDate: '2026-06-02' }
+            { type: 'income', sum: '10000000' },
+            { type: 'expense', sum: '2000000' }
           ]).then(onfulfilled);
         }
         if (selectCount === 2) {
+          // catStats
+          return Promise.resolve([
+            { category: 'sales', type: 'income', sum: '10000000' },
+            { category: 'salary', type: 'expense', sum: '2000000' }
+          ]).then(onfulfilled);
+        }
+        if (selectCount === 3) {
           // ordersStats
           return Promise.resolve([{ totalProfit: '5000000' }]).then(onfulfilled);
         }
-        if (selectCount === 3) {
+        if (selectCount === 4) {
           // warrantyStats
           return Promise.resolve([{ totalWarrantyCost: '1000000' }]).then(onfulfilled);
         }
-        if (selectCount === 4) {
+        if (selectCount === 5) {
           // expensesStats
           return Promise.resolve([{ totalExpense: '2000000' }]).then(onfulfilled);
         }
-        if (selectCount === 5) {
+        if (selectCount === 6) {
           // returnsStats
           return Promise.resolve([{ totalRefund: '1500000', totalFee: '200000' }]).then(onfulfilled);
         }
-        if (selectCount === 6) {
+        if (selectCount === 7) {
           // daysData
           return Promise.resolve([
             { date: '2026-06-01', type: 'income', totalAmount: '10000000' },
             { date: '2026-06-02', type: 'expense', totalAmount: '2000000' }
+          ]).then(onfulfilled);
+        }
+        if (selectCount === 8) {
+          // monthlyData
+          return Promise.resolve([
+            { month: '2026-06', type: 'income', sum: '10000000' },
+            { month: '2026-06', type: 'expense', sum: '2000000' }
           ]).then(onfulfilled);
         }
         return Promise.resolve([]).then(onfulfilled);

@@ -20,6 +20,14 @@ import { eq, desc, ilike, or, sql, and, inArray } from "drizzle-orm";
 // ============================================================
 export async function getCustomersList() {
   try {
+    // Tự động dọn dẹp số điện thoại của Khách vãng lai nếu có
+    if (process.env.NODE_ENV !== "test") {
+      await db
+        .update(customers)
+        .set({ phone: null })
+        .where(and(eq(customers.fullName, "Khách vãng lai"), sql`phone IS NOT NULL`));
+    }
+
     const list = await db
       .select({
         id: customers.id,
@@ -133,6 +141,7 @@ export async function getCustomerDetail(customerId: string) {
         itemId: inventoryItems.id,
         serialNumber: inventoryItems.serialNumber,
         status: inventoryItems.status,
+        location: inventoryItems.location,
         productName: products.name,
         productSpecs: products.specs,
         brandName: brands.name,

@@ -14,8 +14,14 @@ import {
   products, 
   leadSources,
   brands,
+  categories,
   cashBookEntries,
-  returns
+  returns,
+  quotations,
+  purchaseOrders,
+  purchaseOrderItems,
+  accessoryItems,
+  accessoryCatalog
 } from "@/lib/db/schema";
 import { eq, desc, inArray, and, or, ilike, sql } from "drizzle-orm";
 import { sendTelegramNotification } from "@/lib/telegram/notifier";
@@ -147,7 +153,6 @@ export async function getOrdersList(params?: {
   }
 }
 
-// 2. Lấy danh sách máy đang "Sẵn hàng" trong kho để bán
 export async function getInStockItemsForSelect() {
   try {
     const items = await db
@@ -169,9 +174,64 @@ export async function getInStockItemsForSelect() {
       .where(eq(inventoryItems.status, "in_stock"))
       .orderBy(products.name);
 
-    return items;
+    // Fetch attached accessories
+    const attachedAccs = await db
+      .select({
+        id: accessoryItems.id,
+        inventoryItemId: accessoryItems.inventoryItemId,
+        serialNumber: accessoryItems.serialNumber,
+        unitCost: accessoryItems.unitCost,
+        sellingPrice: accessoryItems.sellingPrice,
+        catalogName: accessoryCatalog.name,
+      })
+      .from(accessoryItems)
+      .innerJoin(accessoryCatalog, eq(accessoryItems.accessoryCatalogId, accessoryCatalog.id))
+      .where(eq(accessoryItems.status, "attached"));
+
+    const accMap: Record<string, any[]> = {};
+    for (const acc of attachedAccs) {
+      if (acc.inventoryItemId) {
+        if (!accMap[acc.inventoryItemId]) {
+          accMap[acc.inventoryItemId] = [];
+        }
+        accMap[acc.inventoryItemId].push(acc);
+      }
+    }
+
+    const itemsWithAccessories = items.map(item => ({
+      ...item,
+      accessoryCost: "0",
+      shippingCost: "0",
+      taxImport: "0",
+      poItemsCount: 0,
+      accessories: accMap[item.id] || [],
+    }));
+
+    return itemsWithAccessories;
   } catch (error) {
     console.error("Lỗi lấy danh sách máy sẵn kho:", error);
+    return [];
+  }
+}
+
+export async function getInStockAccessoriesForSelect() {
+  try {
+    const list = await db
+      .select({
+        id: accessoryItems.id,
+        serialNumber: accessoryItems.serialNumber,
+        unitCost: accessoryItems.unitCost,
+        sellingPrice: accessoryItems.sellingPrice,
+        catalogName: accessoryCatalog.name,
+        catalogId: accessoryCatalog.id,
+      })
+      .from(accessoryItems)
+      .innerJoin(accessoryCatalog, eq(accessoryItems.accessoryCatalogId, accessoryCatalog.id))
+      .where(eq(accessoryItems.status, "in_stock"))
+      .orderBy(accessoryCatalog.name);
+    return list;
+  } catch (error) {
+    console.error("Lỗi lấy danh sách phụ kiện sẵn kho:", error);
     return [];
   }
 }
@@ -179,11 +239,20 @@ export async function getInStockItemsForSelect() {
 // 3. Lấy danh sách khách hàng cho dropdown
 export async function getCustomersForSelect() {
   try {
+    // Tự động dọn dẹp số điện thoại của Khách vãng lai nếu có
+    if (process.env.NODE_ENV !== "test") {
+      await db
+        .update(customers)
+        .set({ phone: null })
+        .where(and(eq(customers.fullName, "Khách vãng lai"), sql`phone IS NOT NULL`));
+    }
+
     return await db
       .select({
         id: customers.id,
         fullName: customers.fullName,
         phone: customers.phone,
+        leadSourceId: customers.leadSourceId,
       })
       .from(customers)
       .orderBy(customers.fullName);
@@ -200,6 +269,8 @@ export async function getLeadSourcesAction() {
       .select({
         id: leadSources.id,
         name: leadSources.name,
+        color: leadSources.color,
+        icon: leadSources.icon,
       })
       .from(leadSources)
       .where(eq(leadSources.isActive, true))
@@ -217,6 +288,7 @@ export async function createCustomerAction(data: {
   email?: string;
   address?: string;
   notes?: string;
+  leadSourceId?: string;
 }) {
   try {
     const [newCustomer] = await db
@@ -227,6 +299,7 @@ export async function createCustomerAction(data: {
         email: data.email || null,
         address: data.address || null,
         notes: data.notes || null,
+        leadSourceId: data.leadSourceId || null,
         totalSpent: "0",
         orderCount: 0,
       })
@@ -239,13 +312,111 @@ export async function createCustomerAction(data: {
   }
 }
 
+// 5.1. Thêm nguồn khách mới
+export async function createLeadSourceAction(data: {
+  name: string;
+  color?: string;
+  icon?: string;
+}) {
+  try {
+    if (!data.name?.trim()) {
+      return { success: false, message: "Tên nguồn không được để trống" };
+    }
+    const [newSource] = await db
+      .insert(leadSources)
+      .values({
+        name: data.name.trim(),
+        color: data.color || "#636366",
+        icon: data.icon || "",
+        isActive: true,
+      })
+      .returning();
+    return { success: true, message: "Thêm nguồn khách thành công", leadSource: newSource };
+  } catch (error: any) {
+    console.error("Lỗi tạo nguồn khách:", error);
+    if (error.code === "23505") {
+      return { success: false, message: "Nguồn khách này đã tồn tại" };
+    }
+    return { success: false, message: "Không thể thêm nguồn khách" };
+  }
+}
+
+// 5.2. Cập nhật nguồn khách
+export async function updateLeadSourceAction(
+  id: string,
+  data: {
+    name?: string;
+    color?: string;
+    icon?: string;
+    isActive?: boolean;
+  }
+) {
+  try {
+    const existing = await db.select().from(leadSources).where(eq(leadSources.id, id)).limit(1);
+    if (!existing.length) {
+      return { success: false, message: "Không tìm thấy nguồn khách" };
+    }
+
+    const updateData: any = {};
+    if (data.name !== undefined) updateData.name = data.name.trim();
+    if (data.color !== undefined) updateData.color = data.color;
+    if (data.icon !== undefined) updateData.icon = data.icon;
+    if (data.isActive !== undefined) updateData.isActive = data.isActive;
+
+    const [updatedSource] = await db
+      .update(leadSources)
+      .set(updateData)
+      .where(eq(leadSources.id, id))
+      .returning();
+
+    return { success: true, message: "Cập nhật nguồn khách thành công", leadSource: updatedSource };
+  } catch (error: any) {
+    console.error("Lỗi cập nhật nguồn khách:", error);
+    if (error.code === "23505") {
+      return { success: false, message: "Tên nguồn khách bị trùng" };
+    }
+    return { success: false, message: "Không thể cập nhật nguồn khách" };
+  }
+}
+
+// 5.3. Xóa nguồn khách (an toàn khóa ngoại)
+export async function deleteLeadSourceAction(id: string) {
+  try {
+    // 1. Gỡ liên kết khóa ngoại bằng cách set NULL ở các bảng liên quan
+    await db
+      .update(customers)
+      .set({ leadSourceId: null })
+      .where(eq(customers.leadSourceId, id));
+
+    await db
+      .update(orders)
+      .set({ leadSourceId: null })
+      .where(eq(orders.leadSourceId, id));
+
+    await db
+      .update(quotations)
+      .set({ leadSourceId: null })
+      .where(eq(quotations.leadSourceId, id));
+
+    // 2. Xóa khỏi database
+    await db.delete(leadSources).where(eq(leadSources.id, id));
+
+    return { success: true, message: "Xóa nguồn khách thành công" };
+  } catch (error) {
+    console.error("Lỗi xóa nguồn khách:", error);
+    return { success: false, message: "Không thể xóa nguồn khách" };
+  }
+}
+
+
 // 6. Tạo Đơn hàng mới (Transaction)
 export async function createOrderAction(data: {
   customerId?: string;
   leadSourceId?: string;
   saleChannel: "online" | "offline";
   items: {
-    inventoryItemId: string;
+    inventoryItemId?: string;
+    accessoryItemId?: string;
     productId: string;
     sellingPrice: string;
     discount?: string;
@@ -277,12 +448,18 @@ export async function createOrderAction(data: {
 
         if (guestCustomers.length > 0) {
           finalCustomerId = guestCustomers[0].id;
+          if (guestCustomers[0].phone) {
+            await tx
+              .update(customers)
+              .set({ phone: null })
+              .where(eq(customers.id, guestCustomers[0].id));
+          }
         } else {
           const [newGuest] = await tx
             .insert(customers)
             .values({
               fullName: "Khách vãng lai",
-              phone: "0999888777",
+              phone: null,
               notes: "Khách vãng lai",
             })
             .returning();
@@ -295,23 +472,139 @@ export async function createOrderAction(data: {
       const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
       const orderNumber = `ORD-${dateStr}-${randomSuffix}`;
 
-      // 2. Kiểm tra tính sẵn sàng của các máy trong kho
-      const itemIds = data.items.map((i) => i.inventoryItemId);
-      const dbItems = await tx
-        .select()
-        .from(inventoryItems)
-        .where(inArray(inventoryItems.id, itemIds));
+      // 2. Kiểm tra tính sẵn sàng của các máy và phụ kiện trong kho
+      const inputMachineIds = data.items.map(i => i.inventoryItemId).filter(Boolean) as string[];
+      const inputAccessoryIds = data.items.map(i => i.accessoryItemId).filter(Boolean) as string[];
 
-      if (dbItems.length !== data.items.length) {
-        throw new Error("Một số sản phẩm không tồn tại trong hệ thống kho");
+      let dbMachines: any[] = [];
+      if (inputMachineIds.length > 0) {
+        dbMachines = await tx
+          .select()
+          .from(inventoryItems)
+          .where(inArray(inventoryItems.id, inputMachineIds));
+          
+        if (dbMachines.length !== inputMachineIds.length) {
+          throw new Error("Một số sản phẩm máy không tồn tại trong kho");
+        }
+        if (dbMachines.some(m => m.status !== 'in_stock')) {
+          throw new Error("Một số sản phẩm máy đã bán hoặc không sẵn sàng");
+        }
       }
 
-      const anyNotStock = dbItems.some((i) => i.status !== "in_stock");
-      if (anyNotStock) {
-        throw new Error("Một số sản phẩm đã được bán hoặc không sẵn sàng trong kho");
+      let dbAccessories: any[] = [];
+      if (inputAccessoryIds.length > 0) {
+        dbAccessories = await tx
+          .select()
+          .from(accessoryItems)
+          .where(inArray(accessoryItems.id, inputAccessoryIds));
+
+        if (dbAccessories.length !== inputAccessoryIds.length) {
+          throw new Error("Một số phụ kiện không tồn tại trong kho");
+        }
+        if (dbAccessories.some(a => a.status !== 'in_stock')) {
+          throw new Error("Một số phụ kiện đã bán hoặc không sẵn sàng");
+        }
       }
 
-      const itemCostMap = new Map(dbItems.map((i) => [i.id, Number(i.costPrice)]));
+      // Đảm bảo có sản phẩm "Phụ kiện chung" đại diện
+      let accessoryProductId: string;
+      const existingAccProd = await tx.select().from(products).where(eq(products.name, "Phụ kiện chung")).limit(1);
+      if (existingAccProd.length > 0) {
+        accessoryProductId = existingAccProd[0].id;
+      } else {
+        const accCats = await tx.select().from(categories).where(eq(categories.name, "Phụ kiện")).limit(1);
+        let accCatId = accCats[0]?.id;
+        if (!accCatId) {
+          const [newCat] = await tx.insert(categories).values({ name: "Phụ kiện", slug: "phu-kien" }).returning();
+          accCatId = newCat.id;
+        }
+        const defaultBrands = await tx.select().from(brands).limit(1);
+        const brandId = defaultBrands[0]?.id;
+        
+        const [newProd] = await tx.insert(products).values({
+          name: "Phụ kiện chung",
+          slug: "phu-kien-chung",
+          sku: "PK-CHUNG",
+          categoryId: accCatId,
+          brandId,
+          isActive: true,
+          warrantyMonths: 12,
+        }).returning();
+        accessoryProductId = newProd.id;
+      }
+
+      const finalItemsToInsert: any[] = [];
+      const accessoriesToUpdateSold: string[] = [];
+      const machinesToUpdateSold: string[] = [];
+
+      for (const item of data.items) {
+        if (item.inventoryItemId) {
+          const machine = dbMachines.find(m => m.id === item.inventoryItemId);
+          machinesToUpdateSold.push(machine.id);
+
+          const attachedAccessories = await tx
+            .select()
+            .from(accessoryItems)
+            .where(and(eq(accessoryItems.inventoryItemId, machine.id), eq(accessoryItems.status, 'attached')));
+
+          const sumAttachedCost = attachedAccessories.reduce((sum, a) => sum + Number(a.unitCost || 0), 0);
+          const machineCost = Math.max(0, Number(machine.costPrice || 0) - sumAttachedCost);
+
+          const selling = Number(item.sellingPrice);
+          const disc = Number(item.discount || 0);
+          const profit = selling - machineCost - disc;
+
+          finalItemsToInsert.push({
+            inventoryItemId: machine.id,
+            accessoryItemId: null,
+            productId: item.productId,
+            sellingPrice: item.sellingPrice,
+            costPrice: machineCost.toString(),
+            discount: disc.toString(),
+            profit: profit.toString(),
+            warrantyMonths: item.warrantyMonths,
+            isGift: false,
+          });
+
+          for (const acc of attachedAccessories) {
+            accessoriesToUpdateSold.push(acc.id);
+            finalItemsToInsert.push({
+              inventoryItemId: null,
+              accessoryItemId: acc.id,
+              productId: accessoryProductId,
+              sellingPrice: "0",
+              costPrice: acc.unitCost,
+              discount: "0",
+              profit: (-Number(acc.unitCost)).toString(),
+              warrantyMonths: 12,
+              isGift: true,
+            });
+          }
+        }
+      }
+
+      for (const item of data.items) {
+        if (item.accessoryItemId) {
+          const acc = dbAccessories.find(a => a.id === item.accessoryItemId);
+          accessoriesToUpdateSold.push(acc.id);
+
+          const selling = Number(item.sellingPrice);
+          const disc = Number(item.discount || 0);
+          const profit = selling - Number(acc.unitCost) - disc;
+
+          finalItemsToInsert.push({
+            inventoryItemId: null,
+            accessoryItemId: acc.id,
+            productId: accessoryProductId,
+            sellingPrice: item.sellingPrice,
+            costPrice: acc.unitCost,
+            discount: disc.toString(),
+            profit: profit.toString(),
+            warrantyMonths: item.warrantyMonths,
+            isGift: false,
+          });
+        }
+      }
 
       // 3. Lấy nhân viên bán hàng (Lấy profile đầu tiên làm người tạo nếu chưa có auth)
       const ownerProfiles = await tx.select().from(profiles).limit(1);
@@ -325,25 +618,10 @@ export async function createOrderAction(data: {
       let totalCost = 0;
       let totalItemDiscounts = 0;
 
-      const itemsToInsert = data.items.map((item) => {
-        const cost = itemCostMap.get(item.inventoryItemId) || 0;
-        const selling = Number(item.sellingPrice);
-        const disc = Number(item.discount || 0);
-        const profit = selling - cost - disc;
-
-        subtotal += selling;
-        totalCost += cost;
-        totalItemDiscounts += disc;
-
-        return {
-          inventoryItemId: item.inventoryItemId,
-          productId: item.productId,
-          sellingPrice: item.sellingPrice,
-          costPrice: cost.toString(),
-          discount: disc.toString(),
-          profit: profit.toString(),
-          warrantyMonths: item.warrantyMonths,
-        };
+      finalItemsToInsert.forEach((item) => {
+        subtotal += Number(item.sellingPrice);
+        totalCost += Number(item.costPrice);
+        totalItemDiscounts += Number(item.discount || 0);
       });
 
       const generalDiscount = Number(data.discountAmount || 0);
@@ -372,7 +650,7 @@ export async function createOrderAction(data: {
           orderNumber,
           customerId: finalCustomerId,
           leadSourceId: data.leadSourceId || null,
-          status: data.saleChannel === "online" ? "processing" : "completed", // Đang giao nếu bán online, ngược lại hoàn tất
+          status: data.saleChannel === "online" ? "processing" : "completed",
           saleChannel: data.saleChannel,
           subtotal: subtotal.toString(),
           discountAmount: data.discountAmount || "0",
@@ -391,7 +669,7 @@ export async function createOrderAction(data: {
         .returning();
 
       // 6. Thêm các item của đơn hàng và cập nhật kho hàng loạt
-      const orderItemsToInsert = itemsToInsert.map(item => ({
+      const orderItemsToInsert = finalItemsToInsert.map(item => ({
         orderId: newOrder.id,
         ...item,
       }));
@@ -400,42 +678,57 @@ export async function createOrderAction(data: {
       const movementsToInsert = [];
       const updatePromises = [];
 
-      for (const item of itemsToInsert) {
-        const startDate = new Date();
-        const endDate = new Date();
-        endDate.setMonth(startDate.getMonth() + (item.warrantyMonths || 0));
+      for (const item of finalItemsToInsert) {
+        if (item.inventoryItemId) {
+          const startDate = new Date();
+          const endDate = new Date();
+          endDate.setMonth(startDate.getMonth() + (item.warrantyMonths || 0));
 
-        const warrantyStartStr = startDate.toISOString().split("T")[0];
-        const warrantyEndStr = endDate.toISOString().split("T")[0];
+          const warrantyStartStr = startDate.toISOString().split("T")[0];
+          const warrantyEndStr = endDate.toISOString().split("T")[0];
 
-        updatePromises.push(
-          tx
-            .update(inventoryItems)
-            .set({
-              status: "sold",
-              soldDate: startDate.toISOString().split("T")[0],
-              warrantyStart: warrantyStartStr,
-              warrantyEnd: warrantyEndStr,
-              updatedAt: new Date(),
-            })
-            .where(eq(inventoryItems.id, item.inventoryItemId))
-        );
+          updatePromises.push(
+            tx
+              .update(inventoryItems)
+              .set({
+                status: "sold",
+                soldDate: startDate.toISOString().split("T")[0],
+                warrantyStart: warrantyStartStr,
+                warrantyEnd: warrantyEndStr,
+                updatedAt: new Date(),
+              })
+              .where(eq(inventoryItems.id, item.inventoryItemId))
+          );
 
-        movementsToInsert.push({
-          inventoryItemId: item.inventoryItemId,
-          movementType: "sold" as const,
-          fromStatus: "in_stock",
-          toStatus: "sold",
-          referenceType: "order" as const,
-          referenceId: newOrder.id,
-          quantityChange: -1,
-          notes: `Bán sản phẩm theo Đơn hàng ${orderNumber}`,
-          performedBy: soldById,
-        });
+          movementsToInsert.push({
+            inventoryItemId: item.inventoryItemId,
+            movementType: "sold" as const,
+            fromStatus: "in_stock",
+            toStatus: "sold",
+            referenceType: "order" as const,
+            referenceId: newOrder.id,
+            quantityChange: -1,
+            notes: `Bán sản phẩm theo Đơn hàng ${orderNumber}`,
+            performedBy: soldById,
+          });
+        }
       }
 
       await Promise.all(updatePromises);
-      await tx.insert(inventoryMovements).values(movementsToInsert);
+      if (movementsToInsert.length > 0) {
+        await tx.insert(inventoryMovements).values(movementsToInsert);
+      }
+
+      // Cập nhật trạng thái các phụ kiện đã bán
+      if (accessoriesToUpdateSold.length > 0) {
+        await tx
+          .update(accessoryItems)
+          .set({
+            status: "sold",
+            updatedAt: new Date(),
+          })
+          .where(inArray(accessoryItems.id, accessoriesToUpdateSold));
+      }
 
       // 7. Cập nhật thống kê chi tiêu của Khách hàng
       const customer = await tx
@@ -587,7 +880,8 @@ export async function cancelOrderAction(orderId: string) {
       const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, orderId));
 
       // 3. Khôi phục trạng thái máy về sẵn kho hàng loạt
-      const inventoryItemIds = items.map((i) => i.inventoryItemId);
+      const machineItems = items.filter((i) => i.inventoryItemId);
+      const inventoryItemIds = machineItems.map((i) => i.inventoryItemId) as string[];
       if (inventoryItemIds.length > 0) {
         await tx
           .update(inventoryItems)
@@ -600,8 +894,8 @@ export async function cancelOrderAction(orderId: string) {
           })
           .where(inArray(inventoryItems.id, inventoryItemIds));
 
-        const movementsToInsert = items.map((item) => ({
-          inventoryItemId: item.inventoryItemId,
+        const movementsToInsert = machineItems.map((item) => ({
+          inventoryItemId: item.inventoryItemId as string,
           movementType: "returned" as const,
           fromStatus: "sold",
           toStatus: "in_stock",
@@ -613,6 +907,23 @@ export async function cancelOrderAction(orderId: string) {
         }));
 
         await tx.insert(inventoryMovements).values(movementsToInsert);
+      }
+
+      // 3.5. Khôi phục trạng thái phụ kiện bán/tặng trong đơn hàng
+      const orderAccessories = items.filter((i) => i.accessoryItemId);
+      for (const item of orderAccessories) {
+        const accs = await tx.select().from(accessoryItems).where(eq(accessoryItems.id, item.accessoryItemId as string)).limit(1);
+        if (accs.length > 0) {
+          const acc = accs[0];
+          const newStatus = acc.inventoryItemId ? 'attached' : 'in_stock';
+          await tx
+            .update(accessoryItems)
+            .set({
+              status: newStatus,
+              updatedAt: new Date(),
+            })
+            .where(eq(accessoryItems.id, item.accessoryItemId as string));
+        }
       }
 
       // 4. Khấu trừ tích lũy mua hàng của khách hàng

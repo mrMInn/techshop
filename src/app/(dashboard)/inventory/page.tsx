@@ -12,7 +12,7 @@ import {
   bulkConfirmArrival,
   bulkDeleteInventoryItems,
 } from "@/app/actions/inventory";
-import { getPurchaseOrdersList, getPurchaseOrderDetail, updateAccessoryCostAction } from "@/app/actions/purchase-orders";
+import { getPurchaseOrdersList, getPurchaseOrderDetail, updatePurchaseOrderAction } from "@/app/actions/purchase-orders";
 import { GlassCard } from "@/components/ui/glass-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { 
@@ -24,7 +24,6 @@ import {
   SFSymbolTruck,
   SFSymbolSquareAndPencil,
   SFSymbolTrash,
-  SFSymbolEye,
   SFSymbolCheckmarkCircle,
   SFSymbolCPU,
   SFSymbolMemoryChip,
@@ -36,24 +35,30 @@ import {
   SFSymbolArrowRightLeft,
   SFSymbolDisplay
 } from "@/components/ui/apple-icons";
-import { useState, useMemo, Fragment, useEffect } from "react";
+import { useState, useMemo, useEffect, Suspense } from "react";
 import { useRealtimeSubscription } from "@/hooks/use-realtime";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { Dialog } from "@/components/ui/dialog";
 import { InventoryForm } from "@/components/inventory/inventory-form";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { InventoryDetailDialog } from "@/components/inventory/inventory-detail-dialog";
+import { AccessoryInventoryTab } from "@/components/inventory/accessory-inventory-tab";
+
 import { CustomSelect } from "@/components/ui/custom-select";
 import Link from "next/link";
 import { DefectiveActionsDialog } from "@/components/inventory/defective-actions-dialog";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 
 
-export default function InventoryPage() {
+function InventoryPageContent() {
   const queryClient = useQueryClient();
   
   // Kích hoạt Supabase Realtime cho kho hàng
   useRealtimeSubscription("inventory_items", [["inventory"]]);
+
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
 
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
@@ -65,19 +70,53 @@ export default function InventoryPage() {
   
   // Custom dialog states
   const [itemToDelete, setItemToDelete] = useState<any>(null);
-  const [selectedItemForDetails, setSelectedItemForDetails] = useState<any>(null);
+
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBulkDeleteConfirmOpen, setIsBulkDeleteConfirmOpen] = useState(false);
-  const [activeDrawerProductId, setActiveDrawerProductId] = useState<string | null>(null);
+
+  // Sync activeTab with URL query param 'tab'
+  const tabParam = searchParams.get("tab");
+  const activeTab = (tabParam === "defective" || tabParam === "returned" || tabParam === "purchase_orders" || tabParam === "accessories" ? tabParam : "active") as "active" | "defective" | "returned" | "purchase_orders" | "accessories";
+
+  const setActiveTab = (tab: "active" | "defective" | "returned" | "purchase_orders" | "accessories") => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", tab);
+    params.delete("modelId");
+    params.delete("poId");
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+
+  // Sync activeDrawerProductId with URL query param 'modelId'
+  const activeDrawerProductId = searchParams.get("modelId");
+  const setActiveDrawerProductId = (productId: string | null) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (productId) {
+      params.set("modelId", productId);
+    } else {
+      params.delete("modelId");
+    }
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+
+  // Sync selectedPoId with URL query param 'poId'
+  const selectedPoId = searchParams.get("poId");
+  const setSelectedPoId = (poId: string | null) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (poId) {
+      params.set("poId", poId);
+    } else {
+      params.delete("poId");
+    }
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  };
 
   // Purchase Orders & Cost allocation states
-  const [selectedPoId, setSelectedPoId] = useState<string | null>(null);
-  const [editingAccessoryItem, setEditingAccessoryItem] = useState<any>(null);
-  const [accessoryCostInput, setAccessoryCostInput] = useState<string>("0");
-  const [accessoryNotesInput, setAccessoryNotesInput] = useState<string>("");
+  const [isEditingPo, setIsEditingPo] = useState(false);
+  const [poStatusInput, setPoStatusInput] = useState<string>("");
+  const [poShippingCostInput, setPoShippingCostInput] = useState<string>("");
+  const [poTaxImportInput, setPoTaxImportInput] = useState<string>("");
 
   // Defective inventory / Kho lỗi states
-  const [activeTab, setActiveTab] = useState<"active" | "defective" | "returned" | "purchase_orders">("active");
   const [defectiveItem, setDefectiveItem] = useState<any>(null);
   const [defectiveActionType, setDefectiveActionType] = useState<"report" | "repair" | "complete" | "refund" | "writeoff" | null>(null);
 
@@ -98,6 +137,8 @@ export default function InventoryPage() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+
 
   const bulkConfirmMutation = useMutation({
     mutationFn: (ids: string[]) => bulkConfirmArrival(ids),
@@ -148,23 +189,52 @@ export default function InventoryPage() {
     staleTime: 10000, // Cache for 10 seconds to make Drawer toggle instant
   });
 
-  const updateAccessoryCostMutation = useMutation({
-    mutationFn: (data: { itemId: string; cost: number; notes: string | null }) =>
-      updateAccessoryCostAction(data.itemId, data.cost, data.notes),
+  useEffect(() => {
+    if (poDetailData?.po) {
+      setPoStatusInput(poDetailData.po.status);
+      setPoShippingCostInput(poDetailData.po.shippingCost ? Math.round(Number(poDetailData.po.shippingCost)).toString() : "0");
+      setPoTaxImportInput(poDetailData.po.taxImport ? Math.round(Number(poDetailData.po.taxImport)).toString() : "0");
+    }
+  }, [poDetailData]);
+
+  useEffect(() => {
+    if (!selectedPoId) {
+      setIsEditingPo(false);
+    }
+  }, [selectedPoId]);
+
+
+
+  const updatePoMutation = useMutation({
+    mutationFn: (data: { id: string; payload: { status?: any; shippingCost?: string; taxImport?: string } }) =>
+      updatePurchaseOrderAction(data.id, data.payload),
     onSuccess: (res) => {
       if (res.success) {
         toast.success(res.message);
-        queryClient.invalidateQueries({ queryKey: ["inventory"] });
         queryClient.invalidateQueries({ queryKey: ["purchaseOrders"] });
-        if (selectedPoId) {
-          queryClient.invalidateQueries({ queryKey: ["purchaseOrderDetail", selectedPoId] });
-        }
-        setEditingAccessoryItem(null);
+        queryClient.invalidateQueries({ queryKey: ["purchaseOrderDetail", selectedPoId] });
+        queryClient.invalidateQueries({ queryKey: ["inventory"] });
+        setIsEditingPo(false);
       } else {
         toast.error(res.message);
       }
     },
-    onError: () => toast.error("Có lỗi xảy ra khi cập nhật chi phí phụ kiện"),
+    onError: () => toast.error("Có lỗi xảy ra khi cập nhật phiếu nhập"),
+  });
+
+  const updateItemStatusMutation = useMutation({
+    mutationFn: (data: { id: string; status: any }) => updateInventoryItem(data.id, { status: data.status }),
+    onSuccess: (res) => {
+      if (res.success) {
+        toast.success(res.message);
+        queryClient.invalidateQueries({ queryKey: ["inventory"] });
+        queryClient.invalidateQueries({ queryKey: ["purchaseOrderDetail", selectedPoId] });
+        queryClient.invalidateQueries({ queryKey: ["purchaseOrders"] });
+      } else {
+        toast.error(res.message);
+      }
+    },
+    onError: () => toast.error("Có lỗi xảy ra khi cập nhật trạng thái sản phẩm"),
   });
 
   const filteredPurchaseOrders = useMemo(() => {
@@ -191,6 +261,7 @@ export default function InventoryPage() {
       if (res.success) {
         toast.success(res.message);
         queryClient.invalidateQueries({ queryKey: ["inventory"] });
+        queryClient.invalidateQueries({ queryKey: ["purchaseOrders"] });
         setIsDialogOpen(false);
       } else {
         toast.error(res.message);
@@ -205,6 +276,7 @@ export default function InventoryPage() {
       if (res.success) {
         toast.success(res.message);
         queryClient.invalidateQueries({ queryKey: ["inventory"] });
+        queryClient.invalidateQueries({ queryKey: ["purchaseOrders"] });
         setIsDialogOpen(false);
         setEditingItem(null);
       } else {
@@ -261,10 +333,7 @@ export default function InventoryPage() {
     }
   };
 
-  const handleOpenDetails = (item: any) => {
-    setActiveMenuId(null);
-    setSelectedItemForDetails(item);
-  };
+
 
 
 
@@ -294,6 +363,13 @@ export default function InventoryPage() {
       style: "currency",
       currency: "VND",
     }).format(Number(price));
+  };
+
+  const formatVNDInput = (value: string) => {
+    if (!value) return "";
+    const num = parseInt(value.replace(/\D/g, ""), 10);
+    if (isNaN(num)) return "";
+    return num.toLocaleString("vi-VN");
   };
 
   const formatToDDMMYYYY = (dateString: string | Date | null) => {
@@ -337,7 +413,8 @@ export default function InventoryPage() {
       return [
         { value: "all", label: "Tất cả trạng thái lỗi" },
         { value: "defective", label: "Máy lỗi" },
-        { value: "warranty_repair", label: "Đang sửa/BH" },
+        { value: "internal_repair", label: "Đang sửa" },
+        { value: "supplier_warranty", label: "Đang BH" },
       ];
     } else {
       return [
@@ -348,12 +425,10 @@ export default function InventoryPage() {
 
   const poStatusOptions = [
     { value: "all", label: "Tất cả trạng thái" },
-    { value: "draft", label: "Bản nháp" },
-    { value: "ordered", label: "Đã đặt hàng" },
     { value: "in_transit", label: "Đang vận chuyển" },
-    { value: "partially_received", label: "Nhận một phần" },
-    { value: "received", label: "Đã hoàn thành" },
-    { value: "cancelled", label: "Đã hủy" },
+    { value: "received", label: "Đã sẵn hàng" },
+    { value: "warranty_supplier", label: "Bảo hành NCC" },
+    { value: "returned_supplier", label: "Đã trả NCC" },
   ];
 
   const poSupplierOptions = useMemo(() => {
@@ -385,9 +460,15 @@ export default function InventoryPage() {
           ? (item.status !== "deleted" && item.status !== "sold" && item.status !== "defective" && item.status !== "warranty_repair" && item.status !== "returned")
           : item.status === selectedStatus;
       } else if (activeTab === "defective") {
-        matchesStatus = selectedStatus === "all"
-          ? (item.status === "defective" || item.status === "warranty_repair")
-          : item.status === selectedStatus;
+        if (selectedStatus === "all") {
+          matchesStatus = (item.status === "defective" || item.status === "warranty_repair");
+        } else if (selectedStatus === "defective") {
+          matchesStatus = (item.status === "defective");
+        } else if (selectedStatus === "internal_repair") {
+          matchesStatus = (item.status === "warranty_repair" && item.location === "internal_repair");
+        } else if (selectedStatus === "supplier_warranty") {
+          matchesStatus = (item.status === "warranty_repair" && item.location !== "internal_repair");
+        }
       } else if (activeTab === "returned") {
         matchesStatus = item.status === "returned";
       }
@@ -480,8 +561,53 @@ export default function InventoryPage() {
   }, [filteredItems]);
 
   const activeDrawerProductFromList = useMemo(() => {
-    return groupedItems.find((g) => g.productId === activeDrawerProductId) || null;
-  }, [groupedItems, activeDrawerProductId]);
+    const found = groupedItems.find((g) => g.productId === activeDrawerProductId);
+    if (found) return found;
+
+    if (!activeDrawerProductId || !items) return null;
+    const productItems = items.filter((item) => item.productId === activeDrawerProductId);
+    if (productItems.length === 0) return null;
+
+    const first = productItems[0];
+    const brandName = first.brandName;
+    const categoryName = first.categoryName;
+    const productName = first.productName;
+    const productSku = first.productSku;
+    const productSpecs = first.productSpecs;
+
+    const supplierNames: string[] = [];
+    const costPrices: number[] = [];
+    let inStockCount = 0;
+    let incomingCount = 0;
+
+    for (const item of productItems) {
+      if (item.status === 'in_stock') {
+        inStockCount += 1;
+      } else if (item.status === 'incoming') {
+        incomingCount += 1;
+      }
+      if (item.supplierName && !supplierNames.includes(item.supplierName)) {
+        supplierNames.push(item.supplierName);
+      }
+      const totalCost = Number(item.costPrice || 0);
+      costPrices.push(totalCost);
+    }
+
+    return {
+      productId: activeDrawerProductId,
+      productName,
+      productSku,
+      brandName,
+      categoryName,
+      productSpecs,
+      inStockCount,
+      incomingCount,
+      totalCount: productItems.length,
+      costPrices,
+      items: productItems,
+      supplierNames,
+    };
+  }, [groupedItems, activeDrawerProductId, items]);
 
   const [cachedDrawerProduct, setCachedDrawerProduct] = useState<any>(null);
 
@@ -495,224 +621,133 @@ export default function InventoryPage() {
 
   const activeDrawerProduct = activeDrawerProductFromList || cachedDrawerProduct;
 
+  const activeDrawerDefectiveCount = useMemo(() => {
+    if (!activeDrawerProduct || !items) return 0;
+    return items.filter((item: any) => item.productId === activeDrawerProduct.productId && (item.status === 'defective' || item.status === 'warranty_repair')).length;
+  }, [activeDrawerProduct, items]);
+
   return (
     <div className="space-y-8">
-      {/* Header section - Photography-first presentation, clean, spacious */}
-      {/* Header section - Premium 2-row presentation, clean, spacious */}
-      <div className="space-y-6 pb-6 border-b border-[#e0e0e0]">
-        {/* Row 1: Title & Tabs & Action */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <h1 className="text-[40px] font-semibold tracking-tight leading-[1.10] bg-clip-text text-transparent select-none shrink-0" style={{ backgroundImage: "linear-gradient(90deg, #2997ff, #a855f7, #ec4899)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-            Kho hàng
-          </h1>
-          
-          <div className="flex items-center gap-3 shrink-0 self-start sm:self-auto">
-            {/* Premium Apple-Style Segmented Control (Matching Quotations Tab Style) */}
-            <div className="flex bg-[#f5f5f7] p-[3px] rounded-full text-[12.5px] border border-[#e0e0e0] shadow-[inset_0_1px_1.5px_rgba(0,0,0,0.03)] gap-1 select-none">
-              <button
-                type="button"
-                onClick={() => setActiveTab("active")}
-                className={`px-4.5 py-1.5 rounded-full transition-all duration-200 select-none cursor-pointer flex items-center justify-center gap-2 active:scale-[0.98] ${
-                  activeTab === "active"
-                    ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-md shadow-[0_3px_8px_rgba(0,102,204,0.15)] border border-white/10 font-bold scale-[1.01]"
-                    : "text-slate-600 hover:text-slate-900 font-semibold"
-                }`}
-              >
-                <span>Kho bán</span>
-                {(items?.filter((i) => i.status === "in_stock" || i.status === "incoming").length || 0) > 0 && (
-                  <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full leading-none transition-all duration-200 ${
-                    activeTab === "active" 
-                      ? "bg-white text-blue-600 shadow-sm" 
-                      : "bg-[#0066cc] text-white shadow-[0_1px_3px_rgba(0,102,204,0.25)]"
-                  }`}>
-                    {items?.filter((i) => i.status === "in_stock" || i.status === "incoming").length || 0}
-                  </span>
-                )}
-              </button>
+      {/* Dropdown Filters & Search & Action Buttons */}
+      {activeTab !== "accessories" && (
+        <div className="flex flex-wrap items-center gap-3 pb-6 border-b border-[#e0e0e0]">
 
-              <button
-                type="button"
-                onClick={() => setActiveTab("defective")}
-                className={`px-4.5 py-1.5 rounded-full transition-all duration-200 select-none cursor-pointer flex items-center justify-center gap-2 active:scale-[0.98] ${
-                  activeTab === "defective"
-                    ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-md shadow-[0_3px_8px_rgba(0,102,204,0.15)] border border-white/10 font-bold scale-[1.01]"
-                    : "text-slate-600 hover:text-slate-900 font-semibold"
-                }`}
-              >
-                <span>Kho lỗi</span>
-                {(items?.filter((i) => i.status === "defective" || i.status === "warranty_repair").length || 0) > 0 && (
-                  <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full leading-none transition-all duration-200 ${
-                    activeTab === "defective" 
-                      ? "bg-white text-blue-600 shadow-sm" 
-                      : "bg-[#ff3b30] text-white shadow-[0_1px_3px_rgba(255,59,48,0.25)]"
-                  }`}>
-                    {items?.filter((i) => i.status === "defective" || i.status === "warranty_repair").length || 0}
-                  </span>
-                )}
-              </button>
+            {/* Category Filter */}
+            {activeTab !== "purchase_orders" && (
+              <div className="w-full sm:w-40">
+                <CustomSelect
+                  options={categoryOptions}
+                  value={selectedCategory}
+                  onChange={setSelectedCategory}
+                  size="sm"
+                  rounded="full"
+                  dropdownWidth="full"
+                />
+              </div>
+            )}
 
-              <button
-                type="button"
-                onClick={() => setActiveTab("returned")}
-                className={`px-4.5 py-1.5 rounded-full transition-all duration-200 select-none cursor-pointer flex items-center justify-center gap-2 active:scale-[0.98] ${
-                  activeTab === "returned"
-                    ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-md shadow-[0_3px_8px_rgba(0,102,204,0.15)] border border-white/10 font-bold scale-[1.01]"
-                    : "text-slate-600 hover:text-slate-900 font-semibold"
-                }`}
-              >
-                <span>Đã trả NCC</span>
-                {(items?.filter((i) => i.status === "returned").length || 0) > 0 && (
-                  <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full leading-none transition-all duration-200 ${
-                    activeTab === "returned" 
-                      ? "bg-white text-blue-600 shadow-sm" 
-                      : "bg-slate-500 text-white shadow-[0_1px_3px_rgba(100,116,139,0.25)]"
-                  }`}>
-                    {items?.filter((i) => i.status === "returned").length || 0}
-                  </span>
-                )}
-              </button>
+            {/* Brand Filter */}
+            {activeTab !== "purchase_orders" && (
+              <div className="w-full sm:w-44">
+                <CustomSelect
+                  options={brandOptions}
+                  value={selectedBrand}
+                  onChange={setSelectedBrand}
+                  size="sm"
+                  rounded="full"
+                  dropdownWidth="full"
+                />
+              </div>
+            )}
 
-              <button
-                type="button"
-                onClick={() => setActiveTab("purchase_orders")}
-                className={`px-4.5 py-1.5 rounded-full transition-all duration-200 select-none cursor-pointer flex items-center justify-center gap-2 active:scale-[0.98] ${
-                  activeTab === "purchase_orders"
-                    ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-md shadow-[0_3px_8px_rgba(0,102,204,0.15)] border border-white/10 font-bold scale-[1.01]"
-                    : "text-slate-600 hover:text-slate-900 font-semibold"
-                }`}
-              >
-                <span>Phiếu nhập hàng</span>
-                {purchaseOrdersData?.purchaseOrders && purchaseOrdersData.purchaseOrders.length > 0 && (
-                  <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full leading-none transition-all duration-200 ${
-                    activeTab === "purchase_orders" 
-                      ? "bg-white text-blue-600 shadow-sm" 
-                      : "bg-[#0066cc] text-white shadow-[0_1px_3px_rgba(0,102,204,0.25)]"
-                  }`}>
-                    {purchaseOrdersData.purchaseOrders.length}
-                  </span>
-                )}
-              </button>
+            {/* Status Filter */}
+            {activeTab !== "purchase_orders" && (
+              <div className="w-full sm:w-40">
+                <CustomSelect
+                  options={statusOptions}
+                  value={selectedStatus}
+                  onChange={setSelectedStatus}
+                  size="sm"
+                  rounded="full"
+                  dropdownWidth="full"
+                />
+              </div>
+            )}
+
+            {/* Purchase Order Status Filter */}
+            {activeTab === "purchase_orders" && (
+              <div className="w-full sm:w-44">
+                <CustomSelect
+                  options={poStatusOptions}
+                  value={selectedPoStatus}
+                  onChange={setSelectedPoStatus}
+                  size="sm"
+                  rounded="full"
+                  dropdownWidth="full"
+                />
+              </div>
+            )}
+
+            {/* Purchase Order Supplier Filter */}
+            {activeTab === "purchase_orders" && (
+              <div className="w-full sm:w-48">
+                <CustomSelect
+                  options={poSupplierOptions}
+                  value={selectedPoSupplier}
+                  onChange={setSelectedPoSupplier}
+                  size="sm"
+                  rounded="full"
+                  dropdownWidth="full"
+                />
+              </div>
+            )}
+
+            {/* Search Input */}
+            <div className="relative w-full sm:w-48 shrink-0">
+              <SFSymbolMagnifyingGlass className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7a7a7a]" size={14} />
+              <input 
+                type="text" 
+                placeholder={activeTab === "purchase_orders" ? "Tìm số đơn, nhà cung cấp..." : "Tìm sản phẩm"} 
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-9 pr-4 h-[40px] rounded-full bg-[#f5f5f7] border border-[#e0e0e0] text-[13px] font-medium text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 transition-all placeholder:text-[#7a7a7a]/60"
+              />
             </div>
+
+            {/* Reset Button */}
+            {((activeTab !== "purchase_orders" && (selectedCategory !== "all" || selectedBrand !== "all" || selectedStatus !== "all" || search !== "")) ||
+              (activeTab === "purchase_orders" && (selectedPoStatus !== "all" || selectedPoSupplier !== "all" || search !== ""))) && (
+              <button
+                onClick={() => {
+                  if (activeTab === "purchase_orders") {
+                    setSelectedPoStatus("all");
+                    setSelectedPoSupplier("all");
+                  } else {
+                    setSelectedCategory("all");
+                    setSelectedBrand("all");
+                    setSelectedStatus("all");
+                  }
+                  setSearch("");
+                }}
+                className="h-[40px] w-[40px] bg-[#f5f5f7] hover:bg-[#e8e8ed] border border-[#e0e0e0] text-[#7a7a7a] hover:text-[#1d1d1f] rounded-full transition-all cursor-pointer flex items-center justify-center shrink-0 active:scale-95 duration-200"
+                title="Đặt lại bộ lọc"
+              >
+                <SFSymbolArrowClockwise size={14} />
+              </button>
+            )}
 
             {/* Nhập kho Button */}
-            <button 
-              onClick={handleOpenCreateDialog}
-              className="flex items-center gap-1.5 px-4 h-[34px] bg-[#0066cc] text-white text-[12.5px] font-semibold rounded-full hover:bg-[#0071e3] transition-all cursor-pointer shadow-sm active:scale-95 duration-200 shrink-0"
-            >
-              <SFSymbolPlus size={13} />
-              <span>Nhập kho</span>
-            </button>
+            {activeTab !== "purchase_orders" && (
+              <button 
+                onClick={handleOpenCreateDialog}
+                className="flex items-center gap-1.5 px-4 h-[40px] bg-[#0066cc] text-white text-[13px] font-semibold rounded-full hover:bg-[#0071e3] transition-all cursor-pointer shadow-sm active:scale-95 duration-200 shrink-0 ml-auto"
+              >
+                <SFSymbolPlus size={13} />
+                <span>Nhập kho</span>
+              </button>
+            )}
           </div>
-        </div>
-
-        {/* Row 2: Dropdown Filters & Search & Action Buttons */}
-        <div className="flex flex-wrap items-center gap-3">
-
-          {/* Category Filter */}
-          {activeTab !== "purchase_orders" && (
-            <div className="w-full sm:w-40">
-              <CustomSelect
-                options={categoryOptions}
-                value={selectedCategory}
-                onChange={setSelectedCategory}
-                size="sm"
-                rounded="full"
-                dropdownWidth="full"
-              />
-            </div>
-          )}
-
-          {/* Brand Filter */}
-          {activeTab !== "purchase_orders" && (
-            <div className="w-full sm:w-44">
-              <CustomSelect
-                options={brandOptions}
-                value={selectedBrand}
-                onChange={setSelectedBrand}
-                size="sm"
-                rounded="full"
-                dropdownWidth="full"
-              />
-            </div>
-          )}
-
-          {/* Status Filter */}
-          {activeTab !== "purchase_orders" && (
-            <div className="w-full sm:w-40">
-              <CustomSelect
-                options={statusOptions}
-                value={selectedStatus}
-                onChange={setSelectedStatus}
-                size="sm"
-                rounded="full"
-                dropdownWidth="full"
-              />
-            </div>
-          )}
-
-          {/* Purchase Order Status Filter */}
-          {activeTab === "purchase_orders" && (
-            <div className="w-full sm:w-44">
-              <CustomSelect
-                options={poStatusOptions}
-                value={selectedPoStatus}
-                onChange={setSelectedPoStatus}
-                size="sm"
-                rounded="full"
-                dropdownWidth="full"
-              />
-            </div>
-          )}
-
-          {/* Purchase Order Supplier Filter */}
-          {activeTab === "purchase_orders" && (
-            <div className="w-full sm:w-48">
-              <CustomSelect
-                options={poSupplierOptions}
-                value={selectedPoSupplier}
-                onChange={setSelectedPoSupplier}
-                size="sm"
-                rounded="full"
-                dropdownWidth="full"
-              />
-            </div>
-          )}
-
-          {/* Search Input */}
-          <div className="relative w-full sm:w-48 shrink-0">
-            <SFSymbolMagnifyingGlass className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7a7a7a]" size={14} />
-            <input 
-              type="text" 
-              placeholder={activeTab === "purchase_orders" ? "Tìm số đơn, nhà cung cấp..." : "Tìm sản phẩm"} 
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 h-[40px] rounded-full bg-[#f5f5f7] border border-[#e0e0e0] text-[13px] font-medium text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 transition-all placeholder:text-[#7a7a7a]/60"
-            />
-          </div>
-
-          {/* Reset Button */}
-          {((activeTab !== "purchase_orders" && (selectedCategory !== "all" || selectedBrand !== "all" || selectedStatus !== "all" || search !== "")) ||
-            (activeTab === "purchase_orders" && (selectedPoStatus !== "all" || selectedPoSupplier !== "all" || search !== ""))) && (
-            <button
-              onClick={() => {
-                if (activeTab === "purchase_orders") {
-                  setSelectedPoStatus("all");
-                  setSelectedPoSupplier("all");
-                } else {
-                  setSelectedCategory("all");
-                  setSelectedBrand("all");
-                  setSelectedStatus("all");
-                }
-                setSearch("");
-              }}
-              className="h-[40px] w-[40px] bg-[#f5f5f7] hover:bg-[#e8e8ed] border border-[#e0e0e0] text-[#7a7a7a] hover:text-[#1d1d1f] rounded-full transition-all cursor-pointer flex items-center justify-center shrink-0 active:scale-95 duration-200"
-              title="Đặt lại bộ lọc"
-            >
-              <SFSymbolArrowClockwise size={14} />
-            </button>
-          )}
-        </div>
-      </div>
+        )}
 
       {/* Stats Cards - Premium Apple Shortcuts style */}
       {activeTab === "active" && (
@@ -860,37 +895,42 @@ export default function InventoryPage() {
 
 
       {/* Smart Model Summary Header */}
-      <div className="flex items-center justify-between text-[13px] text-[#7a7a7a] font-medium px-1">
-        {activeTab === "active" ? (
-          <>
-            <div>Đang quản lý <span className="font-bold text-[#1d1d1f]">{groupedItems.length}</span> cấu hình sản phẩm khác nhau.</div>
-            <div>Tổng tồn trong kho: <span className="font-bold text-[#0066cc]">{items?.filter(i => i.status === "in_stock").length || 0}</span> máy.</div>
-          </>
-        ) : activeTab === "defective" ? (
-          <>
-            <div>Có <span className="font-bold text-[#1d1d1f]">{groupedItems.length}</span> cấu hình sản phẩm đang có thiết bị lỗi.</div>
-            <div>Tổng máy lỗi/đang sửa: <span className="font-bold text-red-500">{items?.filter(i => i.status === "defective" || i.status === "warranty_repair").length || 0}</span> máy.</div>
-          </>
-        ) : (
-          <>
-            <div>Có <span className="font-bold text-[#1d1d1f]">{groupedItems.length}</span> cấu hình sản phẩm đã trả nhà cung cấp.</div>
-            <div>Tổng máy đã trả NCC: <span className="font-bold text-slate-500">{items?.filter(i => i.status === "returned").length || 0}</span> máy.</div>
-          </>
-        )}
-      </div>
+      {(activeTab === "active" || activeTab === "defective" || activeTab === "returned") && (
+        <div className="flex items-center justify-between text-[13px] text-[#7a7a7a] font-medium px-1">
+          {activeTab === "active" ? (
+            <>
+              <div>Đang quản lý <span className="font-bold text-[#1d1d1f]">{groupedItems.length}</span> cấu hình sản phẩm khác nhau.</div>
+              <div>Tổng tồn trong kho: <span className="font-bold text-[#0066cc]">{items?.filter(i => i.status === "in_stock").length || 0}</span> máy.</div>
+            </>
+          ) : activeTab === "defective" ? (
+            <>
+              <div>Có <span className="font-bold text-[#1d1d1f]">{groupedItems.length}</span> cấu hình sản phẩm đang có thiết bị lỗi.</div>
+              <div>Tổng máy lỗi/đang sửa: <span className="font-bold text-red-500">{items?.filter(i => i.status === "defective" || i.status === "warranty_repair").length || 0}</span> máy.</div>
+            </>
+          ) : activeTab === "returned" ? (
+            <>
+              <div>Có <span className="font-bold text-[#1d1d1f]">{groupedItems.length}</span> cấu hình sản phẩm đã trả nhà cung cấp.</div>
+              <div>Tổng máy đã trả NCC: <span className="font-bold text-slate-500">{items?.filter(i => i.status === "returned").length || 0}</span> máy.</div>
+            </>
+          ) : null}
+        </div>
+      )}
 
       {/* 4. Main Data Card - Crisp Apple store card layout */}
-      <GlassCard className="p-0 overflow-hidden">
-        {isLoading ? (
-          <div className="p-16 flex flex-col items-center justify-center text-[#7a7a7a]">
-            <SFSymbolArrowClockwise className="animate-spin mb-4 text-[#0066cc]" size={24} />
-            <p className="text-[17px]">Đang truy xuất kho...</p>
-          </div>
-        ) : error ? (
-          <div className="p-16 text-center text-[#b91c1c] text-[17px]">
-            Đã xảy ra lỗi khi kết nối database. Vui lòng thử lại.
-          </div>
-        ) : activeTab === "purchase_orders" ? (
+      {activeTab === "accessories" ? (
+        <AccessoryInventoryTab />
+      ) : (
+        <GlassCard className="p-0 overflow-hidden">
+          {isLoading ? (
+            <div className="p-16 flex flex-col items-center justify-center text-[#7a7a7a]">
+              <SFSymbolArrowClockwise className="animate-spin mb-4 text-[#0066cc]" size={24} />
+              <p className="text-[17px]">Đang truy xuất kho...</p>
+            </div>
+          ) : error ? (
+            <div className="p-16 text-center text-[#b91c1c] text-[17px]">
+              Đã xảy ra lỗi khi kết nối database. Vui lòng thử lại.
+            </div>
+          ) : activeTab === "purchase_orders" ? (
           filteredPurchaseOrders.length === 0 ? (
             <div className="p-20 flex flex-col items-center justify-center text-center">
               <div className="w-16 h-16 bg-[#f5f5f7] rounded-full border border-[#e0e0e0] flex items-center justify-center mb-6 text-[#7a7a7a]">
@@ -909,11 +949,11 @@ export default function InventoryPage() {
                 <thead>
                   <tr className="bg-[#f5f5f7]/50 text-[12px] font-semibold text-[#7a7a7a] uppercase tracking-wider whitespace-nowrap">
                     <th className="px-6 py-3 w-16 text-center border-b border-[#e0e0e0] whitespace-nowrap">STT</th>
-                    <th className="px-6 py-3 border-b border-[#e0e0e0] whitespace-nowrap">Mã Đơn Nhập (PO)</th>
-                    <th className="px-6 py-3 border-b border-[#e0e0e0] whitespace-nowrap">Nhà cung cấp (NCC)</th>
+                    <th className="px-6 py-3 border-b border-[#e0e0e0] whitespace-nowrap">Mã đơn nhập</th>
+                    <th className="px-6 py-3 border-b border-[#e0e0e0] whitespace-nowrap">Nhà cung cấp</th>
                     <th className="px-6 py-3 text-center border-b border-[#e0e0e0] whitespace-nowrap">Số lượng máy</th>
                     <th className="px-6 py-3 text-right border-b border-[#e0e0e0] whitespace-nowrap">Tổng tiền hàng</th>
-                    <th className="px-6 py-3 text-right border-b border-[#e0e0e0] whitespace-nowrap">Phí VC & Thuế</th>
+                    <th className="px-6 py-3 text-right border-b border-[#e0e0e0] whitespace-nowrap">Phí</th>
                     <th className="px-6 py-3 text-center border-b border-[#e0e0e0] whitespace-nowrap">Trạng thái</th>
                     <th className="px-6 py-3 text-center border-b border-[#e0e0e0] whitespace-nowrap">Ngày tạo</th>
                   </tr>
@@ -926,8 +966,10 @@ export default function InventoryPage() {
                       ordered: { color: "text-amber-600", label: "Đã đặt hàng" },
                       in_transit: { color: "text-blue-600", label: "Đang vận chuyển" },
                       partially_received: { color: "text-indigo-600", label: "Nhận một phần" },
-                      received: { color: "text-emerald-600", label: "Đã hoàn thành" },
+                      received: { color: "text-emerald-600", label: "Đã sẵn hàng" },
                       cancelled: { color: "text-red-600", label: "Đã hủy" },
+                      warranty_supplier: { color: "text-orange-600", label: "Bảo hành NCC" },
+                      returned_supplier: { color: "text-slate-600", label: "Đã trả NCC" },
                     };
                     const statusInfo = poStatusConfig[po.status] || { color: "text-slate-800", label: po.status };
                     const shippingVal = Number(po.shippingCost || 0);
@@ -963,10 +1005,7 @@ export default function InventoryPage() {
                         </td>
                         <td className={`px-6 py-3 text-right font-medium text-slate-600 ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
                           {addCost > 0 ? (
-                            <div className="flex flex-col items-end">
-                              <span>{formatPrice(addCost.toFixed(2))}</span>
-                              <span className="text-[11px] text-[#7a7a7a]">VC: {formatPrice(po.shippingCost)} • Thuế: {formatPrice(po.taxImport)}</span>
-                            </div>
+                            <span>{formatPrice(addCost.toFixed(2))}</span>
                           ) : (
                             <span className="text-[#7a7a7a]">—</span>
                           )}
@@ -1028,9 +1067,19 @@ export default function InventoryPage() {
                   <th className="px-6 py-3 text-center border-b border-[#e0e0e0] whitespace-nowrap">
                     {activeTab === "active" ? "Sẵn kho" : activeTab === "defective" ? "Lỗi (Kho)" : "Đã trả NCC"}
                   </th>
-                  <th className="px-6 py-3 text-center border-b border-[#e0e0e0] whitespace-nowrap">
-                    {activeTab === "active" ? "Đang về" : activeTab === "defective" ? "Đang sửa / BH" : "Trạng thái"}
-                  </th>
+                  {activeTab === "defective" ? (
+                    <>
+                      <th className="px-6 py-3 text-center border-b border-[#e0e0e0] whitespace-nowrap">Đang sửa</th>
+                      <th className="px-6 py-3 text-center border-b border-[#e0e0e0] whitespace-nowrap">Đang BH</th>
+                    </>
+                  ) : (
+                    <th className="px-6 py-3 text-center border-b border-[#e0e0e0] whitespace-nowrap">
+                      {activeTab === "active" ? "Đang về" : "Trạng thái"}
+                    </th>
+                  )}
+                  {activeTab === "active" && (
+                    <th className="px-6 py-3 text-center border-b border-[#e0e0e0] whitespace-nowrap">Đang lỗi</th>
+                  )}
                   <th className="px-6 py-3 text-right border-b border-[#e0e0e0] whitespace-nowrap">Giá vốn trung bình</th>
                 </tr>
               </thead>
@@ -1050,25 +1099,41 @@ export default function InventoryPage() {
                       <td className={`px-6 py-3 ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
                         <div className="flex items-center gap-4">
                           <div>
-                            <p className="font-semibold text-[#1d1d1f] tracking-tight group-hover:text-[#0066cc] transition-colors duration-200">{group.productName}</p>
-                            <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                              <span className="text-[12px] text-[#7a7a7a] font-normal">{group.brandName} • {group.categoryName}</span>
-                              {group.productSpecs && (
-                                <>
-                                  <span className="text-[11px] text-[#e0e0e0]">•</span>
-                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[11px] font-medium bg-[#f5f5f7] text-[#1d1d1f] border border-[#e0e0e0]/60 group-hover:bg-white group-hover:border-[#0066cc]/20 transition-colors duration-200">
-                                    {((specs: any) => {
-                                      const parts = [];
-                                      if (specs.cpu) parts.push(specs.cpu);
-                                      if (specs.ram) parts.push(`RAM ${specs.ram}`);
-                                      if (specs.ssd) parts.push(`SSD ${specs.ssd}`);
-                                      if (specs.screen) parts.push(specs.screen);
-                                      return parts.join(" • ") || "Chưa cấu hình";
-                                    })(group.productSpecs)}
+                            <p className="font-semibold text-[#1d1d1f] tracking-tight group-hover:text-[#0066cc] transition-colors duration-200">
+                              <span className="mr-1.5">{group.brandName}</span>
+                              {group.productName}
+                            </p>
+                            {group.productSpecs && (
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-[12px] text-[#7a7a7a] font-medium tracking-tight select-none">
+                                {group.productSpecs.cpu && (
+                                  <span className="flex items-center gap-1">
+                                    <SFSymbolCPU size={11} className="text-[#7a7a7a]/60 shrink-0" />
+                                    <span>{group.productSpecs.cpu}</span>
                                   </span>
-                                </>
-                              )}
-                            </div>
+                                )}
+                                {group.productSpecs.ram && (
+                                  <span className="flex items-center gap-1">
+                                    <SFSymbolMemoryChip size={11} className="text-[#7a7a7a]/60 shrink-0" />
+                                    <span>RAM {group.productSpecs.ram}</span>
+                                  </span>
+                                )}
+                                {group.productSpecs.ssd && (
+                                  <span className="flex items-center gap-1">
+                                    <SFSymbolInternalDrive size={11} className="text-[#7a7a7a]/60 shrink-0" />
+                                    <span>SSD {group.productSpecs.ssd}</span>
+                                  </span>
+                                )}
+                                {group.productSpecs.screen && (
+                                  <span className="flex items-center gap-1">
+                                    <SFSymbolDisplay size={11} className="text-[#7a7a7a]/60 shrink-0" />
+                                    <span>{group.productSpecs.screen}</span>
+                                  </span>
+                                )}
+                                {!group.productSpecs.cpu && !group.productSpecs.ram && !group.productSpecs.ssd && !group.productSpecs.screen && (
+                                  <span className="text-[#a0a0a5] italic text-[11.5px]">Chưa cấu hình</span>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -1102,21 +1167,39 @@ export default function InventoryPage() {
                           </span>
                         )}
                       </td>
-                      <td className={`px-6 py-3 text-center ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
-                        {activeTab === "active" ? (
-                          <span className="text-[13px] font-semibold text-amber-600">
-                            {group.incomingCount} máy
+                      {activeTab === "defective" ? (
+                        <>
+                          <td className={`px-6 py-3 text-center ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                            <span className="text-[13px] font-semibold text-amber-600">
+                              {group.items.filter((i: any) => i.status === 'warranty_repair' && i.location === 'internal_repair').length} máy
+                            </span>
+                          </td>
+                          <td className={`px-6 py-3 text-center ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                            <span className="text-[13px] font-semibold text-[#0066cc]">
+                              {group.items.filter((i: any) => i.status === 'warranty_repair' && i.location !== 'internal_repair').length} máy
+                            </span>
+                          </td>
+                        </>
+                      ) : (
+                        <td className={`px-6 py-3 text-center ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                          {activeTab === "active" ? (
+                            <span className="text-[13px] font-semibold text-amber-600">
+                              {group.incomingCount} máy
+                            </span>
+                          ) : (
+                            <span className="text-[13px] font-semibold text-orange-600">
+                              Đã trả
+                            </span>
+                          )}
+                        </td>
+                      )}
+                      {activeTab === "active" && (
+                        <td className={`px-6 py-3 text-center ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                          <span className="text-[13px] font-semibold text-red-600">
+                            {items?.filter((item: any) => item.productId === group.productId && (item.status === 'defective' || item.status === 'warranty_repair')).length || 0} máy
                           </span>
-                        ) : activeTab === "defective" ? (
-                          <span className="text-[13px] font-semibold text-[#0066cc]">
-                            {group.items.filter((i: any) => i.status === 'warranty_repair').length} máy
-                          </span>
-                        ) : (
-                          <span className="text-[13px] font-semibold text-orange-600">
-                            Đã trả
-                          </span>
-                        )}
-                      </td>
+                        </td>
+                      )}
                       <td className={`px-6 py-3 text-right font-semibold text-[#1d1d1f] ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
                         {formatPrice(avgCost.toFixed(2))}
                       </td>
@@ -1128,6 +1211,7 @@ export default function InventoryPage() {
           </div>
         )}
       </GlassCard>
+      )}
 
       {/* 5. Giao diện Modal bảng chi tiết cấu hình và danh sách Serials - Centered & Portal UI/UX */}
       {mounted && activeDrawerProduct && createPortal(
@@ -1150,39 +1234,65 @@ export default function InventoryPage() {
               {/* Modal Header - Clean Apple Style */}
               <div className="px-8 py-6 border-b border-[#e0e0e0] bg-[#f5f5f7]/50 flex items-start justify-between">
                 <div className="space-y-2">
-                  <h2 className="text-[23px] font-bold text-[#1d1d1f] leading-snug tracking-tight">
-                    {activeDrawerProduct.productName}
+                  <h2 className="text-[24px] font-extrabold tracking-tight leading-snug bg-gradient-to-r from-[#1d1d1f] via-[#2d2d30] to-[#434345] bg-clip-text text-transparent flex items-center gap-2">
+                    {(() => {
+                      const cat = (activeDrawerProduct.categoryName || "").toLowerCase();
+                      if (cat.includes("laptop") || cat.includes("máy tính")) {
+                        return <SFSymbolLaptopComputer size={24} className="text-[#0066cc] drop-shadow-sm shrink-0" />;
+                      }
+                      if (cat.includes("màn hình") || cat.includes("display") || cat.includes("screen")) {
+                        return <SFSymbolDisplay size={24} className="text-[#34c759] drop-shadow-sm shrink-0" />;
+                      }
+                      if (cat.includes("cpu") || cat.includes("chip") || cat.includes("ram") || cat.includes("ổ cứng") || cat.includes("ssd") || cat.includes("hdd")) {
+                        return <SFSymbolCPU size={24} className="text-[#ff9500] drop-shadow-sm shrink-0" />;
+                      }
+                      return <SFSymbolShippingBox size={24} className="text-[#0066cc] drop-shadow-sm shrink-0" />;
+                    })()}
+                    <span>{activeDrawerProduct.productName}</span>
                   </h2>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[13.5px] text-[#7a7a7a] font-medium">
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <span className="text-[14.5px] text-[#7a7a7a] font-medium">
                       {activeDrawerProduct.brandName} • {activeDrawerProduct.categoryName}
                     </span>
                     {activeDrawerProduct.productSku && (
-                      <span className="text-[12px] text-[#7a7a7a] bg-[#f5f5f7] border border-[#e0e0e0] px-2 py-0.5 rounded-md">
+                      <span className="text-[13.5px] text-[#7a7a7a] bg-[#f5f5f7] border border-[#e0e0e0] px-2.5 py-0.5 rounded-md font-medium">
                         SKU: {activeDrawerProduct.productSku}
                       </span>
                     )}
+                    {activeTab === "active" && (
+                      <div className="flex items-center gap-1.5 ml-2 flex-wrap select-none">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[13px] font-bold bg-emerald-50 border border-emerald-200/50 text-emerald-700">
+                          Sẵn kho: {activeDrawerProduct.inStockCount}
+                        </span>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[13px] font-bold bg-blue-50 border border-blue-200/50 text-blue-700">
+                          Đang về: {activeDrawerProduct.incomingCount}
+                        </span>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[13px] font-bold bg-red-50 border border-red-200/50 text-red-600">
+                          Đang lỗi: {activeDrawerDefectiveCount}
+                        </span>
+                      </div>
+                    )}
                   </div>
                   {activeDrawerProduct.productSpecs && (
-                    <div className="flex items-center gap-4 text-[13.5px] text-[#1d1d1f] mt-1.5">
+                    <div className="flex items-center gap-5 text-[14.5px] text-[#1d1d1f] mt-2 font-medium flex-wrap">
                       {activeDrawerProduct.productSpecs.cpu && (
-                        <span className="flex items-center gap-1.5">
-                          <SFSymbolCPU size={13} className="text-[#0066cc]" /> {activeDrawerProduct.productSpecs.cpu}
+                        <span>
+                          <span className="text-[#7a7a7a] font-semibold">CPU:</span> {activeDrawerProduct.productSpecs.cpu}
                         </span>
                       )}
                       {activeDrawerProduct.productSpecs.ram && (
-                        <span className="flex items-center gap-1.5">
-                          <SFSymbolMemoryChip size={13} className="text-[#0066cc]" /> {activeDrawerProduct.productSpecs.ram}
+                        <span>
+                          <span className="text-[#7a7a7a] font-semibold">RAM:</span> {activeDrawerProduct.productSpecs.ram}
                         </span>
                       )}
                       {activeDrawerProduct.productSpecs.ssd && (
-                        <span className="flex items-center gap-1.5">
-                          <SFSymbolInternalDrive size={13} className="text-[#0066cc]" /> {activeDrawerProduct.productSpecs.ssd}
+                        <span>
+                          <span className="text-[#7a7a7a] font-semibold">SSD:</span> {activeDrawerProduct.productSpecs.ssd}
                         </span>
                       )}
                       {activeDrawerProduct.productSpecs.screen && (
-                        <span className="flex items-center gap-1.5">
-                          <SFSymbolDisplay size={13} className="text-[#0066cc]" /> {activeDrawerProduct.productSpecs.screen}
+                        <span>
+                          <span className="text-[#7a7a7a] font-semibold">Màn hình:</span> {activeDrawerProduct.productSpecs.screen}
                         </span>
                       )}
                     </div>
@@ -1197,21 +1307,7 @@ export default function InventoryPage() {
                 </button>
               </div>
 
-              {/* Quick Stats - Simple inline */}
-              {activeTab === "active" && (
-                <div className="flex items-center gap-8 px-8 py-4 border-b border-[#e0e0e0] bg-white">
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-                    <span className="text-[14.5px] text-[#7a7a7a] font-medium">Sẵn kho</span>
-                    <span className="text-[17px] font-bold text-emerald-600">{activeDrawerProduct.inStockCount}</span>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
-                    <span className="text-[14.5px] text-[#7a7a7a] font-medium">Đang về</span>
-                    <span className="text-[17px] font-bold text-amber-600">{activeDrawerProduct.incomingCount}</span>
-                  </div>
-                </div>
-              )}
+
 
               {/* Serials Scrollable List - Concept 2: iOS-style Interactive List */}
               <div className="flex-1 overflow-y-auto p-8 bg-white max-h-[58vh]">
@@ -1266,11 +1362,10 @@ export default function InventoryPage() {
                             <td className="px-5 py-3 whitespace-nowrap">
                               <div className="flex flex-col">
                                 <span 
-                                  onClick={() => handleOpenDetails(item)}
-                                  className={`text-[15px] font-semibold cursor-pointer transition-colors ${
+                                  className={`text-[15px] font-semibold ${
                                     item.serialNumber.startsWith("SN-PENDING-")
-                                      ? "text-amber-600 hover:text-amber-700"
-                                      : "text-[#1d1d1f] hover:text-[#0066cc]"
+                                      ? "text-amber-600"
+                                      : "text-[#1d1d1f]"
                                   }`}
                                 >
                                   {item.serialNumber.startsWith("SN-PENDING-") ? "Chờ cập nhật" : item.serialNumber}
@@ -1279,6 +1374,15 @@ export default function InventoryPage() {
                                   <span className="text-[11.5px] text-[#7a7a7a] mt-0.5">
                                     {item.condition === 'new' ? 'Mới 100%' : 'Like New 99%'}
                                   </span>
+                                )}
+                                {item.accessories && item.accessories.length > 0 && (
+                                  <div className="flex flex-col gap-1 mt-1.5 border-t border-slate-100 pt-1">
+                                    {item.accessories.map((acc: any) => (
+                                      <span key={acc.id} className="inline-flex items-center gap-1 text-[11px] text-[#0066cc] font-medium bg-blue-50/50 px-2 py-0.5 rounded-full w-fit">
+                                        📎 {acc.catalogName} {acc.serialNumber ? `(${acc.serialNumber})` : ""}
+                                      </span>
+                                    ))}
+                                  </div>
                                 )}
                               </div>
                             </td>
@@ -1339,9 +1443,18 @@ export default function InventoryPage() {
                               )}
                             </td>
 
-                            {/* Trạng thái */}
                             <td className="px-5 py-3 whitespace-nowrap">
-                              <StatusBadge status={item.status} className="text-[14px]" />
+                              {item.status === 'warranty_repair' ? (
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[12px] font-semibold border ${
+                                  item.location === 'internal_repair'
+                                    ? "bg-orange-50 text-orange-700 border-orange-200/50"
+                                    : "bg-amber-50 text-amber-700 border-amber-200/50"
+                                } text-[14px]`}>
+                                  {item.location === 'internal_repair' ? 'Đang sửa' : 'Đang BH'}
+                                </span>
+                              ) : (
+                                <StatusBadge status={item.status} className="text-[14px]" />
+                              )}
                             </td>
 
                             {/* Ngày nhập */}
@@ -1377,7 +1490,7 @@ export default function InventoryPage() {
                                     
                                     {/* Tooltip on hover */}
                                     {hasAdd && (
-                                      <div className="absolute right-0 bottom-full mb-2 hidden group-hover/cost:block bg-white border border-[#e0e0e0] rounded-2xl shadow-xl p-4 w-72 z-50 text-[13px] text-left text-[#1d1d1f] font-normal pointer-events-none animate-in fade-in zoom-in-95 duration-150">
+                                      <div className={`absolute right-0 ${idx < 3 ? 'top-full mt-2' : 'bottom-full mb-2'} hidden group-hover/cost:block bg-white border border-[#e0e0e0] rounded-2xl shadow-xl p-4 w-72 z-50 text-[13px] text-left text-[#1d1d1f] font-normal pointer-events-none animate-in fade-in zoom-in-95 duration-150`}>
                                         <div className="font-bold mb-2 pb-1.5 border-b border-[#e0e0e0] text-[#1d1d1f]">
                                           Chi tiết Phân rã giá vốn
                                         </div>
@@ -1433,7 +1546,7 @@ export default function InventoryPage() {
                                             setDefectiveItem(item);
                                             setDefectiveActionType("report");
                                           }}
-                                          className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-amber-50 border border-slate-200/50 hover:border-amber-200/80 text-slate-500 hover:text-amber-600 cursor-pointer transition-all duration-150 active:scale-95"
+                                          className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-amber-50 border border-slate-200/50 hover:border-amber-200/80 text-slate-500 hover:text-amber-600 cursor-pointer transition-all duration-150 active:scale-95 hover:scale-110 hover:-translate-y-0.5 hover:shadow-md hover:shadow-amber-200/40"
                                         >
                                           <SFSymbolExclamationTriangle size={14} />
                                         </button>
@@ -1445,7 +1558,7 @@ export default function InventoryPage() {
                                     <div className="relative group/tooltip">
                                       <Link
                                         href={`/lookup?serial=${item.serialNumber}`}
-                                        className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-blue-50 border border-slate-200/50 hover:border-blue-200/80 text-slate-500 hover:text-[#0066cc] cursor-pointer transition-all duration-150 active:scale-95"
+                                        className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-blue-50 border border-slate-200/50 hover:border-blue-200/80 text-slate-500 hover:text-[#0066cc] cursor-pointer transition-all duration-150 active:scale-95 hover:scale-110 hover:-translate-y-0.5 hover:shadow-md hover:shadow-blue-200/40"
                                       >
                                         <SFSymbolActivity size={14} />
                                       </Link>
@@ -1455,19 +1568,8 @@ export default function InventoryPage() {
                                     </div>
                                     <div className="relative group/tooltip">
                                       <button
-                                        onClick={() => handleOpenDetails(item)}
-                                        className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-slate-100 border border-slate-200/50 hover:border-slate-300 text-slate-500 hover:text-slate-800 cursor-pointer transition-all duration-150 active:scale-95"
-                                      >
-                                        <SFSymbolEye size={14} />
-                                      </button>
-                                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2.5 py-1 bg-[#1d1d1f] text-white text-[10px] font-bold rounded-md opacity-0 pointer-events-none group-hover/tooltip:opacity-100 scale-95 group-hover/tooltip:scale-100 transition-all duration-150 shadow-md whitespace-nowrap z-50">
-                                        Thông tin chi tiết
-                                      </span>
-                                    </div>
-                                    <div className="relative group/tooltip">
-                                      <button
                                         onClick={() => handleOpenEditDialog(item)}
-                                        className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-slate-100 border border-slate-200/50 hover:border-slate-300 text-slate-500 hover:text-slate-800 cursor-pointer transition-all duration-150 active:scale-95"
+                                        className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-slate-100 border border-slate-200/50 hover:border-slate-300 text-slate-500 hover:text-slate-800 cursor-pointer transition-all duration-150 active:scale-95 hover:scale-110 hover:-translate-y-0.5 hover:shadow-md hover:shadow-slate-300/40"
                                       >
                                         <SFSymbolSquareAndPencil size={14} />
                                       </button>
@@ -1478,7 +1580,7 @@ export default function InventoryPage() {
                                     <div className="relative group/tooltip">
                                       <button
                                         onClick={() => handleDeleteClick(item)}
-                                        className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-red-50 border border-slate-200/50 hover:border-red-200/80 text-slate-500 hover:text-red-600 cursor-pointer transition-all duration-150 active:scale-95"
+                                        className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-red-50 border border-slate-200/50 hover:border-red-200/80 text-slate-500 hover:text-red-600 cursor-pointer transition-all duration-150 active:scale-95 hover:scale-110 hover:-translate-y-0.5 hover:shadow-md hover:shadow-red-200/40"
                                       >
                                         <SFSymbolTrash size={14} />
                                       </button>
@@ -1496,7 +1598,7 @@ export default function InventoryPage() {
                                             setDefectiveItem(item);
                                             setDefectiveActionType("repair");
                                           }}
-                                          className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-blue-50 border border-slate-200/50 hover:border-blue-200/80 text-slate-500 hover:text-[#0066cc] cursor-pointer transition-all duration-150 active:scale-95"
+                                          className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-blue-50 border border-slate-200/50 hover:border-blue-200/80 text-slate-500 hover:text-[#0066cc] cursor-pointer transition-all duration-150 active:scale-95 hover:scale-110 hover:-translate-y-0.5 hover:shadow-md hover:shadow-blue-200/40"
                                         >
                                           <SFSymbolWrench size={14} />
                                         </button>
@@ -1512,7 +1614,7 @@ export default function InventoryPage() {
                                             setDefectiveItem(item);
                                             setDefectiveActionType("complete");
                                           }}
-                                          className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-emerald-50 border border-slate-200/50 hover:border-emerald-200/80 text-slate-500 hover:text-emerald-600 cursor-pointer transition-all duration-150 active:scale-95"
+                                          className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-emerald-50 border border-slate-200/50 hover:border-emerald-200/80 text-slate-500 hover:text-emerald-600 cursor-pointer transition-all duration-150 active:scale-95 hover:scale-110 hover:-translate-y-0.5 hover:shadow-md hover:shadow-emerald-200/40"
                                         >
                                           <SFSymbolCheckmarkCircle size={14} />
                                         </button>
@@ -1521,38 +1623,42 @@ export default function InventoryPage() {
                                         </span>
                                       </div>
                                     )}
-                                    <div className="relative group/tooltip">
-                                      <button
-                                        onClick={() => {
-                                          setDefectiveItem(item);
-                                          setDefectiveActionType("refund");
-                                        }}
-                                        className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-green-50 border border-slate-200/50 hover:border-green-200/80 text-slate-500 hover:text-green-600 cursor-pointer transition-all duration-150 active:scale-95"
-                                      >
-                                        <SFSymbolDollarSign size={14} />
-                                      </button>
-                                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2.5 py-1 bg-[#1d1d1f] text-white text-[10px] font-bold rounded-md opacity-0 pointer-events-none group-hover/tooltip:opacity-100 scale-95 group-hover/tooltip:scale-100 transition-all duration-150 shadow-md whitespace-nowrap z-50">
-                                        NCC hoàn tiền
-                                      </span>
-                                    </div>
-                                    <div className="relative group/tooltip">
-                                      <button
-                                        onClick={() => {
-                                          setDefectiveItem(item);
-                                          setDefectiveActionType("writeoff");
-                                        }}
-                                        className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-purple-50 border border-slate-200/50 hover:border-purple-200/80 text-slate-500 hover:text-purple-600 cursor-pointer transition-all duration-150 active:scale-95"
-                                      >
-                                        <SFSymbolArrowRightLeft size={14} />
-                                      </button>
-                                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2.5 py-1 bg-[#1d1d1f] text-white text-[10px] font-bold rounded-md opacity-0 pointer-events-none group-hover/tooltip:opacity-100 scale-95 group-hover/tooltip:scale-100 transition-all duration-150 shadow-md whitespace-nowrap z-50">
-                                        NCC đổi máy mới
-                                      </span>
-                                    </div>
+                                    {(item.status === "defective" || item.status === "warranty_repair") && (
+                                      <div className="relative group/tooltip">
+                                        <button
+                                          onClick={() => {
+                                            setDefectiveItem(item);
+                                            setDefectiveActionType("refund");
+                                          }}
+                                          className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-green-50 border border-slate-200/50 hover:border-green-200/80 text-slate-500 hover:text-green-600 cursor-pointer transition-all duration-150 active:scale-95 hover:scale-110 hover:-translate-y-0.5 hover:shadow-md hover:shadow-green-200/40"
+                                        >
+                                          <SFSymbolDollarSign size={14} />
+                                        </button>
+                                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2.5 py-1 bg-[#1d1d1f] text-white text-[10px] font-bold rounded-md opacity-0 pointer-events-none group-hover/tooltip:opacity-100 scale-95 group-hover/tooltip:scale-100 transition-all duration-150 shadow-md whitespace-nowrap z-50">
+                                          NCC hoàn tiền
+                                        </span>
+                                      </div>
+                                    )}
+                                    {(item.status === "defective" || item.status === "warranty_repair") && (
+                                      <div className="relative group/tooltip">
+                                        <button
+                                          onClick={() => {
+                                            setDefectiveItem(item);
+                                            setDefectiveActionType("writeoff");
+                                          }}
+                                          className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-purple-50 border border-slate-200/50 hover:border-purple-200/80 text-slate-500 hover:text-purple-600 cursor-pointer transition-all duration-150 active:scale-95 hover:scale-110 hover:-translate-y-0.5 hover:shadow-md hover:shadow-purple-200/40"
+                                        >
+                                          <SFSymbolArrowRightLeft size={14} />
+                                        </button>
+                                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2.5 py-1 bg-[#1d1d1f] text-white text-[10px] font-bold rounded-md opacity-0 pointer-events-none group-hover/tooltip:opacity-100 scale-95 group-hover/tooltip:scale-100 transition-all duration-150 shadow-md whitespace-nowrap z-50">
+                                          NCC đổi máy mới
+                                        </span>
+                                      </div>
+                                    )}
                                     <div className="relative group/tooltip">
                                       <Link
                                         href={`/lookup?serial=${item.serialNumber}`}
-                                        className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-blue-50 border border-slate-200/50 hover:border-blue-200/80 text-slate-500 hover:text-[#0066cc] cursor-pointer transition-all duration-150 active:scale-95"
+                                        className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-blue-50 border border-slate-200/50 hover:border-blue-200/80 text-slate-500 hover:text-[#0066cc] cursor-pointer transition-all duration-150 active:scale-95 hover:scale-110 hover:-translate-y-0.5 hover:shadow-md hover:shadow-blue-200/40"
                                       >
                                         <SFSymbolActivity size={14} />
                                       </Link>
@@ -1562,19 +1668,8 @@ export default function InventoryPage() {
                                     </div>
                                     <div className="relative group/tooltip">
                                       <button
-                                        onClick={() => handleOpenDetails(item)}
-                                        className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-slate-100 border border-slate-200/50 hover:border-slate-300 text-slate-500 hover:text-slate-800 cursor-pointer transition-all duration-150 active:scale-95"
-                                      >
-                                        <SFSymbolEye size={14} />
-                                      </button>
-                                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2.5 py-1 bg-[#1d1d1f] text-white text-[10px] font-bold rounded-md opacity-0 pointer-events-none group-hover/tooltip:opacity-100 scale-95 group-hover/tooltip:scale-100 transition-all duration-150 shadow-md whitespace-nowrap z-50">
-                                        Thông tin chi tiết
-                                      </span>
-                                    </div>
-                                    <div className="relative group/tooltip">
-                                      <button
                                         onClick={() => handleDeleteClick(item)}
-                                        className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-red-50 border border-slate-200/50 hover:border-red-200/80 text-slate-500 hover:text-red-600 cursor-pointer transition-all duration-150 active:scale-95"
+                                        className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-red-50 border border-slate-200/50 hover:border-red-200/80 text-slate-500 hover:text-red-600 cursor-pointer transition-all duration-150 active:scale-95 hover:scale-110 hover:-translate-y-0.5 hover:shadow-md hover:shadow-red-200/40"
                                       >
                                         <SFSymbolTrash size={14} />
                                       </button>
@@ -1588,7 +1683,7 @@ export default function InventoryPage() {
                                     <div className="relative group/tooltip">
                                       <Link
                                         href={`/lookup?serial=${item.serialNumber}`}
-                                        className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-blue-50 border border-slate-200/50 hover:border-blue-200/80 text-slate-500 hover:text-[#0066cc] cursor-pointer transition-all duration-150 active:scale-95"
+                                        className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-blue-50 border border-slate-200/50 hover:border-blue-200/80 text-slate-500 hover:text-[#0066cc] cursor-pointer transition-all duration-150 active:scale-95 hover:scale-110 hover:-translate-y-0.5 hover:shadow-md hover:shadow-blue-200/40"
                                       >
                                         <SFSymbolActivity size={14} />
                                       </Link>
@@ -1596,21 +1691,11 @@ export default function InventoryPage() {
                                         Lịch sử máy
                                       </span>
                                     </div>
-                                    <div className="relative group/tooltip">
-                                      <button
-                                        onClick={() => handleOpenDetails(item)}
-                                        className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-slate-100 border border-slate-200/50 hover:border-slate-300 text-slate-500 hover:text-slate-800 cursor-pointer transition-all duration-150 active:scale-95"
-                                      >
-                                        <SFSymbolEye size={14} />
-                                      </button>
-                                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2.5 py-1 bg-[#1d1d1f] text-white text-[10px] font-bold rounded-md opacity-0 pointer-events-none group-hover/tooltip:opacity-100 scale-95 group-hover/tooltip:scale-100 transition-all duration-150 shadow-md whitespace-nowrap z-50">
-                                        Thông tin chi tiết
-                                      </span>
-                                    </div>
+
                                     <div className="relative group/tooltip">
                                       <button
                                         onClick={() => handleDeleteClick(item)}
-                                        className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-red-50 border border-slate-200/50 hover:border-red-200/80 text-slate-500 hover:text-red-600 cursor-pointer transition-all duration-150 active:scale-95"
+                                        className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-red-50 border border-slate-200/50 hover:border-red-200/80 text-slate-500 hover:text-red-600 cursor-pointer transition-all duration-150 active:scale-95 hover:scale-110 hover:-translate-y-0.5 hover:shadow-md hover:shadow-red-200/40"
                                       >
                                         <SFSymbolTrash size={14} />
                                       </button>
@@ -1633,7 +1718,7 @@ export default function InventoryPage() {
               {/* Modal Footer */}
               <div className="p-5 border-t border-[#e0e0e0] bg-[#f5f5f7]/30 text-center">
                 <span className="text-[13.5px] text-[#7a7a7a] font-medium">
-                  Nhấp vào tiêu đề serial hoặc biểu tượng chi tiết để chỉnh sửa sản phẩm cụ thể.
+                  Nhấp vào mã serial để xem cấu hình chi tiết sản phẩm cụ thể.
                 </span>
               </div>
               
@@ -1659,11 +1744,7 @@ export default function InventoryPage() {
         />
       </Dialog>
 
-      <InventoryDetailDialog
-        isOpen={!!selectedItemForDetails}
-        onClose={() => setSelectedItemForDetails(null)}
-        item={selectedItemForDetails}
-      />
+
 
 
 
@@ -1740,137 +1821,236 @@ export default function InventoryPage() {
               </div>
             ) : (
               <>
-                {/* 1. Header Card - Premium white card floating on gray bg */}
-                <div className="mx-6 mt-5 mb-3 p-4 bg-white rounded-2xl border border-slate-200/50 shadow-sm flex items-start justify-between shrink-0">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-3">
-                      <h2 className="text-[20px] font-bold text-[#1d1d1f] leading-none tracking-[-0.02em]" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
-                        Chi tiết Đơn nhập: {poDetailData.po.poNumber}
-                      </h2>
-                      {((status: string) => {
-                          const mapping: Record<string, { label: string; bg: string; text: string; border: string }> = {
-                            draft: { label: "Nháp", bg: "bg-slate-50", text: "text-slate-600", border: "border-slate-200/60" },
-                            ordered: { label: "Đã đặt hàng", bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200/60" },
-                            in_transit: { label: "Đang vận chuyển", bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200/60" },
-                            partially_received: { label: "Nhận một phần", bg: "bg-orange-50", text: "text-orange-700", border: "border-orange-200/60" },
-                            received: { label: "Đã hoàn thành", bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200/60" },
-                            cancelled: { label: "Đã hủy", bg: "bg-red-50", text: "text-red-600", border: "border-red-200/60" },
-                          };
-                          const cfg = mapping[status] || { label: status, bg: "bg-slate-50", text: "text-slate-600", border: "border-slate-200/60" };
-                          if (status === "received") {
-                            return (
-                              <span className="text-[13px] font-bold text-emerald-600">
-                                {cfg.label}
-                              </span>
-                            );
-                          }
-                          return (
-                            <span className={`text-[12px] font-semibold px-2.5 py-1 rounded-lg ${cfg.bg} ${cfg.text} border ${cfg.border}`}>
-                              {cfg.label}
+                {/* 1. Header Card - Edit Mode / Display Mode */}
+                <div className="mx-6 mt-5 mb-3 p-4 bg-white rounded-2xl border border-slate-200/50 shadow-sm shrink-0">
+                  {isEditingPo ? (
+                    <div className="space-y-3.5">
+                      <div className="flex items-center justify-between border-b border-[#f5f5f7] pb-2.5">
+                        <h2 className="text-[17px] font-bold text-[#1d1d1f] tracking-[-0.02em]">
+                          Chỉnh sửa Phiếu nhập: {poDetailData.po.poNumber}
+                        </h2>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              // Save changes
+                              const shippingDigits = poShippingCostInput.replace(/\D/g, "");
+                              const taxDigits = poTaxImportInput.replace(/\D/g, "");
+                              updatePoMutation.mutate({
+                                id: selectedPoId!,
+                                payload: {
+                                  status: poStatusInput as any,
+                                  shippingCost: shippingDigits || "0",
+                                  taxImport: taxDigits || "0",
+                                }
+                              });
+                            }}
+                            disabled={updatePoMutation.isPending}
+                            className="px-4 h-[30px] bg-[#0066cc] hover:bg-[#0071e3] text-white text-[12px] font-bold rounded-full cursor-pointer transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center shadow-sm"
+                          >
+                            {updatePoMutation.isPending ? "Đang lưu..." : "Lưu"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              // Reset states and exit edit mode
+                              setPoStatusInput(poDetailData.po.status);
+                              setPoShippingCostInput(poDetailData.po.shippingCost ? Math.round(Number(poDetailData.po.shippingCost)).toString() : "0");
+                              setPoTaxImportInput(poDetailData.po.taxImport ? Math.round(Number(poDetailData.po.taxImport)).toString() : "0");
+                              setIsEditingPo(false);
+                            }}
+                            className="px-4 h-[30px] bg-slate-100 hover:bg-slate-200 text-[#1d1d1f] text-[12px] font-bold rounded-full cursor-pointer transition-all active:scale-95"
+                          >
+                            Hủy
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-3.5">
+                        {/* Status Select */}
+                        <div className="flex items-center gap-3">
+                          <label className="shrink-0 text-[13px] font-semibold text-[#86868b] min-w-[75px]">Trạng thái:</label>
+                          <div className="flex-1">
+                            <CustomSelect
+                              options={[
+                                { value: "in_transit", label: "Đang vận chuyển" },
+                                { value: "received", label: "Đã sẵn hàng" },
+                                { value: "cancelled", label: "Đã hủy" },
+                              ]}
+                              value={poStatusInput}
+                              onChange={setPoStatusInput}
+                              size="sm"
+                              rounded="full"
+                              dropdownWidth="full"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Shipping Cost Input */}
+                        <div className="flex items-center gap-3">
+                          <label className="shrink-0 text-[13px] font-semibold text-[#86868b] min-w-[75px]">Vận chuyển:</label>
+                          <div className="relative flex-1">
+                            <input
+                              type="text"
+                              value={formatVNDInput(poShippingCostInput)}
+                              onChange={(e) => setPoShippingCostInput(e.target.value.replace(/\D/g, ""))}
+                              className="w-full pl-4 pr-8 h-[40px] rounded-full bg-[#f5f5f7] border border-[#e0e0e0] text-[13px] font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 transition-all text-right"
+                              placeholder="0"
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-[#7a7a7a] font-medium pointer-events-none">₫</span>
+                          </div>
+                        </div>
+
+                        {/* Tax Import Input */}
+                        <div className="flex items-center gap-3">
+                          <label className="shrink-0 text-[13px] font-semibold text-[#86868b] min-w-[75px]">Thuế & Khác:</label>
+                          <div className="relative flex-1">
+                            <input
+                              type="text"
+                              value={formatVNDInput(poTaxImportInput)}
+                              onChange={(e) => setPoTaxImportInput(e.target.value.replace(/\D/g, ""))}
+                              className="w-full pl-4 pr-8 h-[40px] rounded-full bg-[#f5f5f7] border border-[#e0e0e0] text-[13px] font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 transition-all text-right"
+                              placeholder="0"
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-[#7a7a7a] font-medium pointer-events-none">₫</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-3">
+                          <h2 className="text-[20px] font-bold text-[#1d1d1f] leading-none tracking-[-0.02em]" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
+                            Chi tiết Đơn nhập: {poDetailData.po.poNumber}
+                          </h2>
+                          <div 
+                            className={`text-[13px] font-bold select-none ${
+                              poDetailData.po.status === "received" 
+                                ? "text-emerald-600"
+                                : poDetailData.po.status === "in_transit"
+                                ? "text-blue-600"
+                                : poDetailData.po.status === "cancelled"
+                                ? "text-red-600"
+                                : "text-slate-500"
+                            }`}
+                          >
+                            {poDetailData.po.status === "received" 
+                              ? "Đã sẵn hàng"
+                              : poDetailData.po.status === "in_transit"
+                              ? "Đang vận chuyển"
+                              : poDetailData.po.status === "cancelled"
+                              ? "Đã hủy"
+                              : poDetailData.po.status === "draft"
+                              ? "Bản nháp"
+                              : poDetailData.po.status === "ordered"
+                              ? "Đã đặt hàng"
+                              : poDetailData.po.status === "partially_received"
+                              ? "Nhận một phần"
+                              : poDetailData.po.status === "warranty_supplier"
+                              ? "Bảo hành NCC"
+                              : poDetailData.po.status === "returned_supplier"
+                              ? "Đã trả NCC"
+                              : poDetailData.po.status}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setIsEditingPo(true)}
+                            className="flex items-center gap-1.5 px-3.5 h-[30px] bg-[#0066cc] hover:bg-[#0071e3] text-white text-[12px] font-bold rounded-full transition-all cursor-pointer shadow-sm active:scale-95 duration-200"
+                          >
+                            <SFSymbolSquareAndPencil size={12} />
+                            <span>Cập nhật chi phí</span>
+                          </button>
+                        </div>
+                        
+                        <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-[13px] text-[#86868b] font-medium">
+                          <div>
+                            Nhà cung cấp: <span className="font-bold text-[#1d1d1f]">{poDetailData.po.supplierName || "N/A"}</span>
+                          </div>
+                          <span className="text-slate-200">|</span>
+                          <div>
+                            Quốc gia gửi: <span className="font-bold text-[#1d1d1f]">{poDetailData.po.originCountry || "VN"}</span>
+                          </div>
+                          <span className="text-slate-200">|</span>
+                          <div>
+                            Vận chuyển: <span className="font-bold text-[#1d1d1f]">
+                              {poDetailData.po.shippingMethod || "N/A"} 
+                              {poDetailData.po.trackingNumber && ` (Mã: ${poDetailData.po.trackingNumber})`}
                             </span>
-                          );
-                        })(poDetailData.po.status)}
+                          </div>
+                          <span className="text-slate-200">|</span>
+                          <div>
+                            Ngày nhập: <span className="font-bold text-[#1d1d1f]">{formatToDDMMYYYY(poDetailData.po.createdAt)}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <button 
+                        onClick={() => setSelectedPoId(null)}
+                        className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-[#7a7a7a] hover:text-[#1d1d1f] cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95 shrink-0"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+                  {/* Quick Stats Grid - Compact Segmented UI */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 mt-4 pt-4 border-t border-[#f5f5f7]">
+                    <div className="bg-[#f5f5f7]/55 rounded-xl p-2.5 border border-slate-100 flex flex-col justify-center select-none">
+                      <span className="text-[10.5px] font-bold text-[#86868b] uppercase tracking-wider">Tổng số máy</span>
+                      <span className="text-[14.5px] font-extrabold text-[#1d1d1f] mt-1">{Number(poDetailData.stats?.totalItemsCount || 0)} máy</span>
                     </div>
                     
-                    <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-[13px] text-[#86868b] font-medium">
-                      <div>
-                        Nhà cung cấp: <span className="font-bold text-[#1d1d1f]">{poDetailData.po.supplierName || "N/A"}</span>
-                      </div>
-                      <span className="text-slate-200">|</span>
-                      <div>
-                        Quốc gia gửi: <span className="font-bold text-[#1d1d1f]">{poDetailData.po.originCountry || "VN"}</span>
-                      </div>
-                      <span className="text-slate-200">|</span>
-                      <div>
-                        Vận chuyển: <span className="font-bold text-[#1d1d1f]">
-                          {poDetailData.po.shippingMethod || "N/A"} 
-                          {poDetailData.po.trackingNumber && ` (Mã: ${poDetailData.po.trackingNumber})`}
+                    <div className="bg-emerald-50/45 rounded-xl p-2.5 border border-emerald-100/50 flex flex-col justify-center select-none">
+                      <span className="text-[10.5px] font-bold text-emerald-700/80 uppercase tracking-wider">Sẵn bán</span>
+                      <span className="text-[14.5px] font-extrabold text-emerald-600 mt-1">
+                        {Number(poDetailData.stats?.inStockCount || 0)} máy
+                      </span>
+                    </div>
+
+                    <div className="bg-blue-50/45 rounded-xl p-2.5 border border-blue-100/50 flex flex-col justify-center select-none">
+                      <span className="text-[10.5px] font-bold text-blue-700/80 uppercase tracking-wider">Đang về</span>
+                      <span className="text-[14.5px] font-extrabold text-blue-600 mt-1">
+                        {Number(poDetailData.stats?.incomingCount || 0)} máy
+                      </span>
+                    </div>
+                    
+                    <div className="bg-amber-50/45 rounded-xl p-2.5 border border-amber-100/50 flex flex-col justify-center select-none">
+                      <span className="text-[10.5px] font-bold text-amber-700/80 uppercase tracking-wider">Đang lỗi</span>
+                      <span className="text-[14.5px] font-extrabold text-amber-600 mt-1">
+                        {Number(poDetailData.stats?.defectiveCount || 0)} máy
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-50/60 rounded-xl p-2.5 border border-slate-200/50 flex flex-col justify-center select-none">
+                      <span className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Đã trả NCC</span>
+                      <span className="text-[14.5px] font-extrabold text-slate-600 mt-1">
+                        {Number(poDetailData.stats?.returnedCount || 0)} máy
+                      </span>
+                    </div>
+                    
+                    <div className="bg-[#f5f5f7]/55 rounded-xl p-2.5 border border-slate-100 flex flex-col justify-center select-none">
+                      <span className="text-[10.5px] font-bold text-[#86868b] uppercase tracking-wider">Tiền hàng</span>
+                      <span className="text-[14.5px] font-extrabold text-[#1d1d1f] mt-1">{formatPrice(poDetailData.po.totalCost)}</span>
+                    </div>
+                    
+                    <div className="bg-[#f5f5f7]/55 rounded-xl p-2.5 border border-slate-100 flex flex-col justify-center select-none">
+                      <span className="text-[10.5px] font-bold text-[#86868b] uppercase tracking-wider">VC & Thuế</span>
+                      <div className="flex flex-col mt-0.5">
+                        <span className="text-[14.5px] font-extrabold text-[#1d1d1f] leading-tight">
+                          {formatPrice((Number(poDetailData.po.shippingCost || 0) + Number(poDetailData.po.taxImport || 0)).toFixed(2))}
+                        </span>
+                        <span className="text-[9px] text-[#86868b] font-semibold mt-0.5 leading-none">
+                          Mỗi máy: +{formatPrice(((Number(poDetailData.po.shippingCost || 0) + Number(poDetailData.po.taxImport || 0)) / (Number(poDetailData.stats?.totalItemsCount || 0) || 1)).toFixed(2))}
                         </span>
                       </div>
-                      <span className="text-slate-200">|</span>
-                      <div>
-                        Ngày nhập: <span className="font-bold text-[#1d1d1f]">{formatToDDMMYYYY(poDetailData.po.createdAt)}</span>
-                      </div>
                     </div>
-                  </div>
-
-                  <button 
-                    onClick={() => setSelectedPoId(null)}
-                    className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-[#7a7a7a] hover:text-[#1d1d1f] cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95 shrink-0"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                {/* 2. Stats Cards Grid */}
-                <div className="mx-6 mb-3 grid grid-cols-3 md:grid-cols-6 gap-2.5 shrink-0">
-                  {/* Card: Tổng số máy */}
-                  <div className="relative overflow-hidden rounded-[22px] p-3 bg-gradient-to-br from-[#8e8e93] to-[#636366] text-white shadow-sm hover:scale-[1.02] transition-all duration-200 select-none">
-                    <div className="relative z-10">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-white/70">Tổng số máy</div>
-                      <div className="text-[17px] font-extrabold mt-0.5">
-                        {Number(poDetailData.stats?.totalItemsCount || 0)} <span className="text-[11px] font-semibold text-white/80">máy</span>
-                      </div>
-                    </div>
-                    <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 opacity-100 pointer-events-none z-0" />
-                  </div>
-                  
-                  {/* Card: Sẵn bán */}
-                  <div className="relative overflow-hidden rounded-[22px] p-3 bg-gradient-to-br from-[#34c759] to-[#28a745] text-white shadow-sm hover:scale-[1.02] transition-all duration-200 select-none">
-                    <div className="relative z-10">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-white/70">Sẵn bán / Đang về</div>
-                      <div className="text-[17px] font-extrabold mt-0.5">
-                        {Number(poDetailData.stats?.inStockCount || 0) + Number(poDetailData.stats?.incomingCount || 0)} <span className="text-[11px] font-semibold text-white/80">máy</span>
-                      </div>
-                    </div>
-                    <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 opacity-100 pointer-events-none z-0" />
-                  </div>
-
-                  {/* Card: Máy lỗi */}
-                  <div className="relative overflow-hidden rounded-[22px] p-3 bg-gradient-to-br from-[#ff3b30] to-[#d12229] text-white shadow-sm hover:scale-[1.02] transition-all duration-200 select-none">
-                    <div className="relative z-10">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-white/70">Máy lỗi / Trả hàng</div>
-                      <div className="text-[17px] font-extrabold mt-0.5">
-                        {Number(poDetailData.stats?.defectiveCount || 0) + Number(poDetailData.stats?.returnedCount || 0)} <span className="text-[11px] font-semibold text-white/80">máy</span>
-                      </div>
-                    </div>
-                    <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 opacity-100 pointer-events-none z-0" />
-                  </div>
-
-                  {/* Card: Tổng tiền hàng */}
-                  <div className="relative overflow-hidden rounded-[22px] p-3 bg-gradient-to-br from-[#2ea1ff] to-[#0066cc] text-white shadow-sm hover:scale-[1.02] transition-all duration-200 select-none">
-                    <div className="relative z-10">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-white/70">Tổng tiền hàng</div>
-                      <div className="text-[16px] font-extrabold mt-0.5">
-                        {formatPrice(poDetailData.po.totalCost)}
-                      </div>
-                    </div>
-                    <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 opacity-100 pointer-events-none z-0" />
-                  </div>
-
-                  {/* Card: VC & Thuế */}
-                  <div className="relative overflow-hidden rounded-[22px] p-3 bg-gradient-to-br from-[#af52de] to-[#892ec0] text-white shadow-sm hover:scale-[1.02] transition-all duration-200 select-none">
-                    <div className="relative z-10">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-white/70">VC & Thuế phân bổ</div>
-                      <div className="text-[16px] font-extrabold mt-0.5">
-                        {formatPrice((Number(poDetailData.po.shippingCost || 0) + Number(poDetailData.po.taxImport || 0)).toFixed(2))}
-                      </div>
-                      <div className="text-[9px] text-white/80 font-medium mt-0.5">
-                        Mỗi máy: +{formatPrice(((Number(poDetailData.po.shippingCost || 0) + Number(poDetailData.po.taxImport || 0)) / (Number(poDetailData.stats?.totalItemsCount || 0) || 1)).toFixed(2))}
-                      </div>
-                    </div>
-                    <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 opacity-100 pointer-events-none z-0" />
-                  </div>
-
-                  {/* Card: Phụ kiện lẻ */}
-                  <div className="relative overflow-hidden rounded-[22px] p-3 bg-gradient-to-br from-[#ff9f0a] to-[#ff8000] text-white shadow-sm hover:scale-[1.02] transition-all duration-200 select-none">
-                    <div className="relative z-10">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-white/70">Chi phí phụ kiện lẻ</div>
-                      <div className="text-[16px] font-extrabold mt-0.5">
+                    
+                    <div className="bg-[#f5f5f7]/55 rounded-xl p-2.5 border border-slate-100 flex flex-col justify-center select-none">
+                      <span className="text-[10.5px] font-bold text-[#86868b] uppercase tracking-wider">Phụ kiện lẻ</span>
+                      <span className="text-[14.5px] font-extrabold text-[#1d1d1f] mt-1">
                         {formatPrice(Number(poDetailData.stats?.totalAccessoryCost || 0).toFixed(2))}
-                      </div>
+                      </span>
                     </div>
-                    <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 opacity-100 pointer-events-none z-0" />
                   </div>
                 </div>
 
@@ -1882,31 +2062,19 @@ export default function InventoryPage() {
                     </h3>
                     
                     <div className="overflow-auto flex-1 rounded-xl border border-slate-100">
-                      <table className="w-full text-left border-collapse min-w-[1000px]">
+                      <table className="w-full text-left border-collapse min-w-[700px]">
                         <thead className="sticky top-0 z-10">
                           <tr className="bg-[#f5f5f7] text-[#8e8e93] font-semibold uppercase text-[11px] tracking-wide whitespace-nowrap border-b border-slate-200/60">
                             <th className="px-5 py-3 w-14 text-center whitespace-nowrap">STT</th>
                             <th className="px-5 py-3 whitespace-nowrap">Tên sản phẩm / Model</th>
                             <th className="px-5 py-3 whitespace-nowrap">Số Serial</th>
                             <th className="px-5 py-3 text-center whitespace-nowrap">Trạng thái máy</th>
-                            <th className="px-5 py-3 text-right whitespace-nowrap">Giá gốc NCC</th>
-                            <th className="px-5 py-3 text-right whitespace-nowrap">VC & Thuế phân bổ</th>
-                            <th className="px-5 py-3 text-right whitespace-nowrap">Phụ kiện phát sinh</th>
-                            <th className="px-5 py-3 text-right whitespace-nowrap">Giá vốn thực tế</th>
-                            <th className="px-5 py-3 text-center w-[120px] whitespace-nowrap">Tác vụ</th>
+                            <th className="px-5 py-3 text-right whitespace-nowrap">Giá vốn nhập kho</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100/80 text-[14px] text-[#1d1d1f]">
                           {poDetailData.items?.map((item: any, idx: number) => {
                             const costPriceVal = Number(item.costPrice || 0);
-                            const accessoryCostVal = Number(item.accessoryCost || 0);
-                            const allocShippingVal = Number(item.allocatedShipping || 0);
-                            const allocTaxVal = Number(item.allocatedTax || 0);
-                            const allocatedAdd = allocShippingVal + allocTaxVal;
-                            const totalActualCostVal = Number(item.totalActualCost || 0);
-                            
-                            const hasAccessory = accessoryCostVal > 0;
-                            
                             return (
                               <tr key={item.id} className="hover:bg-[#f5f5f7]/40 transition-colors">
                                 <td className="px-5 py-3 text-center text-[#8e8e93] font-medium text-[13px] whitespace-nowrap">
@@ -1930,98 +2098,8 @@ export default function InventoryPage() {
                                 <td className="px-5 py-3 text-center whitespace-nowrap">
                                   <StatusBadge status={item.status} className="text-[12.5px]" />
                                 </td>
-                                <td className="px-5 py-3 text-right font-medium text-[#1d1d1f] whitespace-nowrap text-[13.5px]">
+                                <td className="px-5 py-3 text-right font-bold text-[#1d1d1f] whitespace-nowrap text-[13.5px]">
                                   {formatPrice(costPriceVal.toString())}
-                                </td>
-                                <td className="px-5 py-3 text-right text-[#8e8e93] font-medium whitespace-nowrap text-[13px]">
-                                  {allocatedAdd > 0 ? (
-                                    <div className="flex flex-col items-end">
-                                      <span>+{formatPrice(allocatedAdd.toFixed(2))}</span>
-                                      <span className="text-[10px] text-slate-400">VC: {formatPrice(allocShippingVal.toFixed(2))} | Thuế: {formatPrice(allocTaxVal.toFixed(2))}</span>
-                                    </div>
-                                  ) : (
-                                    <span>—</span>
-                                  )}
-                                </td>
-                                <td className="px-5 py-3 text-right whitespace-nowrap text-[13px]">
-                                  <div className="flex flex-col items-end">
-                                    {hasAccessory ? (
-                                      <span className="font-semibold text-blue-600">+{formatPrice(accessoryCostVal.toString())}</span>
-                                    ) : (
-                                      <span className="text-[#7a7a7a]">—</span>
-                                    )}
-                                    {item.accessoryNotes && (
-                                      <span className="text-[11px] text-[#7a7a7a] max-w-[180px] truncate" title={item.accessoryNotes}>
-                                        {item.accessoryNotes}
-                                      </span>
-                                    )}
-                                  </div>
-                                </td>
-                                <td className="px-5 py-3 text-right font-semibold text-[#1d1d1f] whitespace-nowrap">
-                                  <div className="relative group/cost flex flex-col items-end">
-                                    <span className="text-[14px] text-[#1d1d1f] hover:text-[#0066cc] cursor-help font-bold">
-                                      {formatPrice(totalActualCostVal.toFixed(2))}
-                                    </span>
-                                    
-                                    {/* Tooltip on hover */}
-                                    <div className="absolute right-0 bottom-full mb-2 hidden group-hover/cost:block bg-white border border-[#e0e0e0] rounded-2xl shadow-xl p-4 w-72 z-50 text-[13px] text-left text-[#1d1d1f] font-normal pointer-events-none animate-in fade-in zoom-in-95 duration-150">
-                                      <div className="font-bold mb-2 pb-1.5 border-b border-[#e0e0e0] text-[#1d1d1f]">
-                                        Chi tiết Phân rã giá vốn
-                                      </div>
-                                      <div className="space-y-1.5 font-medium">
-                                        <div className="flex justify-between">
-                                          <span className="text-[#7a7a7a]">Giá gốc NCC:</span>
-                                          <span>{formatPrice(costPriceVal.toString())}</span>
-                                        </div>
-                                        {allocShippingVal > 0 && (
-                                          <div className="flex justify-between text-emerald-600">
-                                            <span className="text-[#7a7a7a]">Phí VC phân bổ:</span>
-                                            <span>+{formatPrice(allocShippingVal.toFixed(2))}</span>
-                                          </div>
-                                        )}
-                                        {allocTaxVal > 0 && (
-                                          <div className="flex justify-between text-emerald-600">
-                                            <span className="text-[#7a7a7a]">Thuế NK phân bổ:</span>
-                                            <span>+{formatPrice(allocTaxVal.toFixed(2))}</span>
-                                          </div>
-                                        )}
-                                        {hasAccessory && (
-                                          <div className="flex justify-between text-emerald-600">
-                                            <span className="text-[#7a7a7a]">Mua sạc/phụ kiện:</span>
-                                            <span>+{formatPrice(accessoryCostVal.toString())}</span>
-                                          </div>
-                                        )}
-                                        {item.accessoryNotes && (
-                                          <div className="mt-2 pt-1.5 border-t border-[#e0e0e0]/60 text-[11px] text-[#7a7a7a] italic">
-                                            Ghi chú: {item.accessoryNotes}
-                                          </div>
-                                        )}
-                                        <div className="pt-2 border-t border-[#e0e0e0] flex justify-between font-bold text-[#0066cc]">
-                                          <span>Tổng giá vốn:</span>
-                                          <span>{formatPrice(totalActualCostVal.toFixed(2))}</span>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </td>
-                                <td className="px-5 py-3 text-center whitespace-nowrap">
-                                  <div className="flex items-center justify-center">
-                                    <div className="relative group/tooltip">
-                                      <button
-                                        onClick={() => {
-                                          setEditingAccessoryItem(item);
-                                          setAccessoryCostInput(Number(item.accessoryCost || 0).toString());
-                                          setAccessoryNotesInput(item.accessoryNotes || "");
-                                        }}
-                                        className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-blue-50 border border-slate-200/50 hover:border-blue-200/80 text-slate-500 hover:text-[#0066cc] cursor-pointer transition-all duration-150 active:scale-95"
-                                      >
-                                        <SFSymbolSquareAndPencil size={14} />
-                                      </button>
-                                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2.5 py-1 bg-[#1d1d1f] text-white text-[10px] font-bold rounded-md opacity-0 pointer-events-none group-hover/tooltip:opacity-100 scale-95 group-hover/tooltip:scale-100 transition-all duration-150 shadow-md whitespace-nowrap z-50">
-                                        Thêm chi phí
-                                      </span>
-                                    </div>
-                                  </div>
                                 </td>
                               </tr>
                             );
@@ -2044,81 +2122,7 @@ export default function InventoryPage() {
         document.body
       )}
 
-      {/* 7. Modal cập nhật chi phí sạc/phụ kiện */}
-      <Dialog
-        isOpen={!!editingAccessoryItem}
-        onClose={() => setEditingAccessoryItem(null)}
-        title="Cập nhật Chi phí Sạc / Phụ kiện"
-        description={`Cập nhật chi phí phát sinh ngoài (mua sạc, phụ kiện, sửa chữa nhanh) cho máy có Serial ${editingAccessoryItem?.serialNumber}`}
-        size="lg"
-      >
-        <form 
-          onSubmit={(e) => {
-            e.preventDefault();
-            const costVal = parseFloat(accessoryCostInput) || 0;
-            updateAccessoryCostMutation.mutate({
-              itemId: editingAccessoryItem.id,
-              cost: costVal,
-              notes: accessoryNotesInput.trim() || null
-            });
-          }}
-          className="space-y-6 pt-2"
-        >
-          <div className="space-y-4">
-            <div>
-              <label className="block text-[13px] font-semibold text-[#1d1d1f] mb-1.5">
-                Chi phí phụ kiện / sạc phát sinh (VND)
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="any"
-                value={accessoryCostInput}
-                onChange={(e) => setAccessoryCostInput(e.target.value)}
-                className="w-full px-4 h-[44px] rounded-2xl bg-[#f5f5f7] border border-[#e0e0e0] text-[15px] font-medium text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 transition-all placeholder:text-[#7a7a7a]/60"
-                placeholder="Nhập số tiền phát sinh, ví dụ: 250000"
-                required
-              />
-              <span className="text-[12px] text-[#7a7a7a] mt-1 block">
-                Nhập số tiền lẻ. Ví dụ: 250000 = 250.000đ. Hệ thống lưu dạng Decimal chính xác.
-              </span>
-            </div>
-            
-            <div>
-              <label className="block text-[13px] font-semibold text-[#1d1d1f] mb-1.5">
-                Ghi chú chi tiết phụ kiện
-              </label>
-              <textarea
-                value={accessoryNotesInput}
-                onChange={(e) => setAccessoryNotesInput(e.target.value)}
-                rows={3}
-                className="w-full p-4 rounded-2xl bg-[#f5f5f7] border border-[#e0e0e0] text-[15px] font-medium text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 transition-all placeholder:text-[#7a7a7a]/60"
-                placeholder="Ví dụ: Mua sạc xin Type-C 96W, dán cường lực..."
-              />
-            </div>
-          </div>
-          
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#e0e0e0]">
-            <button
-              type="button"
-              onClick={() => setEditingAccessoryItem(null)}
-              className="px-5 h-[44px] bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[14px] font-semibold text-[#1d1d1f] rounded-full transition-all cursor-pointer active:scale-95 duration-200"
-            >
-              Hủy
-            </button>
-            <button
-              type="submit"
-              disabled={updateAccessoryCostMutation.isPending}
-              className="px-6 h-[44px] bg-[#0066cc] hover:bg-[#0071e3] disabled:opacity-50 text-white text-[14px] font-semibold rounded-full transition-all cursor-pointer shadow-sm active:scale-95 duration-200 flex items-center justify-center gap-2"
-            >
-              {updateAccessoryCostMutation.isPending && (
-                <SFSymbolArrowClockwise className="animate-spin text-white" size={14} />
-              )}
-              <span>Lưu chi phí</span>
-            </button>
-          </div>
-        </form>
-      </Dialog>
+
 
       {/* Floating Batch Action Bar */}
       {selectedIds.length > 0 && (
@@ -2160,5 +2164,18 @@ export default function InventoryPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function InventoryPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center py-32 text-[#86868b]">
+        <SFSymbolArrowClockwise className="animate-spin mb-4 text-[#0066cc]" size={28} />
+        <p className="text-[16px] font-semibold text-[#1d1d1f]">Đang tải dữ liệu kho hàng...</p>
+      </div>
+    }>
+      <InventoryPageContent />
+    </Suspense>
   );
 }

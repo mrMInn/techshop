@@ -34,6 +34,8 @@ const { mockDb } = vi.hoisted(() => {
     leftJoin: vi.fn().mockImplementation(() => mockDbObj),
     where: vi.fn().mockImplementation(() => mockDbObj),
     orderBy: vi.fn().mockImplementation(() => mockDbObj),
+    groupBy: vi.fn().mockImplementation(() => mockDbObj),
+    as: vi.fn().mockImplementation(() => mockDbObj),
     offset: vi.fn().mockImplementation(() => mockDbObj),
     limit: vi.fn().mockImplementation(() => mockDbObj),
     returning: vi.fn().mockImplementation(() => Promise.resolve([])),
@@ -61,6 +63,8 @@ const mockChain = (resolved: any) => {
     leftJoin: vi.fn().mockImplementation(() => obj),
     where: vi.fn().mockImplementation(() => obj),
     orderBy: vi.fn().mockImplementation(() => obj),
+    groupBy: vi.fn().mockImplementation(() => obj),
+    as: vi.fn().mockImplementation(() => obj),
     offset: vi.fn().mockImplementation(() => obj),
     limit: vi.fn().mockImplementation(() => Promise.resolve(resolved)),
     returning: vi.fn().mockImplementation(() => Promise.resolve(resolved)),
@@ -80,6 +84,8 @@ const createTxMock = (selectResponses: any[], insertResponses: any[] = [], updat
     leftJoin: vi.fn().mockImplementation(() => chainObj),
     where: vi.fn().mockImplementation(() => chainObj),
     orderBy: vi.fn().mockImplementation(() => chainObj),
+    groupBy: vi.fn().mockImplementation(() => chainObj),
+    as: vi.fn().mockImplementation(() => chainObj),
     offset: vi.fn().mockImplementation(() => chainObj),
     limit: vi.fn().mockImplementation(() => Promise.resolve(chainObj.currentVal)),
     returning: vi.fn().mockImplementation(() => Promise.resolve(chainObj.currentVal)),
@@ -131,6 +137,8 @@ describe('Server Actions - Quản lý Kho hàng (Inventory Actions)', () => {
     mockDb.leftJoin.mockImplementation(() => mockDb);
     mockDb.where.mockImplementation(() => mockDb);
     mockDb.orderBy.mockImplementation(() => mockDb);
+    mockDb.groupBy.mockImplementation(() => mockDb);
+    mockDb.as.mockImplementation(() => mockDb);
     mockDb.offset.mockImplementation(() => mockDb);
     mockDb.limit.mockImplementation(() => mockDb);
     mockDb.returning.mockImplementation(() => Promise.resolve([]));
@@ -174,7 +182,7 @@ describe('Server Actions - Quản lý Kho hàng (Inventory Actions)', () => {
         costPrice: '10000000',
       });
       expect(res.success).toBe(true);
-      expect(res.item?.id).toBe('inv-1');
+      expect((res as any).item?.id).toBe('inv-1');
     });
 
     it('thành công có nhà cung cấp mới tự tạo', async () => {
@@ -418,7 +426,7 @@ describe('Server Actions - Quản lý Kho hàng (Inventory Actions)', () => {
           [{ id: 'inv-1', purchaseOrderItemId: 'poi-1', costPrice: '10000000', status: 'incoming' }], // existing
           [{ id: 'profile-1' }], // profile
           [{ id: 'poi-1', purchaseOrderId: 'po-1', quantity: 1 }], // poItems
-          [{ id: 'po-1', shippingCost: '100000', taxImport: '50000' }] // existingPo
+          [{ id: 'po-1', shippingCost: '100000' }] // existingPo
         ],
         [],
         [[{ id: 'inv-1', serialNumber: 'SN-new', status: 'in_stock' }]] // update returning

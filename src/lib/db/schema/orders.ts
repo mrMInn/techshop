@@ -1,7 +1,7 @@
-import { pgTable, uuid, varchar, text, timestamp, integer, decimal, pgEnum, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, text, boolean, timestamp, integer, decimal, pgEnum, index } from 'drizzle-orm/pg-core';
 import { customers, leadSources } from './customers';
 import { products } from './products';
-import { inventoryItems } from './inventory';
+import { inventoryItems, accessoryItems } from './inventory';
 import { profiles } from './auth';
 
 // ============================================================
@@ -70,13 +70,15 @@ export const orders = pgTable('orders', {
 export const orderItems = pgTable('order_items', {
   id: uuid('id').primaryKey().defaultRandom(),
   orderId: uuid('order_id').references(() => orders.id).notNull(),
-  inventoryItemId: uuid('inventory_item_id').references(() => inventoryItems.id).notNull(),
+  inventoryItemId: uuid('inventory_item_id').references(() => inventoryItems.id),
+  accessoryItemId: uuid('accessory_item_id').references(() => accessoryItems.id),
   productId: uuid('product_id').references(() => products.id).notNull(),
   sellingPrice: decimal('selling_price', { precision: 15, scale: 2 }).notNull(),
   costPrice: decimal('cost_price', { precision: 15, scale: 2 }).notNull(),
   discount: decimal('discount', { precision: 15, scale: 2 }).default('0'),
   profit: decimal('profit', { precision: 15, scale: 2 }),
   warrantyMonths: integer('warranty_months').notNull(),
+  isGift: boolean('is_gift').default(false).notNull(),
 });
 
 // ============================================================

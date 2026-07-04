@@ -7,7 +7,7 @@ import { profiles } from './auth';
 // ============================================================
 
 export const poStatusEnum = pgEnum('po_status', [
-  'draft', 'ordered', 'in_transit', 'partially_received', 'received', 'cancelled',
+  'draft', 'ordered', 'in_transit', 'partially_received', 'received', 'cancelled', 'warranty_supplier', 'returned_supplier',
 ]);
 
 // ============================================================
@@ -44,7 +44,6 @@ export const purchaseOrders = pgTable('purchase_orders', {
   expectedArrival: date('expected_arrival'),
   actualArrival: date('actual_arrival'),
   shippingCost: decimal('shipping_cost', { precision: 15, scale: 2 }).default('0'),
-  taxImport: decimal('tax_import', { precision: 15, scale: 2 }).default('0'),
   totalCost: decimal('total_cost', { precision: 15, scale: 2 }).notNull(),
   notes: text('notes'),
   createdBy: uuid('created_by').references(() => profiles.id),

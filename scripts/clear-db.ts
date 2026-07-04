@@ -32,6 +32,8 @@ import {
   telegramNotificationEvents,
   telegramSettings,
   auditLogs,
+  countries,
+  shippingCarriers,
 } from '../src/lib/db/schema'; 
 
 const sqlDb = postgres(process.env.DATABASE_URL!);
@@ -106,6 +108,11 @@ async function main() {
       console.log('🧹 Đang xóa Khách hàng...');
       await tx.delete(customers);
       await tx.delete(leadSources);
+
+      // Bước 13: Xóa Quốc gia và đơn vị vận chuyển
+      console.log('🧹 Đang xóa Quốc gia và đơn vị vận chuyển...');
+      await tx.delete(countries);
+      await tx.delete(shippingCarriers);
 
       // Chừa bảng 'profiles' để giữ tài khoản admin
     });

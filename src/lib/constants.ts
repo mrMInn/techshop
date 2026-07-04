@@ -120,9 +120,11 @@ export const PO_STATUS = {
   draft: { label: 'Nháp', color: 'bg-slate-500/10 text-slate-500 border-slate-500/20' },
   ordered: { label: 'Đã đặt', color: 'bg-blue-500/10 text-blue-500 border-blue-500/20' },
   in_transit: { label: 'Đang vận chuyển', color: 'bg-amber-500/10 text-amber-500 border-amber-500/20' },
-  partially_received: { label: 'Nhận một phần', color: 'bg-orange-500/10 text-orange-500 border-orange-500/20' },
-  received: { label: 'Đã nhận', color: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' },
+  partially_received: { label: 'Nhận một phần', color: 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20' },
+  received: { label: 'Đã sẵn hàng', color: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' },
   cancelled: { label: 'Đã hủy', color: 'bg-red-500/10 text-red-500 border-red-500/20' },
+  warranty_supplier: { label: 'Bảo hành NCC', color: 'bg-orange-500/10 text-orange-500 border-orange-500/20' },
+  returned_supplier: { label: 'Đã trả NCC', color: 'bg-slate-500/10 text-slate-500 border-slate-500/20' },
 } as const;
 
 export const WARRANTY_STATUS = {

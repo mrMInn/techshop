@@ -75,7 +75,7 @@ describe('Server Actions - Quotations', () => {
       });
 
       expect(res.success).toBe(true);
-      expect(res.quotation.id).toBe('q-new');
+      expect((res as any).quotation.id).toBe('q-new');
     });
 
     it('should return error when quotation insertion transaction fails', async () => {
@@ -119,7 +119,7 @@ describe('Server Actions - Quotations', () => {
 
       const res = await getQuotationByToken('some-token');
       expect(res.success).toBe(true);
-      expect(res.quotation.quoteNumber).toBe('QT-1');
+      expect((res as any).quotation.quoteNumber).toBe('QT-1');
       expect(res.items).toEqual(mockItems);
     });
 

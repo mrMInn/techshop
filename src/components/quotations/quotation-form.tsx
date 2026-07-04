@@ -13,7 +13,8 @@ import { CustomDatePicker } from "@/components/ui/custom-date-picker";
 import { Plus, Trash2, FileText, Tag, Landmark, Calendar, MessageSquare, PlusCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog } from "@/components/ui/dialog";
-import { CustomerQuickDialog } from "@/components/orders/customer-quick-dialog";
+import { CustomerManagementDialog } from "@/components/orders/customer-management-dialog";
+import { LeadSourceManagerDialog } from "@/components/orders/lead-source-management-dialog";
 
 const formatPrice = (price: number) => {
   return new Intl.NumberFormat("vi-VN", {
@@ -51,7 +52,7 @@ export function QuotationForm({ onSubmit, onCancel, isLoading }: QuotationFormPr
     queryFn: getInStockItemsForSelect,
   });
 
-  const { data: leadSourceList } = useQuery({
+  const { data: leadSourceList, refetch: refetchLeadSources } = useQuery({
     queryKey: ["lead-sources-select"],
     queryFn: getLeadSourcesAction,
   });
@@ -62,6 +63,7 @@ export function QuotationForm({ onSubmit, onCancel, isLoading }: QuotationFormPr
   const [manualCustomerName, setManualCustomerName] = useState("");
   const [manualCustomerPhone, setManualCustomerPhone] = useState("");
   const [leadSourceId, setLeadSourceId] = useState("");
+  const [isLeadSourceManageOpen, setIsLeadSourceManageOpen] = useState(false);
   const [validUntil, setValidUntil] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() + 3); // Mặc định hiệu lực trong 3 ngày tới
@@ -84,13 +86,14 @@ export function QuotationForm({ onSubmit, onCancel, isLoading }: QuotationFormPr
   }[]>([]);
 
   const [selectedProductId, setSelectedProductId] = useState("");
-  const [isCustomerQuickOpen, setIsCustomerQuickOpen] = useState(false);
+  // Dialog quản lý khách hàng
+  const [isCustomerManageOpen, setIsCustomerManageOpen] = useState(false);
 
   // Select Options Mapping
   const customerOptions = useMemo(() => {
     return customerList?.map(c => ({
       value: c.id,
-      label: `${c.fullName} (${c.phone})`
+      label: c.phone ? `${c.fullName} (${c.phone})` : c.fullName
     })) || [];
   }, [customerList]);
 
@@ -193,6 +196,16 @@ export function QuotationForm({ onSubmit, onCancel, isLoading }: QuotationFormPr
     }
   }, [selectedProductId, availableSerialsForSelectedProduct]);
 
+  // Tự động điền Nguồn khách hàng khi chọn Khách hàng có sẵn nguồn
+  useEffect(() => {
+    if (customerMode === "select" && selectedCustomerId && customerList) {
+      const selectedCustomer = customerList.find(c => c.id === selectedCustomerId);
+      if (selectedCustomer?.leadSourceId) {
+        setLeadSourceId(selectedCustomer.leadSourceId);
+      }
+    }
+  }, [selectedCustomerId, customerList, customerMode]);
+
   // Xóa item khỏi danh sách chọn
   const handleRemoveItem = (index: number) => {
     const updated = [...selectedItems];
@@ -290,32 +303,40 @@ export function QuotationForm({ onSubmit, onCancel, isLoading }: QuotationFormPr
               {customerMode === "select" ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-semibold text-[#7a7a7a] uppercase tracking-wider pl-1">
-                      Chọn khách hàng
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <CustomSelect
-                        options={customerOptions}
-                        value={selectedCustomerId}
-                        onChange={setSelectedCustomerId}
-                        placeholder="Chọn khách hàng hoặc bỏ trống"
-                        searchable={true}
-                        dropdownWidth="full"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setIsCustomerQuickOpen(true)}
-                        className="h-[44px] w-[44px] bg-[#0066cc] text-white rounded-lg hover:bg-[#0071e3] transition-colors flex items-center justify-center shrink-0 cursor-pointer shadow-sm"
-                        title="Thêm khách hàng nhanh"
+                    <div className="flex justify-between items-center pl-1">
+                      <label className="text-[11px] font-semibold text-[#7a7a7a] uppercase tracking-wider">
+                        Chọn khách hàng
+                      </label>
+                      <button 
+                        type="button" 
+                        onClick={() => setIsCustomerManageOpen(true)}
+                        className="text-[11.5px] font-semibold text-[#0066cc] hover:underline cursor-pointer"
                       >
-                        <PlusCircle size={18} />
+                        Quản lý khách hàng
                       </button>
                     </div>
+                    <CustomSelect
+                      options={customerOptions}
+                      value={selectedCustomerId}
+                      onChange={setSelectedCustomerId}
+                      placeholder="Chọn khách hàng hoặc bỏ trống"
+                      searchable={true}
+                      dropdownWidth="full"
+                    />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-semibold text-[#7a7a7a] uppercase tracking-wider pl-1">
-                      Nguồn khách hàng
-                    </label>
+                    <div className="flex justify-between items-center pl-1">
+                      <label className="text-[11px] font-semibold text-[#7a7a7a] uppercase tracking-wider">
+                        Nguồn khách hàng
+                      </label>
+                      <button 
+                        type="button" 
+                        onClick={() => setIsLeadSourceManageOpen(true)}
+                        className="text-[11.5px] font-semibold text-[#0066cc] hover:underline cursor-pointer"
+                      >
+                        Quản lý nguồn khách
+                      </button>
+                    </div>
                     <CustomSelect
                       options={leadSourceOptions}
                       value={leadSourceId}
@@ -352,9 +373,18 @@ export function QuotationForm({ onSubmit, onCancel, isLoading }: QuotationFormPr
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-semibold text-[#7a7a7a] uppercase tracking-wider pl-1">
-                      Nguồn khách hàng
-                    </label>
+                    <div className="flex justify-between items-center pl-1">
+                      <label className="text-[11px] font-semibold text-[#7a7a7a] uppercase tracking-wider">
+                        Nguồn khách hàng
+                      </label>
+                      <button 
+                        type="button" 
+                        onClick={() => setIsLeadSourceManageOpen(true)}
+                        className="text-[11.5px] font-semibold text-[#0066cc] hover:underline cursor-pointer"
+                      >
+                        Quản lý nguồn khách
+                      </button>
+                    </div>
                     <CustomSelect
                       options={leadSourceOptions}
                       value={leadSourceId}
@@ -410,19 +440,26 @@ export function QuotationForm({ onSubmit, onCancel, isLoading }: QuotationFormPr
                           handleAddItemDirectly(item);
                           setSelectedProductId("");
                         }}
-                        className="flex flex-col p-3 bg-white border border-[#e0e0e0] hover:border-[#0066cc] rounded-xl text-left transition-all hover:shadow-sm cursor-pointer group"
+                        className="flex flex-col p-3.5 bg-white hover:bg-slate-50/50 border border-slate-200/70 hover:border-[#0066cc] rounded-2xl text-left transition-all hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] duration-150 cursor-pointer group"
                       >
-                        <div className="flex items-center justify-between gap-1.5 w-full mb-0.5">
-                          <span className="font-mono text-[13px] font-bold text-[#1d1d1f] group-hover:text-[#0066cc] truncate">
+                        <div className="flex items-center justify-between gap-1.5 w-full mb-1.5">
+                          <span className="text-[14px] font-bold text-[#1d1d1f] group-hover:text-[#0066cc] transition-colors truncate">
                             {item.serialNumber}
                           </span>
-                          <span className="text-[10px] font-extrabold px-1.5 py-0.5 bg-[#f5f5f7] rounded text-[#7a7a7a] border uppercase tracking-wider">
+                          <span className={`text-[11.5px] font-bold px-2 py-0.5 rounded-full border ${
+                            item.condition === "new" 
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200/50" 
+                              : "bg-slate-100 text-slate-600 border-slate-200/50"
+                          }`}>
                             {item.condition === "new" ? "Mới" : "Cũ"}
                           </span>
                         </div>
-                        <span className="text-[11px] text-[#7a7a7a] font-semibold mt-0.5">
-                          Giá niêm yết: <span className="font-bold text-[#1d1d1f]">{formatPrice(Number(item.sellingPrice || item.costPrice))}</span>
-                        </span>
+                        <div className="text-[13px] text-[#7a7a7a] mt-0.5 w-full">
+                          <div className="flex justify-between">
+                            <span>Giá niêm yết:</span>
+                            <span className="font-semibold text-[#1d1d1f]">{formatPrice(Number(item.sellingPrice || item.costPrice))}</span>
+                          </div>
+                        </div>
                       </button>
                     ))}
                   </div>
@@ -461,7 +498,7 @@ export function QuotationForm({ onSubmit, onCancel, isLoading }: QuotationFormPr
                                   {item.productName}
                                 </p>
                                 {item.serialNumber && (
-                                  <span className="font-mono text-[11px] text-[#7a7a7a] bg-[#f5f5f7] px-2 py-0.5 rounded border border-[#e0e0e0] mt-1 inline-block">
+                                  <span className="text-[12px] font-medium text-[#7a7a7a] bg-[#f5f5f7] px-2 py-0.5 rounded border border-[#e0e0e0] mt-1 inline-block">
                                     Serial: {item.serialNumber}
                                   </span>
                                 )}
@@ -640,15 +677,25 @@ export function QuotationForm({ onSubmit, onCancel, isLoading }: QuotationFormPr
         </div>
       </form>
 
-      {/* Dialog thêm nhanh khách hàng */}
-      <CustomerQuickDialog
-        isOpen={isCustomerQuickOpen}
-        onClose={() => setIsCustomerQuickOpen(false)}
-        onSuccess={async (newCustomer) => {
-          await refetchCustomers();
+      {/* Dialog quản lý khách hàng */}
+      <CustomerManagementDialog
+        isOpen={isCustomerManageOpen}
+        onClose={() => setIsCustomerManageOpen(false)}
+        onSelect={async (newCustomer) => {
           setSelectedCustomerId(newCustomer.id);
           setCustomerMode("select");
+          if (newCustomer.leadSourceId) {
+            setLeadSourceId(newCustomer.leadSourceId);
+          }
         }}
+        onUpdate={refetchCustomers}
+      />
+
+      {/* Modal quản lý nguồn khách */}
+      <LeadSourceManagerDialog
+        isOpen={isLeadSourceManageOpen}
+        onClose={() => setIsLeadSourceManageOpen(false)}
+        onUpdate={refetchLeadSources}
       />
     </div>
   );

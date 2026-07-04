@@ -1,6 +1,7 @@
 import { pgTable, uuid, varchar, text, boolean, timestamp, integer, decimal, jsonb, date, pgEnum, index } from 'drizzle-orm/pg-core';
 import { products } from './products';
 import { profiles } from './auth';
+import { suppliers, purchaseOrders } from './suppliers';
 
 // ============================================================
 // ENUMS
@@ -24,6 +25,14 @@ export const movementRefTypeEnum = pgEnum('movement_ref_type', [
   'purchase_order', 'order', 'warranty_claim', 'manual', 'stocktake',
 ]);
 
+export const accessoryItemStatusEnum = pgEnum('accessory_item_status', [
+  'in_stock',
+  'attached',
+  'sold',
+  'defective',
+  'returned',
+]);
+
 // ============================================================
 // INVENTORY_ITEMS — Kho hàng (từng chiếc máy theo Serial)
 // Mỗi row = 1 chiếc máy cụ thể với Serial riêng
@@ -38,8 +47,6 @@ export const inventoryItems = pgTable('inventory_items', {
   status: itemStatusEnum('status').default('incoming').notNull(),
   costPrice: decimal('cost_price', { precision: 15, scale: 2 }).notNull(),
   sellingPrice: decimal('selling_price', { precision: 15, scale: 2 }),
-  accessoryCost: decimal('accessory_cost', { precision: 15, scale: 2 }).default('0').notNull(),
-  accessoryNotes: text('accessory_notes'),
   specsOverride: jsonb('specs_override'), // Override specs if different from product model
   originCountry: varchar('origin_country', { length: 50 }).default('VN'),
   location: varchar('location', { length: 100 }),
@@ -110,3 +117,39 @@ export const shippingCarriers = pgTable('shipping_carriers', {
   isActive: boolean('is_active').default(true).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+// ============================================================
+// ACCESSORY_CATALOG — Danh mục loại phụ kiện
+// ============================================================
+export const accessoryCatalog = pgTable('accessory_catalog', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: varchar('name', { length: 200 }).notNull().unique(),
+  defaultCost: decimal('default_cost', { precision: 15, scale: 2 }).default('0').notNull(),
+  defaultSellingPrice: decimal('default_selling_price', { precision: 15, scale: 2 }).default('0').notNull(),
+  description: text('description'),
+  isActive: boolean('is_active').default(true).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ============================================================
+// ACCESSORY_ITEMS — Từng chiếc phụ kiện vật lý (Serial tùy chọn)
+// ============================================================
+export const accessoryItems = pgTable('accessory_items', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  accessoryCatalogId: uuid('accessory_catalog_id').references(() => accessoryCatalog.id).notNull(),
+  serialNumber: varchar('serial_number', { length: 100 }),
+  unitCost: decimal('unit_cost', { precision: 15, scale: 2 }).default('0').notNull(),
+  status: accessoryItemStatusEnum('status').default('in_stock').notNull(),
+  inventoryItemId: uuid('inventory_item_id').references(() => inventoryItems.id), // Máy đang gắn kèm (status = attached)
+  sellingPrice: decimal('selling_price', { precision: 15, scale: 2 }).default('0').notNull(),
+  supplierId: uuid('supplier_id').references(() => suppliers.id),
+  purchaseOrderId: uuid('purchase_order_id').references(() => purchaseOrders.id),
+  batchCode: varchar('batch_code', { length: 50 }),
+  notes: text('notes'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index('idx_acc_items_catalog').on(table.accessoryCatalogId),
+  index('idx_acc_items_status').on(table.status),
+  index('idx_acc_items_inv').on(table.inventoryItemId),
+]);

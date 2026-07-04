@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { Loader2, Phone, User, Mail, MapPin, ShoppingBag, CreditCard, RefreshCw, FileText, ExternalLink } from "lucide-react";
 import { 
   SFSymbolMagnifyingGlass,
@@ -58,6 +59,22 @@ const formatToDDMMYYYY = (dateString: string | Date | null) => {
   return `${day}/${month}/${year}`;
 };
 
+const formatDateTime = (dateString: string | Date | null) => {
+  if (!dateString) return "N/A";
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return "N/A";
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  
+  if (date.getHours() === 0 && date.getMinutes() === 0 && date.getSeconds() === 0 && date.getMilliseconds() === 0) {
+    return `${day}/${month}/${year}`;
+  }
+  return `${hours}:${minutes} - ${day}/${month}/${year}`;
+};
+
 const formatPrice = (price: string | number | null) => {
   if (price === null || price === undefined) return "0đ";
   return Math.round(Number(price || 0)).toLocaleString("vi-VN") + "đ";
@@ -80,7 +97,11 @@ const formatSpecs = (specs: any): string => {
   return String(specs);
 };
 
-export default function LookupPage() {
+function LookupPageContent() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   // Smart Search States
   const [searchQuery, setSearchQuery] = useState("");
   const [searchType, setSearchType] = useState<"customer" | "serial" | null>(null);
@@ -89,7 +110,17 @@ export default function LookupPage() {
   // Phone Lookup States
   const [phoneLoading, setPhoneLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [selectedCustomerId, setSelectedCustomerIdState] = useState<string | null>(null);
+  const setSelectedCustomerId = (id: string | null) => {
+    setSelectedCustomerIdState(id);
+    const params = new URLSearchParams(searchParams.toString());
+    if (id) {
+      params.set("customerId", id);
+    } else {
+      params.delete("customerId");
+    }
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
   const [customerDetail, setCustomerDetail] = useState<any>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
@@ -99,24 +130,22 @@ export default function LookupPage() {
 
   // Update URL parameters
   const updateURL = (value: string, forceType?: "customer" | "serial") => {
-    if (typeof window !== "undefined") {
-      const url = new URL(window.location.href);
-      if (forceType === "serial") {
-        url.searchParams.set("serial", value);
-        url.searchParams.delete("q");
-        url.searchParams.delete("phone");
-      } else if (forceType === "customer") {
-        url.searchParams.set("phone", value);
-        url.searchParams.delete("q");
-        url.searchParams.delete("serial");
-      } else {
-        url.searchParams.set("q", value);
-        url.searchParams.delete("phone");
-        url.searchParams.delete("serial");
-      }
-      url.searchParams.delete("tab");
-      window.history.pushState({}, "", url.toString());
+    const params = new URLSearchParams(searchParams.toString());
+    if (forceType === "serial") {
+      params.set("serial", value);
+      params.delete("q");
+      params.delete("phone");
+    } else if (forceType === "customer") {
+      params.set("phone", value);
+      params.delete("q");
+      params.delete("serial");
+    } else {
+      params.set("q", value);
+      params.delete("phone");
+      params.delete("serial");
     }
+    params.delete("tab");
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   };
 
   // Switch to Serial Tab & lookup Serial Number
@@ -148,7 +177,15 @@ export default function LookupPage() {
       const res = await searchCustomersByPhone(target);
       if (res.success && res.customers && res.customers.length > 0) {
         setSearchResults(res.customers);
-        if (res.customers.length === 1) {
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const customerIdParam = urlParams.get("customerId");
+        const hasMatchingCustomer = customerIdParam && res.customers.some((c: any) => c.id === customerIdParam);
+        
+        if (hasMatchingCustomer) {
+          setSelectedCustomerId(customerIdParam);
+          fetchCustomerDetail(customerIdParam);
+        } else if (res.customers.length === 1) {
           const customerId = res.customers[0].id;
           setSelectedCustomerId(customerId);
           fetchCustomerDetail(customerId);
@@ -462,6 +499,7 @@ export default function LookupPage() {
                     <table className="w-full text-left border-collapse min-w-[550px]">
                       <thead>
                         <tr className="border-b border-[#e5e5e7] text-[12px] font-bold text-[#86868b] uppercase tracking-wider">
+                          <th className="pb-3.5 pr-2 text-center w-[45px]">STT</th>
                           <th className="pb-3.5 pr-4">Tên máy & Cấu hình</th>
                           <th className="pb-3.5 px-3">Số Serial</th>
                           <th className="pb-3.5 px-3">Hóa đơn mua</th>
@@ -471,12 +509,21 @@ export default function LookupPage() {
                       </thead>
                       <tbody className="text-[13.5px] text-[#1d1d1f] font-medium">
                         {customerDetail.purchasedItems.map((item: any, idx: number) => {
-                          const badge = statusMapping[item.status] || {
-                            label: item.status,
-                            color: "text-[#1d1d1f]",
-                          };
+                          let label = statusMapping[item.status]?.label || item.status;
+                          let color = statusMapping[item.status]?.color || "text-[#1d1d1f]";
+                          if (item.status === 'warranty_repair') {
+                            if (item.location === 'internal_repair') {
+                              label = "Đang sửa";
+                              color = "text-orange-600";
+                            } else {
+                              label = "Đang BH";
+                              color = "text-amber-600";
+                            }
+                          }
+                          const badge = { label, color };
                           return (
                             <tr key={idx} className="border-b border-slate-100 last:border-0 hover:bg-[#f5f5f7]/30 transition-colors">
+                              <td className="py-3.5 pr-2 align-top text-center text-[13px] font-semibold text-[#86868b] w-[45px]">{idx + 1}</td>
                               <td className="py-3.5 pr-4 align-top max-w-[220px]">
                                 <p className="font-semibold text-[#1d1d1f] leading-tight">{item.productName}</p>
                                 <span className="text-[11.5px] text-[#86868b] block mt-1 font-medium leading-relaxed">{formatSpecs(item.productSpecs)}</span>
@@ -526,6 +573,7 @@ export default function LookupPage() {
                     <table className="w-full text-left border-collapse min-w-[550px]">
                       <thead>
                         <tr className="border-b border-[#e5e5e7] text-[12px] font-bold text-[#86868b] uppercase tracking-wider">
+                          <th className="pb-3.5 pr-2 text-center w-[45px]">STT</th>
                           <th className="pb-3.5 pr-4">Mã Đơn hàng</th>
                           <th className="pb-3.5 px-3">Ngày lên đơn</th>
                           <th className="pb-3.5 px-3">Kênh bán</th>
@@ -535,10 +583,11 @@ export default function LookupPage() {
                         </tr>
                       </thead>
                       <tbody className="text-[13.5px] text-[#1d1d1f] font-medium">
-                        {customerDetail.orders.map((ord: any) => {
+                        {customerDetail.orders.map((ord: any, ordIdx: number) => {
                           const stBadge = orderStatusMapping[ord.status] || { label: ord.status, color: "text-slate-500" };
                           return (
                             <tr key={ord.id} className="border-b border-slate-100 last:border-0 hover:bg-[#f5f5f7]/30 transition-colors">
+                              <td className="py-3.5 pr-2 align-middle text-center text-[13px] font-semibold text-[#86868b] w-[45px]">{ordIdx + 1}</td>
                               <td className="py-3.5 pr-4 align-middle font-bold text-[#1d1d1f]">{ord.orderNumber}</td>
                               <td className="py-3.5 px-3 align-middle text-[#86868b]">{formatToDDMMYYYY(ord.createdAt)}</td>
                               <td className="py-3.5 px-3 align-middle text-slate-600 capitalize">{ord.saleChannel}</td>
@@ -577,6 +626,7 @@ export default function LookupPage() {
                     <table className="w-full text-left border-collapse min-w-[550px]">
                       <thead>
                         <tr className="border-b border-[#e5e5e7] text-[12px] font-bold text-[#86868b] uppercase tracking-wider">
+                          <th className="pb-3.5 pr-2 text-center w-[45px]">STT</th>
                           <th className="pb-3.5 pr-4">Mã Phiếu đổi trả</th>
                           <th className="pb-3.5 px-3">Loại</th>
                           <th className="pb-3.5 px-3">Sản phẩm đổi/trả</th>
@@ -585,8 +635,9 @@ export default function LookupPage() {
                         </tr>
                       </thead>
                       <tbody className="text-[13.5px] text-[#1d1d1f] font-medium">
-                        {customerDetail.returns.map((ret: any) => (
+                        {customerDetail.returns.map((ret: any, retIdx: number) => (
                           <tr key={ret.id} className="border-b border-slate-100 last:border-0 hover:bg-[#f5f5f7]/30 transition-colors">
+                            <td className="py-3.5 pr-2 align-middle text-center text-[13px] font-semibold text-[#86868b] w-[45px]">{retIdx + 1}</td>
                             <td className="py-3.5 pr-4 align-middle">
                               <p className="font-bold text-[#1d1d1f]">{ret.returnNumber}</p>
                               <span className="text-[11.5px] text-[#86868b] block mt-0.5 font-medium">{formatToDDMMYYYY(ret.createdAt)}</span>
@@ -679,13 +730,20 @@ export default function LookupPage() {
                 
                 {/* Dynamic status badge */}
                 {(() => {
-                  const badge = statusMapping[lifecycleData.item.status] || {
-                    label: lifecycleData.item.status,
-                    color: "text-slate-700",
-                  };
+                  let label = statusMapping[lifecycleData.item.status]?.label || lifecycleData.item.status;
+                  let color = statusMapping[lifecycleData.item.status]?.color || "text-slate-700";
+                  if (lifecycleData.item.status === 'warranty_repair') {
+                    if (lifecycleData.item.location === 'internal_repair') {
+                      label = "Đang sửa";
+                      color = "text-orange-600";
+                    } else {
+                      label = "Đang BH";
+                      color = "text-amber-600";
+                    }
+                  }
                   return (
-                    <span className={`text-[13px] font-semibold ${badge.color}`}>
-                      {badge.label}
+                    <span className={`text-[13px] font-semibold ${color}`}>
+                      {label}
                     </span>
                   );
                 })()}
@@ -822,7 +880,7 @@ export default function LookupPage() {
           <GlassCard className="lg:col-span-8 p-6 space-y-6 bg-white border border-[#e5e5e7] rounded-2xl shadow-sm">
             <h4 className="text-[14px] font-bold text-[#1d1d1f] uppercase tracking-wider pb-2.5 border-b border-slate-100 flex items-center gap-1.5">
               <SFSymbolFileSpreadsheet size={15} className="text-[#0066cc]" />
-              Dòng thời gian Vòng đời Thiết bị (Milestones)
+              Vòng đời thiết bị
             </h4>
 
             {/* Chronological Vertical Timeline path */}
@@ -850,7 +908,7 @@ export default function LookupPage() {
                         <div className="flex items-center gap-1 text-[#86868b]">
                           <SFSymbolCalendar size={12} className="text-slate-400" />
                           <span className="text-[12px] font-semibold tracking-tight">
-                            {formatToDDMMYYYY(m.date)}
+                            {formatDateTime(m.date)}
                           </span>
                         </div>
                       </div>
@@ -905,7 +963,7 @@ export default function LookupPage() {
                               <span className="font-semibold text-slate-700">Đơn: {m.meta.orderNumber}</span>
                             </>
                           )}
-                          {m.type === "return" && (
+                          {m.type === "return" && m.meta.refundPrice !== undefined && (
                             <>
                               <span className="font-semibold text-slate-700">
                                 Khấu trừ hoàn trả: {formatPrice(m.meta.refundPrice)}
@@ -933,10 +991,10 @@ export default function LookupPage() {
                               )}
                             </>
                           )}
-                          {m.type === "movement" && (
+                          {(m.type === "movement" || (m.type === "return" && m.meta.fromStatus)) && (
                             <>
                               <span className="font-medium text-[12.5px]">
-                                Trạng thái: <span className="font-semibold text-slate-500">{m.meta.fromStatus || "N/A"}</span> ➔ <span className="font-semibold text-slate-800">{m.meta.toStatus}</span>
+                                Trạng thái: <span className="font-semibold text-slate-500">{statusMapping[m.meta.fromStatus]?.label || m.meta.fromStatus || "N/A"}</span> ➔ <span className="font-semibold text-slate-800">{statusMapping[m.meta.toStatus]?.label || m.meta.toStatus || "N/A"}</span>
                               </span>
                             </>
                           )}
@@ -995,14 +1053,7 @@ export default function LookupPage() {
     <div className="space-y-8 pb-10">
       
       {/* 1. Header with inline Search Console */}
-      <div className="pb-6 border-b border-[#e5e5e7] flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-[40px] font-semibold tracking-tight leading-[1.10] bg-clip-text text-transparent select-none" style={{ backgroundImage: "linear-gradient(90deg, #2997ff, #a855f7, #ec4899)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-            Tra cứu thông tin
-          </h1>
-          <p className="text-[14px] text-[#86868b] font-medium">Tìm kiếm dữ liệu khách hàng hoặc thiết bị trong hệ thống</p>
-        </div>
-
+      <div className="pb-6 border-b border-[#e5e5e7] flex flex-col md:flex-row md:items-center justify-start gap-4">
         {/* Search Console */}
         <form onSubmit={(e) => { e.preventDefault(); handleSearch(searchQuery); }} className="w-full md:max-w-md">
           <div className="flex gap-2">
@@ -1039,5 +1090,18 @@ export default function LookupPage() {
       </div>
 
     </div>
+  );
+}
+
+export default function LookupPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center py-32 text-[#86868b]">
+        <Loader2 className="animate-spin mb-4 text-[#0066cc]" size={28} />
+        <p className="text-[16px] font-semibold text-[#1d1d1f]">Đang tải dữ liệu tra cứu...</p>
+      </div>
+    }>
+      <LookupPageContent />
+    </Suspense>
   );
 }

@@ -1060,15 +1060,7 @@ export default function DashboardHome() {
           <div className="pb-2">
             <div className="flex flex-col md:flex-row gap-4 items-start md:items-end justify-between">
               <div>
-                <h1
-                  className="text-[40px] font-semibold tracking-tight leading-[1.10] bg-clip-text text-transparent select-none"
-                  style={{
-                    backgroundImage: "linear-gradient(90deg, #2997ff, #a855f7, #ec4899)",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                    backgroundSize: "100%",
-                  }}
-                >
+                <p className="text-[15px] font-semibold text-slate-500">
                   {(() => {
                     const now = new Date();
                     const hour = now.getHours();
@@ -1081,7 +1073,7 @@ export default function DashboardHome() {
                     const yyyy = now.getFullYear();
                     return `${greeting} — ${dayOfWeek}, ${dd}/${mm}/${yyyy}`;
                   })()}
-                </h1>
+                </p>
               </div>
 
               {isRefreshing && (

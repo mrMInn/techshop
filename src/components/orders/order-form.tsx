@@ -5,9 +5,11 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { 
   getCustomersForSelect, 
   getInStockItemsForSelect, 
-  getLeadSourcesAction 
+  getLeadSourcesAction,
+  getInStockAccessoriesForSelect
 } from "@/app/actions/orders";
-import { CustomerQuickDialog } from "./customer-quick-dialog";
+import { CustomerManagementDialog } from "./customer-management-dialog";
+import { LeadSourceManagerDialog } from "./lead-source-management-dialog";
 import { CustomSelect } from "@/components/ui/custom-select";
 import { Plus, Trash2, ShoppingBag, DollarSign, Tag, Landmark, Truck, MessageSquare, PlusCircle, Banknote } from "lucide-react";
 import { toast } from "sonner";
@@ -17,6 +19,10 @@ const formatPrice = (price: number) => {
     style: "currency",
     currency: "VND",
   }).format(price);
+};
+
+const getActualCost = (item: any) => {
+  return Number(item.costPrice || 0);
 };
 
 const formatNumberInput = (val: string) => {
@@ -69,31 +75,41 @@ export function OrderForm({ onSubmit, onCancel, isLoading }: OrderFormProps) {
     queryFn: getInStockItemsForSelect,
   });
 
-  const { data: leadSourceList } = useQuery({
+  const { data: leadSourceList, refetch: refetchLeadSources } = useQuery({
     queryKey: ["lead-sources-select"],
     queryFn: getLeadSourcesAction,
+  });
+
+  const { data: stockAccessories } = useQuery({
+    queryKey: ["stock-accessories-select"],
+    queryFn: getInStockAccessoriesForSelect,
   });
 
   // 2. State quản lý form
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [leadSourceId, setLeadSourceId] = useState("");
   const [saleChannel, setSaleChannel] = useState<"online" | "offline">("offline");
+  const [isLeadSourceManageOpen, setIsLeadSourceManageOpen] = useState(false);
   
   // Danh sách sản phẩm được chọn trong đơn hàng
   const [selectedItems, setSelectedItems] = useState<{
-    inventoryItemId: string;
+    inventoryItemId?: string;
+    accessoryItemId?: string;
     productId: string;
     productName: string;
     serialNumber: string;
     costPrice: number;
-    specs: any;
-    sellingPrice: string; // Giá trị nhập
-    discount: string;      // Giảm giá riêng
-    warrantyMonths: string; // Số tháng bảo hành (kiểu string để hỗ trợ để trống)
+    actualCost: number;
+    specs?: any;
+    sellingPrice: string;
+    discount: string;
+    warrantyMonths: string;
+    accessories?: any[];
   }[]>([]);
 
   // Trường chọn máy hiện tại để thêm vào đơn
   const [currentSelectedItemId, setCurrentSelectedItemId] = useState("");
+  const [selectedAccessoryId, setSelectedAccessoryId] = useState("");
 
   // Các trường thanh toán & giao hàng
   const [discountAmount, setDiscountAmount] = useState("");
@@ -109,7 +125,7 @@ export function OrderForm({ onSubmit, onCancel, isLoading }: OrderFormProps) {
   const customerOptions = useMemo(() => {
     return customerList?.map(c => ({
       value: c.id,
-      label: `${c.fullName} (${c.phone})`
+      label: c.phone ? `${c.fullName} (${c.phone})` : c.fullName
     })) || [];
   }, [customerList]);
 
@@ -199,6 +215,7 @@ export function OrderForm({ onSubmit, onCancel, isLoading }: OrderFormProps) {
 
     // Look up specs from the grouped stock items
     const group = groupedStockItems.find(g => g.productId === item.productId);
+    const actualCost = getActualCost(item);
     setSelectedItems([
       ...selectedItems,
       {
@@ -207,10 +224,12 @@ export function OrderForm({ onSubmit, onCancel, isLoading }: OrderFormProps) {
         productName: item.productName,
         serialNumber: item.serialNumber,
         costPrice: Number(item.costPrice),
+        actualCost: actualCost,
         specs: group?.specs || item.specs || null,
         sellingPrice: "",
         discount: "",
         warrantyMonths: "",
+        accessories: item.accessories || [],
       }
     ]);
   };
@@ -225,6 +244,45 @@ export function OrderForm({ onSubmit, onCancel, isLoading }: OrderFormProps) {
     }
   }, [selectedProductId, availableSerialsForSelectedProduct]);
 
+  const accessoryOptions = useMemo(() => {
+    const availableAccessories = stockAccessories?.filter(
+      acc => !selectedItems.some(si => si.accessoryItemId === acc.id)
+    ) || [];
+
+    return availableAccessories.map(acc => ({
+      value: acc.id,
+      label: acc.catalogName,
+      subLabel: acc.serialNumber ? `S/N: ${acc.serialNumber}` : `Không serial (ID: ${acc.id.slice(0, 6)})`,
+    })) || [];
+  }, [stockAccessories, selectedItems]);
+
+  const handleAddAccessoryDirectly = (accId: string) => {
+    const acc = stockAccessories?.find(a => a.id === accId);
+    if (!acc) return;
+
+    setSelectedItems([
+      ...selectedItems,
+      {
+        accessoryItemId: acc.id,
+        productId: acc.catalogId,
+        productName: acc.catalogName,
+        serialNumber: acc.serialNumber || "Không serial",
+        costPrice: Number(acc.unitCost),
+        actualCost: Number(acc.unitCost),
+        sellingPrice: acc.sellingPrice && Number(acc.sellingPrice) > 0 ? Math.round(Number(acc.sellingPrice)).toString() : "",
+        discount: "",
+        warrantyMonths: "12",
+      }
+    ]);
+    setSelectedAccessoryId("");
+  };
+
+  useEffect(() => {
+    if (selectedAccessoryId) {
+      handleAddAccessoryDirectly(selectedAccessoryId);
+    }
+  }, [selectedAccessoryId]);
+
   const paymentMethodOptions = [
     { value: "cash", label: "Tiền mặt" },
     { value: "bank_transfer", label: "Chuyển khoản" },
@@ -232,8 +290,8 @@ export function OrderForm({ onSubmit, onCancel, isLoading }: OrderFormProps) {
     { value: "mixed", label: "Hỗn hợp" },
   ];
 
-  // Dialog thêm nhanh khách hàng
-  const [isCustomerQuickOpen, setIsCustomerQuickOpen] = useState(false);
+  // Dialog quản lý khách hàng
+  const [isCustomerManageOpen, setIsCustomerManageOpen] = useState(false);
 
 
 
@@ -258,7 +316,7 @@ export function OrderForm({ onSubmit, onCancel, isLoading }: OrderFormProps) {
   // 4. Tính toán số liệu đơn hàng real-time
   const subtotal = selectedItems.reduce((sum, item) => sum + (Number(item.sellingPrice) || 0), 0);
   const totalItemDiscounts = selectedItems.reduce((sum, item) => sum + (Number(item.discount) || 0), 0);
-  const totalCost = selectedItems.reduce((sum, item) => sum + item.costPrice, 0);
+  const totalCost = selectedItems.reduce((sum, item) => sum + item.actualCost, 0);
 
   const generalDiscount = Number(discountAmount) || 0;
   const tax = Number(taxAmount) || 0;
@@ -284,6 +342,16 @@ export function OrderForm({ onSubmit, onCancel, isLoading }: OrderFormProps) {
     }
   }, [customerList, selectedCustomerId]);
 
+  // Tự động điền Nguồn khách hàng khi chọn Khách hàng có sẵn nguồn
+  useEffect(() => {
+    if (selectedCustomerId && customerList) {
+      const selectedCustomer = customerList.find(c => c.id === selectedCustomerId);
+      if (selectedCustomer?.leadSourceId) {
+        setLeadSourceId(selectedCustomer.leadSourceId);
+      }
+    }
+  }, [selectedCustomerId, customerList]);
+
   // Xử lý gửi dữ liệu đơn hàng đi
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -299,10 +367,11 @@ export function OrderForm({ onSubmit, onCancel, isLoading }: OrderFormProps) {
       leadSourceId: leadSourceId || undefined,
       saleChannel,
       items: selectedItems.map(item => ({
-        inventoryItemId: item.inventoryItemId,
+        inventoryItemId: item.inventoryItemId || undefined,
+        accessoryItemId: item.accessoryItemId || undefined,
         productId: item.productId,
-        sellingPrice: item.sellingPrice,
-        discount: item.discount,
+        sellingPrice: item.sellingPrice || "0",
+        discount: item.discount || "0",
         warrantyMonths: Number(item.warrantyMonths) || 0,
       })),
       discountAmount,
@@ -334,28 +403,26 @@ export function OrderForm({ onSubmit, onCancel, isLoading }: OrderFormProps) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Khách hàng */}
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-semibold text-[#7a7a7a] uppercase tracking-wider pl-1">
-                    Khách hàng
-                  </label>
-                  <div className="flex items-center gap-2 w-full">
-                    <CustomSelect
-                      options={customerOptions}
-                      value={selectedCustomerId}
-                      onChange={setSelectedCustomerId}
-                      placeholder="Mặc định: Khách vãng lai"
-                      searchable={true}
-                      className="flex-1"
-                      dropdownWidth="full"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setIsCustomerQuickOpen(true)}
-                      className="h-[44px] px-3 bg-[#f5f5f7] hover:bg-[#e8e8ed] border border-[#e0e0e0] text-[#1d1d1f] rounded-xl transition-all flex items-center justify-center shrink-0 cursor-pointer active:scale-95 duration-150"
-                      title="Thêm khách hàng nhanh"
+                  <div className="flex justify-between items-center pl-1">
+                    <label className="text-[11px] font-semibold text-[#7a7a7a] uppercase tracking-wider">
+                      Khách hàng
+                    </label>
+                    <button 
+                      type="button" 
+                      onClick={() => setIsCustomerManageOpen(true)}
+                      className="text-[11.5px] font-semibold text-[#0066cc] hover:underline cursor-pointer"
                     >
-                      <Plus size={18} />
+                      Quản lý khách hàng
                     </button>
                   </div>
+                  <CustomSelect
+                    options={customerOptions}
+                    value={selectedCustomerId}
+                    onChange={setSelectedCustomerId}
+                    placeholder="Mặc định: Khách vãng lai"
+                    searchable={true}
+                    dropdownWidth="full"
+                  />
                 </div>
 
                 {/* Kênh bán hàng */}
@@ -374,14 +441,24 @@ export function OrderForm({ onSubmit, onCancel, isLoading }: OrderFormProps) {
 
                 {/* Nguồn khách */}
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-semibold text-[#7a7a7a] uppercase tracking-wider pl-1">
-                    Nguồn khách
-                  </label>
+                  <div className="flex justify-between items-center pl-1">
+                    <label className="text-[11px] font-semibold text-[#7a7a7a] uppercase tracking-wider">
+                      Nguồn khách
+                    </label>
+                    <button 
+                      type="button" 
+                      onClick={() => setIsLeadSourceManageOpen(true)}
+                      className="text-[11.5px] font-semibold text-[#0066cc] hover:underline cursor-pointer"
+                    >
+                      Quản lý nguồn khách
+                    </button>
+                  </div>
                   <CustomSelect
                     options={leadSourceOptions}
                     value={leadSourceId}
                     onChange={setLeadSourceId}
                     searchable={true}
+                    placeholder="Chọn nguồn..."
                     dropdownWidth="full"
                   />
                 </div>
@@ -409,17 +486,32 @@ export function OrderForm({ onSubmit, onCancel, isLoading }: OrderFormProps) {
                   Danh sách sản phẩm trong đơn ({selectedItems.length})
                 </h3>
                 
-                {/* Dropdown chọn model sẵn hàng */}
-                <div className="relative w-full md:w-96 shrink-0">
-                  <CustomSelect
-                    options={stockItemOptions}
-                    value={selectedProductId}
-                    onChange={setSelectedProductId}
-                    placeholder="Tìm theo Model hoặc Serial..."
-                    searchable={true}
-                    align="right"
-                    dropdownWidth="full"
-                  />
+                <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto shrink-0">
+                  {/* Dropdown chọn model sẵn hàng */}
+                  <div className="relative w-full sm:w-72">
+                    <CustomSelect
+                      options={stockItemOptions}
+                      value={selectedProductId}
+                      onChange={setSelectedProductId}
+                      placeholder="Tìm máy theo Model/Serial..."
+                      searchable={true}
+                      align="right"
+                      dropdownWidth="full"
+                    />
+                  </div>
+
+                  {/* Dropdown chọn phụ kiện lẻ */}
+                  <div className="relative w-full sm:w-60">
+                    <CustomSelect
+                      options={accessoryOptions}
+                      value={selectedAccessoryId}
+                      onChange={setSelectedAccessoryId}
+                      placeholder="Bán phụ kiện lẻ..."
+                      searchable={true}
+                      align="right"
+                      dropdownWidth="full"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -439,29 +531,49 @@ export function OrderForm({ onSubmit, onCancel, isLoading }: OrderFormProps) {
                     </button>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
-                    {availableSerialsForSelectedProduct.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => {
-                          handleAddItemDirectly(item);
-                          setSelectedProductId("");
-                        }}
-                        className="flex flex-col p-3 bg-white border border-[#e0e0e0] hover:border-[#0066cc] rounded-xl text-left transition-all hover:shadow-sm cursor-pointer group"
-                      >
-                        <div className="flex items-center justify-between gap-1.5 w-full mb-0.5">
-                          <span className="font-mono text-[13px] font-bold text-[#1d1d1f] group-hover:text-[#0066cc] truncate">
-                            {item.serialNumber}
-                          </span>
-                          <span className="text-[11px] font-medium px-1.5 py-0.5 bg-[#f5f5f7] rounded text-[#7a7a7a]">
-                            {item.condition === "new" ? "Mới" : "Cũ"}
-                          </span>
-                        </div>
-                        <span className="text-[11px] text-[#7a7a7a] mt-0.5">
-                          Giá vốn: <span className="font-semibold text-[#1d1d1f]">{new Intl.NumberFormat("vi-VN").format(Number(item.costPrice))} ₫</span>
-                        </span>
-                      </button>
-                    ))}
+                    {availableSerialsForSelectedProduct.map((item) => {
+                      const actualCost = getActualCost(item);
+                      const originalCost = Number(item.costPrice || 0);
+                      const hasCostDiff = actualCost !== originalCost;
+
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            handleAddItemDirectly(item);
+                            setSelectedProductId("");
+                          }}
+                          className="flex flex-col p-3.5 bg-white hover:bg-slate-50/50 border border-slate-200/70 hover:border-[#0066cc] rounded-2xl text-left transition-all hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] duration-150 cursor-pointer group"
+                        >
+                          <div className="flex items-center justify-between gap-1.5 w-full mb-1.5">
+                            <span className="text-[14px] font-bold text-[#1d1d1f] group-hover:text-[#0066cc] transition-colors truncate">
+                              {item.serialNumber}
+                            </span>
+                            <span className={`text-[11.5px] font-bold px-2 py-0.5 rounded-full border ${
+                              item.condition === "new" 
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200/50" 
+                                : "bg-slate-100 text-slate-600 border-slate-200/50"
+                            }`}>
+                              {item.condition === "new" ? "Mới" : "Cũ"}
+                            </span>
+                          </div>
+                          
+                          <div className="text-[13px] text-[#7a7a7a] space-y-0.5 mt-0.5 w-full">
+                            <div className="flex justify-between">
+                              <span>Giá gốc:</span>
+                              <span className="font-semibold text-[#1d1d1f]">{formatPrice(originalCost)}</span>
+                            </div>
+                            {hasCostDiff && (
+                              <div className="flex justify-between text-amber-700 font-medium">
+                                <span>Vốn thực tế:</span>
+                                <span className="font-extrabold text-amber-600">{formatPrice(actualCost)}</span>
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -493,10 +605,12 @@ export function OrderForm({ onSubmit, onCancel, isLoading }: OrderFormProps) {
                         const sellingNum = Number(item.sellingPrice) || 0;
                         const discNum = Number(item.discount) || 0;
                         const finalNum = sellingNum - discNum;
-                        const profit = finalNum - item.costPrice;
+                        const profit = finalNum - item.actualCost;
+                        const originalCost = item.costPrice;
+                        const hasCostDiff = item.actualCost !== originalCost;
 
                         return (
-                          <tr key={item.inventoryItemId} className="border-b border-[#e0e0e0]/60 last:border-0 hover:bg-[#f5f5f7]/30 transition-colors">
+                          <tr key={item.inventoryItemId || item.accessoryItemId} className="border-b border-[#e0e0e0]/60 last:border-0 hover:bg-[#f5f5f7]/30 transition-colors">
                             {/* Tên máy & Serial */}
                             <td className="px-3 py-3.5">
                               <div className="flex flex-col">
@@ -508,15 +622,33 @@ export function OrderForm({ onSubmit, onCancel, isLoading }: OrderFormProps) {
                                     {formatSpecs(item.specs)}
                                   </span>
                                 )}
-                                <span className="text-[12px] text-[#7a7a7a] bg-[#f5f5f7] px-2 py-0.5 rounded border border-[#e0e0e0] mt-1 inline-block w-fit">
+                                <span className="text-[12px] font-medium text-[#7a7a7a] bg-[#f5f5f7] px-2 py-0.5 rounded border border-[#e0e0e0] mt-1 inline-block w-fit">
                                   {item.serialNumber}
                                 </span>
+                                {item.accessories && item.accessories.length > 0 && (
+                                  <div className="flex flex-col gap-1 mt-1.5 border-t border-slate-100 pt-1">
+                                    {item.accessories.map((acc: any) => (
+                                      <span key={acc.id} className="inline-flex items-center gap-1 text-[11px] text-[#0066cc] font-medium bg-blue-50/50 px-2 py-0.5 rounded-full w-fit">
+                                        🎁 Tặng kèm: {acc.catalogName} {acc.serialNumber ? `(${acc.serialNumber})` : ""}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             </td>
 
                             {/* Giá nhập (Read-only) */}
                             <td className="px-3 py-3.5 text-right text-[14px] text-[#7a7a7a] font-medium">
-                              {formatPrice(item.costPrice)}
+                              <div className="flex flex-col items-end">
+                                <span className={hasCostDiff ? "line-through text-[11px] opacity-60" : ""}>
+                                  {formatPrice(originalCost)}
+                                </span>
+                                {hasCostDiff && (
+                                  <span className="text-[13px] font-semibold text-amber-600">
+                                    {formatPrice(item.actualCost)}
+                                  </span>
+                                )}
+                              </div>
                             </td>
 
                             {/* Giá bán (Editable) */}
@@ -788,16 +920,24 @@ export function OrderForm({ onSubmit, onCancel, isLoading }: OrderFormProps) {
         </div>
       </form>
 
-      {/* Dialog thêm khách hàng nhanh */}
-      <CustomerQuickDialog
-        isOpen={isCustomerQuickOpen}
-        onClose={() => setIsCustomerQuickOpen(false)}
-        onSuccess={(newCust) => {
-          // Tự động load lại danh sách khách hàng và chọn khách hàng vừa được tạo
-          refetchCustomers().then(() => {
-            setSelectedCustomerId(newCust.id);
-          });
+      {/* Dialog quản lý khách hàng */}
+      <CustomerManagementDialog
+        isOpen={isCustomerManageOpen}
+        onClose={() => setIsCustomerManageOpen(false)}
+        onSelect={(cust) => {
+          setSelectedCustomerId(cust.id);
+          if (cust.leadSourceId) {
+            setLeadSourceId(cust.leadSourceId);
+          }
         }}
+        onUpdate={refetchCustomers}
+      />
+
+      {/* Modal quản lý nguồn khách */}
+      <LeadSourceManagerDialog
+        isOpen={isLeadSourceManageOpen}
+        onClose={() => setIsLeadSourceManageOpen(false)}
+        onUpdate={refetchLeadSources}
       />
     </div>
   );

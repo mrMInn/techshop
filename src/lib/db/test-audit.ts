@@ -110,28 +110,56 @@ async function testOrderFinancials() {
       orderProfit, expectedProfit, 2
     );
 
-    // 2. Kiểm tra mỗi item có inventory_item tương ứng
+    // 2. Kiểm tra mỗi item có inventory_item hoặc accessory_item tương ứng
     for (const item of items) {
-      const inv = await db.select().from(schema.inventoryItems)
-        .where(eq(schema.inventoryItems.id, item.inventoryItemId)).limit(1);
-      assert(
-        `${order.orderNumber}: Item ${item.id.slice(0,8)} có inventory_item`,
-        inv.length > 0
-      );
-    }
-
-    // 3. Kiểm tra đơn completed → máy phải status sold/warranty_repair/returned
-    if (order.status === 'completed') {
-      for (const item of items) {
+      if (item.inventoryItemId) {
         const inv = await db.select().from(schema.inventoryItems)
           .where(eq(schema.inventoryItems.id, item.inventoryItemId)).limit(1);
-        if (inv.length > 0) {
-          const validStatuses = ['sold', 'warranty_repair', 'returned', 'defective'];
-          assert(
-            `${order.orderNumber}: Máy ${inv[0].serialNumber} status hợp lệ (${inv[0].status})`,
-            validStatuses.includes(inv[0].status),
-            `status=${inv[0].status}, expected one of: ${validStatuses.join(',')}`
-          );
+        assert(
+          `${order.orderNumber}: Item ${item.id.slice(0,8)} có inventory_item`,
+          inv.length > 0
+        );
+      } else if (item.accessoryItemId) {
+        const acc = await db.select().from(schema.accessoryItems)
+          .where(eq(schema.accessoryItems.id, item.accessoryItemId)).limit(1);
+        assert(
+          `${order.orderNumber}: Item ${item.id.slice(0,8)} có accessory_item`,
+          acc.length > 0
+        );
+      } else {
+        assert(
+          `${order.orderNumber}: Item ${item.id.slice(0,8)} có liên kết hợp lệ`,
+          false,
+          "Không có cả inventoryItemId và accessoryItemId"
+        );
+      }
+    }
+
+    // 3. Kiểm tra đơn completed → máy/phụ kiện phải status sold/warranty_repair/returned/defective
+    if (order.status === 'completed') {
+      for (const item of items) {
+        if (item.inventoryItemId) {
+          const inv = await db.select().from(schema.inventoryItems)
+            .where(eq(schema.inventoryItems.id, item.inventoryItemId)).limit(1);
+          if (inv.length > 0) {
+            const validStatuses = ['sold', 'warranty_repair', 'returned', 'defective'];
+            assert(
+              `${order.orderNumber}: Máy ${inv[0].serialNumber} status hợp lệ (${inv[0].status})`,
+              validStatuses.includes(inv[0].status),
+              `status=${inv[0].status}, expected one of: ${validStatuses.join(',')}`
+            );
+          }
+        } else if (item.accessoryItemId) {
+          const acc = await db.select().from(schema.accessoryItems)
+            .where(eq(schema.accessoryItems.id, item.accessoryItemId)).limit(1);
+          if (acc.length > 0) {
+            const validStatuses = ['sold', 'returned', 'defective'];
+            assert(
+              `${order.orderNumber}: Phụ kiện ${acc[0].serialNumber || acc[0].id.slice(0,6)} status hợp lệ (${acc[0].status})`,
+              validStatuses.includes(acc[0].status),
+              `status=${acc[0].status}, expected one of: ${validStatuses.join(',')}`
+            );
+          }
         }
       }
     }

@@ -163,6 +163,11 @@ export default function ReportsPage() {
           -ms-overflow-style: none;  /* IE and Edge */
           scrollbar-width: none;  /* Firefox */
         }
+        @media screen {
+          .print-only {
+            display: none !important;
+          }
+        }
         @media print {
           body {
             background-color: white !important;
@@ -324,10 +329,10 @@ export default function ReportsPage() {
 
 
             {/* Apple Flat Structured General Ledger Page */}
-            <div className="bg-white rounded-3xl border border-slate-200/60 shadow-[0_15px_50px_rgba(0,0,0,0.06)] overflow-hidden p-8 md:p-10 print:w-full print:border-none print:p-0 print:shadow-none">
+            <div className="bg-white rounded-3xl border border-slate-200/60 shadow-[0_15px_50px_rgba(0,0,0,0.06)] overflow-hidden pt-5 pb-8 px-6 md:pt-6 md:pb-10 md:px-10 print:w-full print:border-none print:p-0 print:shadow-none">
               
               {/* Printed Document Header */}
-              <div className="text-center pb-8 border-b border-[#e0e0e0]/70 space-y-2">
+              <div className="print-only text-center pb-8 border-b border-[#e0e0e0]/70 space-y-2">
                 <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#0066cc]">TechStore ERP System</p>
                 <h3 className="text-[22px] font-black text-[#1d1d1f] tracking-tight uppercase">Báo Cáo Kết Quả Hoạt Động Kinh Doanh</h3>
                 <p className="text-[13px] text-[#7a7a7a] font-medium">
@@ -337,7 +342,7 @@ export default function ReportsPage() {
               </div>
 
               {/* General Ledger Table Structure */}
-              <div className="mt-8">
+              <div className="print:mt-8 mt-0">
                 <table className="w-full text-left border-collapse text-[13.5px]">
                   <thead>
                     <tr className="border-b-2 border-[#1d1d1f] text-[#7a7a7a] font-bold uppercase text-[11px] tracking-wider">
@@ -482,10 +487,10 @@ export default function ReportsPage() {
 
 
             {/* Apple Flat Structured Cashflow Ledger Page */}
-            <div className="bg-white rounded-3xl border border-slate-200/60 shadow-[0_15px_50px_rgba(0,0,0,0.06)] overflow-hidden p-8 md:p-10 print:w-full print:border-none print:p-0 print:shadow-none">
+            <div className="bg-white rounded-3xl border border-slate-200/60 shadow-[0_15px_50px_rgba(0,0,0,0.06)] overflow-hidden pt-5 pb-8 px-6 md:pt-6 md:pb-10 md:px-10 print:w-full print:border-none print:p-0 print:shadow-none">
               
               {/* Printed Document Header */}
-              <div className="text-center pb-8 border-b border-[#e0e0e0]/70 space-y-2">
+              <div className="print-only text-center pb-8 border-b border-[#e0e0e0]/70 space-y-2">
                 <p className="text-[10px] font-extrabold uppercase tracking-widest text-[#0066cc]">TechStore ERP System</p>
                 <h3 className="text-[22px] font-black text-[#1d1d1f] tracking-tight uppercase">Báo Cáo Lưu Chuyển Tiền Tệ Trực Tiếp</h3>
                 <p className="text-[13px] text-[#7a7a7a] font-medium">
@@ -495,7 +500,7 @@ export default function ReportsPage() {
               </div>
 
               {/* Cashflow Table Structure */}
-              <div className="mt-8">
+              <div className="print:mt-8 mt-0">
                 <table className="w-full text-left border-collapse text-[13.5px]">
                   <thead>
                     <tr className="border-b-2 border-[#1d1d1f] text-[#7a7a7a] font-bold uppercase text-[11px] tracking-wider">

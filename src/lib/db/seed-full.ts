@@ -2,7 +2,7 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as dotenv from 'dotenv';
 import * as schema from './schema';
-import { sql } from 'drizzle-orm';
+import { sql, eq } from 'drizzle-orm';
 
 dotenv.config({ path: '.env.local' });
 
@@ -71,6 +71,8 @@ async function main() {
   await db.delete(schema.quotations);
   await db.delete(schema.payments);
   await db.delete(schema.orderItems);
+  await db.delete(schema.accessoryItems);
+  await db.delete(schema.accessoryCatalog);
   await db.delete(schema.orders);
   await db.delete(schema.inventoryMovements);
   await db.delete(schema.inventoryItems);
@@ -202,6 +204,20 @@ async function main() {
   const leadSources = await db.insert(schema.leadSources).values(leadSourcesData).returning();
 
   // ============================================================
+  // 5.5. ACCESSORY CATALOG
+  // ============================================================
+  console.log('📦 Seeding accessory catalog...');
+  const accessoryCatalogData = [
+    { name: 'Sạc 20W USB-C', defaultCost: '150000', defaultSellingPrice: '250000', description: 'Sạc nhanh 20W cổng USB-C', isActive: true },
+    { name: 'Sạc 35W Dual USB-C', defaultCost: '250000', defaultSellingPrice: '400000', description: 'Sạc nhanh 35W 2 cổng', isActive: true },
+    { name: 'Cáp USB-C to USB-C 1m', defaultCost: '80000', defaultSellingPrice: '150000', description: 'Cáp sạc USB-C 1m', isActive: true },
+    { name: 'Cáp USB-C to Lightning 1m', defaultCost: '90000', defaultSellingPrice: '180000', description: 'Cáp sạc Lightning 1m', isActive: true },
+    { name: 'Ốp lưng silicon', defaultCost: '50000', defaultSellingPrice: '100000', description: 'Ốp silicon trong suốt', isActive: true },
+    { name: 'Cường lực màn hình', defaultCost: '30000', defaultSellingPrice: '80000', description: 'Kính cường lực 9H', isActive: true }
+  ];
+  const accCatalogs = await db.insert(schema.accessoryCatalog).values(accessoryCatalogData).returning();
+
+  // ============================================================
   // 6. CUSTOMERS (15)
   // ============================================================
   console.log('👤 Seeding 15 customers...');
@@ -248,7 +264,6 @@ async function main() {
       shippingMethod: po.status === 'draft' ? null : 'Vận chuyển đường biển',
       totalCost: po.total,
       shippingCost: po.status === 'received' ? String(randomInt(2000000, 8000000)) : '0',
-      taxImport: po.status === 'received' ? String(randomInt(5000000, 15000000)) : '0',
       expectedArrival: po.arrival ? dateStr(po.arrival) : (po.status === 'in_transit' ? dateStr(daysAgo(-10)) : null),
       actualArrival: po.status === 'received' ? dateStr(po.arrival!) : null,
       notes: `Đơn nhập hàng từ ${po.supplier.name}`,
@@ -347,6 +362,64 @@ async function main() {
       createdBy: profileId,
     }).returning();
     allItems.push({ ...item, model, originalStatus: status, tempSoldDate });
+  }
+
+  // ============================================================
+  // 8.5. ACCESSORY ITEMS
+  // ============================================================
+  console.log('📦 Seeding accessory items...');
+  const allAccessoryItems: any[] = [];
+  
+  // Seed 30 in_stock accessories (some with serial, some without)
+  for (let i = 0; i < 30; i++) {
+    const catalog = pick(accCatalogs);
+    const hasSerial = Math.random() > 0.4;
+    const serialNumber = hasSerial ? generateSerial('ACC', 8) : null;
+    const unitCost = Number(catalog.defaultCost);
+    const sellingPrice = Number(catalog.defaultSellingPrice);
+    const po = pick(poRows);
+
+    const [accItem] = await db.insert(schema.accessoryItems).values({
+      accessoryCatalogId: catalog.id,
+      serialNumber,
+      unitCost: unitCost.toString(),
+      status: 'in_stock',
+      sellingPrice: sellingPrice.toString(),
+      supplierId: po.supplierId,
+      purchaseOrderId: po.id,
+      batchCode: `BAT-${dateStr(daysAgo(randomInt(10, 60))).replace(/-/g, '')}`,
+      notes: 'Nhập kho phụ kiện lẻ',
+    }).returning();
+    allAccessoryItems.push(accItem);
+  }
+
+  // Seed 15 attached accessories (attached to some in_stock machines)
+  const inStockMachines = allItems.filter(item => item.status === 'in_stock');
+  for (let i = 0; i < Math.min(15, inStockMachines.length); i++) {
+    const machine = inStockMachines[i];
+    const catalog = pick(accCatalogs);
+    const hasSerial = Math.random() > 0.4;
+    const serialNumber = hasSerial ? generateSerial('ACC', 8) : null;
+    const unitCost = Number(catalog.defaultCost);
+
+    const [accItem] = await db.insert(schema.accessoryItems).values({
+      accessoryCatalogId: catalog.id,
+      serialNumber,
+      unitCost: unitCost.toString(),
+      status: 'attached',
+      inventoryItemId: machine.id,
+      sellingPrice: '0', // 0 for gifts
+      batchCode: `BAT-${dateStr(daysAgo(randomInt(10, 60))).replace(/-/g, '')}`,
+      notes: 'Gắn tặng kèm theo máy',
+    }).returning();
+    allAccessoryItems.push(accItem);
+
+    // Also update the machine's cost price to include the accessory cost!
+    const newCost = Number(machine.costPrice) + unitCost;
+    await db.update(schema.inventoryItems)
+      .set({ costPrice: newCost.toString() })
+      .where(eq(schema.inventoryItems.id, machine.id));
+    machine.costPrice = newCost.toString(); // Update local copy for order seeding
   }
 
   // Insert movements for all items

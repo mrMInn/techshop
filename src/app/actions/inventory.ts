@@ -21,7 +21,9 @@ import {
   cashBookEntries,
   expenses,
   customers,
-  suppliers
+  suppliers,
+  accessoryCatalog,
+  accessoryItems
 } from "@/lib/db/schema";
 import { db, recalculateRunningBalances } from "@/lib/db";
 import { eq, desc, inArray, sql, and, or } from "drizzle-orm";
@@ -36,27 +38,42 @@ export async function syncPurchaseOrderStatus(tx: any, purchaseOrderId: string) 
     .from(purchaseOrderItems)
     .where(eq(purchaseOrderItems.purchaseOrderId, purchaseOrderId));
 
+  if (poItems.length === 0) return;
+
+  const poItemIds = poItems.map((item: any) => item.id);
+
+  // 2. Lấy số lượng máy lẻ đã nhận của tất cả poItems trong PO này bằng một câu query duy nhất
+  const receivedCounts = await tx
+    .select({
+      purchaseOrderItemId: inventoryItems.purchaseOrderItemId,
+      count: sql<number>`cast(count(${inventoryItems.id}) as integer)`
+    })
+    .from(inventoryItems)
+    .where(
+      and(
+        inArray(inventoryItems.purchaseOrderItemId, poItemIds),
+        or(
+          eq(inventoryItems.status, "in_stock"),
+          eq(inventoryItems.status, "sold"),
+          eq(inventoryItems.status, "warranty_repair"),
+          eq(inventoryItems.status, "defective")
+        )
+      )
+    )
+    .groupBy(inventoryItems.purchaseOrderItemId);
+
+  const countMap: Record<string, number> = {};
+  for (const row of receivedCounts) {
+    if (row.purchaseOrderItemId) {
+      countMap[row.purchaseOrderItemId] = Number(row.count || 0);
+    }
+  }
+
   let totalQty = 0;
   let totalReceived = 0;
 
   for (const item of poItems) {
-    // Đếm số lượng máy lẻ tương ứng đã được nhập kho thành công (in_stock, sold, warranty_repair, defective)
-    const receivedItems = await tx
-      .select({ count: sql<number>`count(*)` })
-      .from(inventoryItems)
-      .where(
-        and(
-          eq(inventoryItems.purchaseOrderItemId, item.id),
-          or(
-            eq(inventoryItems.status, "in_stock"),
-            eq(inventoryItems.status, "sold"),
-            eq(inventoryItems.status, "warranty_repair"),
-            eq(inventoryItems.status, "defective")
-          )
-        )
-      );
-
-    const receivedCount = Number(receivedItems[0]?.count || 0);
+    const receivedCount = countMap[item.id] || 0;
 
     // Cập nhật số lượng đã nhận thực tế cho sản phẩm này trong đơn nhập
     await tx
@@ -68,13 +85,42 @@ export async function syncPurchaseOrderStatus(tx: any, purchaseOrderId: string) 
     totalReceived += receivedCount;
   }
 
-  // Xác định trạng thái mới của đơn nhập hàng
-  let newStatus: "in_transit" | "partially_received" | "received" = "in_transit";
-  if (totalReceived > 0) {
-    if (totalReceived >= totalQty) {
+  // Lấy thông tin đơn nhập hiện tại
+  const currentPo = await tx
+    .select()
+    .from(purchaseOrders)
+    .where(eq(purchaseOrders.id, purchaseOrderId))
+    .limit(1);
+
+  if (currentPo.length === 0) return;
+  const currentStatus = currentPo[0].status;
+
+  // Đếm tất cả máy lẻ thuộc đơn nhập này và trạng thái của chúng
+  const allPoItemsInInventory = await tx
+    .select({ 
+      id: inventoryItems.id,
+      status: inventoryItems.status 
+    })
+    .from(inventoryItems)
+    .innerJoin(purchaseOrderItems, eq(inventoryItems.purchaseOrderItemId, purchaseOrderItems.id))
+    .where(eq(purchaseOrderItems.purchaseOrderId, purchaseOrderId));
+
+  const totalInventoryCount = allPoItemsInInventory.length;
+  const returnedCount = allPoItemsInInventory.filter((i: any) => i.status === "returned").length;
+
+  let newStatus: any = currentStatus;
+
+  // Nếu tất cả máy đều đã được trả lại NCC
+  if (totalInventoryCount > 0 && returnedCount === totalInventoryCount) {
+    newStatus = "returned_supplier";
+  } else if (currentStatus === "warranty_supplier" || currentStatus === "returned_supplier") {
+    // Giữ nguyên trạng thái thủ công
+    newStatus = currentStatus;
+  } else {
+    // Trạng thái bình thường: Đang vận chuyển hoặc Đã sẵn hàng
+    newStatus = "in_transit";
+    if (totalReceived > 0 && totalReceived >= totalQty) {
       newStatus = "received";
-    } else {
-      newStatus = "partially_received";
     }
   }
 
@@ -84,7 +130,7 @@ export async function syncPurchaseOrderStatus(tx: any, purchaseOrderId: string) 
     .update(purchaseOrders)
     .set({
       status: newStatus,
-      actualArrival: newStatus === "received" || newStatus === "partially_received" ? todayStr : null,
+      actualArrival: newStatus === "received" ? todayStr : (newStatus === "in_transit" ? null : currentPo[0].actualArrival),
       updatedAt: new Date(),
     })
     .where(eq(purchaseOrders.id, purchaseOrderId));
@@ -111,8 +157,6 @@ export async function getInventoryItems() {
       status: inventoryItems.status,
       costPrice: inventoryItems.costPrice,
       sellingPrice: inventoryItems.sellingPrice,
-      accessoryCost: inventoryItems.accessoryCost,
-      accessoryNotes: inventoryItems.accessoryNotes,
       stockedDate: inventoryItems.stockedDate,
       expectedArrivalDate: inventoryItems.expectedArrivalDate,
       receivedDate: inventoryItems.receivedDate,
@@ -139,7 +183,6 @@ export async function getInventoryItems() {
       trackingUrl: purchaseOrders.trackingUrl,
       shippingMethod: purchaseOrders.shippingMethod,
       shippingCost: purchaseOrders.shippingCost,
-      taxImport: purchaseOrders.taxImport,
       poStatus: purchaseOrders.status,
       poItemsCount: sql<number>`coalesce(${poCounts.totalItems}, 0)`,
     })
@@ -154,7 +197,39 @@ export async function getInventoryItems() {
     .where(inArray(inventoryItems.status, ['incoming', 'in_stock', 'sold', 'warranty_repair', 'returned', 'defective', 'deleted']))
     .orderBy(desc(inventoryItems.createdAt), desc(inventoryItems.id));
 
-  return items;
+  // Fetch attached accessories
+  const attachedAccs = await db
+    .select({
+      id: accessoryItems.id,
+      inventoryItemId: accessoryItems.inventoryItemId,
+      serialNumber: accessoryItems.serialNumber,
+      unitCost: accessoryItems.unitCost,
+      sellingPrice: accessoryItems.sellingPrice,
+      catalogName: accessoryCatalog.name,
+    })
+    .from(accessoryItems)
+    .innerJoin(accessoryCatalog, eq(accessoryItems.accessoryCatalogId, accessoryCatalog.id))
+    .where(eq(accessoryItems.status, "attached"));
+
+  const accMap: Record<string, any[]> = {};
+  for (const acc of attachedAccs) {
+    if (acc.inventoryItemId) {
+      if (!accMap[acc.inventoryItemId]) {
+        accMap[acc.inventoryItemId] = [];
+      }
+      accMap[acc.inventoryItemId].push(acc);
+    }
+  }
+
+  const itemsWithAccessories = items.map(item => ({
+    ...item,
+    accessoryCost: "0",
+    accessoryNotes: null,
+    taxImport: "0",
+    accessories: accMap[item.id] || [],
+  }));
+
+  return itemsWithAccessories;
 }
 
 
@@ -188,6 +263,8 @@ export async function createInventoryItem(data: {
   shippingMethod?: string;
   shippingCost?: string;
   taxImport?: string;
+  accessoryCost?: string;
+  accessoryNotes?: string;
 }) {
   try {
     const result = await db.transaction(async (tx) => {
@@ -217,6 +294,10 @@ export async function createInventoryItem(data: {
         }
       }
 
+      const unitCost = Number(data.costPrice) || 0;
+      const shippingCost = Number(data.shippingCost) || 0;
+      const loadedCostPrice = (unitCost + shippingCost).toFixed(2);
+
       if (targetSupplierId) {
         // Sinh poNumber ngẫu nhiên độc nhất
         const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -224,11 +305,8 @@ export async function createInventoryItem(data: {
         const poNumber = `PO-${dateStr}-${rand}`;
 
         const count = 1;
-        const unitCost = Number(data.costPrice) || 0;
         const totalItemsCost = unitCost * count;
-        const shippingCost = Number(data.shippingCost) || 0;
-        const taxImport = Number(data.taxImport) || 0;
-        const totalCost = (totalItemsCost + shippingCost + taxImport).toFixed(2);
+        const totalCost = (totalItemsCost + shippingCost).toFixed(2);
 
         // Tạo đơn nhập purchaseOrders
         const [newPo] = await tx.insert(purchaseOrders).values({
@@ -240,7 +318,6 @@ export async function createInventoryItem(data: {
           trackingNumber: data.trackingNumber || null,
           trackingUrl: data.trackingUrl || null,
           shippingCost: String(shippingCost),
-          taxImport: String(taxImport),
           totalCost: String(totalCost),
           notes: data.notes || null,
           expectedArrival: data.status === 'incoming' ? (data.expectedArrivalDate || null) : null,
@@ -268,7 +345,7 @@ export async function createInventoryItem(data: {
         serialNumber: data.serialNumber,
         condition: data.condition,
         status: data.status,
-        costPrice: data.costPrice,
+        costPrice: loadedCostPrice,
         sellingPrice: data.sellingPrice || null,
         purchaseOrderItemId: purchaseOrderItemId || null,
         originCountry: data.originCountry || 'VN',
@@ -400,8 +477,7 @@ export async function createInventoryItemsBatch(data: {
         const unitCost = Number(data.costPrice) || 0;
         const totalItemsCost = unitCost * count;
         const shippingCost = Number(data.shippingCost) || 0;
-        const taxImport = Number(data.taxImport) || 0;
-        const totalCost = (totalItemsCost + shippingCost + taxImport).toFixed(2);
+        const totalCost = (totalItemsCost + shippingCost).toFixed(2);
 
         // Tạo đơn nhập purchaseOrders
         const [newPo] = await tx.insert(purchaseOrders).values({
@@ -413,7 +489,6 @@ export async function createInventoryItemsBatch(data: {
           trackingNumber: data.trackingNumber || null,
           trackingUrl: data.trackingUrl || null,
           shippingCost: String(shippingCost),
-          taxImport: String(taxImport),
           totalCost: String(totalCost),
           notes: data.notes || null,
           expectedArrival: data.status === 'incoming' ? (data.expectedArrivalDate || null) : null,
@@ -446,13 +521,19 @@ export async function createInventoryItemsBatch(data: {
         throw new Error(`Serial Number đã tồn tại trên hệ thống: ${dupSerials}`);
       }
 
+      const count = cleanSerials.length;
+      const unitCost = Number(data.costPrice) || 0;
+      const shippingCost = Number(data.shippingCost) || 0;
+      const allocatedShipping = count > 0 ? shippingCost / count : 0;
+      const loadedCostPrice = (unitCost + allocatedShipping).toFixed(2);
+
       // 2. Tạo các items hàng loạt (Bulk Insert)
       const itemsToInsert = cleanSerials.map(serial => ({
         productId: data.productId,
         serialNumber: serial,
         condition: data.condition,
         status: data.status,
-        costPrice: data.costPrice,
+        costPrice: loadedCostPrice,
         sellingPrice: data.sellingPrice || null,
         purchaseOrderItemId: purchaseOrderItemId || null,
         originCountry: data.originCountry || 'VN',
@@ -537,7 +618,7 @@ export async function updateInventoryItem(
         trackingNumber,
         trackingUrl,
         shippingCost,
-        taxImport,
+        taxImport, // ignored
         ...itemData
       } = finalData;
 
@@ -578,14 +659,12 @@ export async function updateInventoryItem(
             const quantity = poItem.quantity || 1;
             const totalItemsCost = unitCost * quantity;
             
-            // Lấy giá trị cũ hoặc mới của shippingCost & taxImport
+            // Lấy giá trị cũ hoặc mới của shippingCost
             const existingPo = await tx.select().from(purchaseOrders).where(eq(purchaseOrders.id, purchaseOrderId)).limit(1);
             const oldShippingCost = existingPo[0]?.shippingCost ? Number(existingPo[0].shippingCost) : 0;
-            const oldTaxImport = existingPo[0]?.taxImport ? Number(existingPo[0].taxImport) : 0;
 
             const finalShippingCost = shippingCost !== undefined ? (Number(shippingCost) || 0) : oldShippingCost;
-            const finalTaxImport = taxImport !== undefined ? (Number(taxImport) || 0) : oldTaxImport;
-            const totalCost = (totalItemsCost + finalShippingCost + finalTaxImport).toFixed(2);
+            const totalCost = (totalItemsCost + finalShippingCost).toFixed(2);
 
             // Cập nhật thông tin trong purchaseOrders
             await tx.update(purchaseOrders).set({
@@ -594,19 +673,25 @@ export async function updateInventoryItem(
               trackingNumber: trackingNumber !== undefined ? (trackingNumber || null) : existingPo[0]?.trackingNumber,
               trackingUrl: trackingUrl !== undefined ? (trackingUrl || null) : existingPo[0]?.trackingUrl,
               shippingCost: String(finalShippingCost),
-              taxImport: String(finalTaxImport),
               totalCost: String(totalCost),
               originCountry: itemData.originCountry || oldItem.originCountry || "VN",
               updatedAt: new Date(),
             }).where(eq(purchaseOrders.id, purchaseOrderId));
 
+            // Tính toán lại loadedCostPrice cho máy
+            const poCountResult = await tx
+              .select({ count: sql<number>`cast(count(${inventoryItems.id}) as integer)` })
+              .from(inventoryItems)
+              .where(eq(inventoryItems.purchaseOrderItemId, purchaseOrderItemId));
+            const poCount = poCountResult[0]?.count || 1;
+            const allocatedShipping = finalShippingCost / poCount;
+            itemData.costPrice = (unitCost + allocatedShipping).toFixed(2);
+
             // Cập nhật chi tiết purchaseOrderItems nếu có thay đổi đơn giá costPrice
-            if (itemData.costPrice) {
-              await tx.update(purchaseOrderItems).set({
-                unitCost: itemData.costPrice,
-                totalCost: String(totalItemsCost.toFixed(2)),
-              }).where(eq(purchaseOrderItems.id, purchaseOrderItemId));
-            }
+            await tx.update(purchaseOrderItems).set({
+              unitCost: String(unitCost),
+              totalCost: String(totalItemsCost.toFixed(2)),
+            }).where(eq(purchaseOrderItems.id, purchaseOrderItemId));
           }
         } else {
           // 2. Chưa có PO liên kết: Tạo PO mới và liên kết
@@ -618,8 +703,7 @@ export async function updateInventoryItem(
           const count = 1;
           const totalItemsCost = unitCost * count;
           const finalShippingCost = Number(shippingCost || 0);
-          const finalTaxImport = Number(taxImport || 0);
-          const totalCost = (totalItemsCost + finalShippingCost + finalTaxImport).toFixed(2);
+          const totalCost = (totalItemsCost + finalShippingCost).toFixed(2);
 
           const [newPo] = await tx.insert(purchaseOrders).values({
             poNumber,
@@ -630,7 +714,6 @@ export async function updateInventoryItem(
             trackingNumber: trackingNumber || null,
             trackingUrl: trackingUrl || null,
             shippingCost: String(finalShippingCost),
-            taxImport: String(finalTaxImport),
             totalCost: String(totalCost),
             notes: itemData.notes || oldItem.notes || null,
             expectedArrival: (itemData.status || oldItem.status) === 'incoming' ? (itemData.expectedArrivalDate || oldItem.expectedArrivalDate || null) : null,
@@ -650,6 +733,7 @@ export async function updateInventoryItem(
 
           purchaseOrderItemId = newPoItem.id;
           (itemData as any).purchaseOrderItemId = purchaseOrderItemId;
+          itemData.costPrice = (unitCost + finalShippingCost).toFixed(2);
         }
       } else if (supplierId === "") {
         // 3. User hủy chọn nhà cung cấp và không có tracking: Hủy liên kết PO
@@ -862,42 +946,59 @@ export async function bulkConfirmArrival(ids: string[]) {
       const performedById = ownerProfiles[0]?.id;
       if (!performedById) throw new Error("Hệ thống chưa có tài khoản nhân viên");
 
+      // 1. Lấy tất cả các items được yêu cầu bằng một câu SELECT duy nhất
+      const existing = await tx
+        .select()
+        .from(inventoryItems)
+        .where(inArray(inventoryItems.id, ids));
+
+      const itemsToConfirm = existing.filter(item => item.status === 'incoming');
+      if (itemsToConfirm.length === 0) {
+        return { success: true, message: "Không có sản phẩm nào ở trạng thái 'Đang về' cần xác nhận" };
+      }
+
       const todayStr = new Date().toISOString().split('T')[0];
+      const itemsToConfirmIds = itemsToConfirm.map(i => i.id);
+
+      // 2. Cập nhật hàng loạt trạng thái máy sang 'in_stock'
+      await tx
+        .update(inventoryItems)
+        .set({
+          status: 'in_stock',
+          stockedDate: todayStr,
+          updatedAt: new Date(),
+        })
+        .where(inArray(inventoryItems.id, itemsToConfirmIds));
+
+      // 3. Ghi nhận thẻ kho hàng loạt (bulk insert)
+      const movementsToInsert = itemsToConfirm.map(item => ({
+        inventoryItemId: item.id,
+        movementType: 'stocked' as const,
+        fromStatus: item.status,
+        toStatus: 'in_stock' as const,
+        referenceType: item.purchaseOrderItemId ? ('purchase_order' as const) : ('manual' as const),
+        referenceId: item.purchaseOrderItemId || null,
+        quantityChange: 1,
+        performedBy: performedById,
+        notes: 'Xác nhận hàng về kho hàng loạt',
+      }));
+
+      await tx.insert(inventoryMovements).values(movementsToInsert);
+
+      // 4. Lấy tất cả purchaseOrderItems liên quan để xác định PO Ids cần đồng bộ
+      const poItemIds = itemsToConfirm
+        .map(item => item.purchaseOrderItemId)
+        .filter((id): id is string => !!id);
+
       const poIdsToSync = new Set<string>();
-
-      for (const id of ids) {
-        const existing = await tx.select().from(inventoryItems).where(eq(inventoryItems.id, id)).limit(1);
-        if (existing.length > 0 && existing[0].status === 'incoming') {
-          const item = existing[0];
-          // 1. Cập nhật trạng thái máy
-          await tx.update(inventoryItems)
-            .set({
-              status: 'in_stock',
-              stockedDate: todayStr,
-              updatedAt: new Date(),
-            })
-            .where(eq(inventoryItems.id, id));
-
-          // 2. Ghi nhận thẻ kho
-          await tx.insert(inventoryMovements).values({
-            inventoryItemId: id,
-            movementType: 'stocked',
-            fromStatus: 'incoming',
-            toStatus: 'in_stock',
-            referenceType: item.purchaseOrderItemId ? 'purchase_order' : 'manual',
-            referenceId: item.purchaseOrderItemId || null,
-            quantityChange: 1,
-            performedBy: performedById,
-            notes: 'Xác nhận hàng về kho hàng loạt',
-          });
-
-          // Lưu lại PO Id cần đồng bộ
-          if (item.purchaseOrderItemId) {
-            const poItem = await tx.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.id, item.purchaseOrderItemId)).limit(1);
-            if (poItem.length > 0) {
-              poIdsToSync.add(poItem[0].purchaseOrderId);
-            }
-          }
+      if (poItemIds.length > 0) {
+        const poItems = await tx
+          .select({ purchaseOrderId: purchaseOrderItems.purchaseOrderId })
+          .from(purchaseOrderItems)
+          .where(inArray(purchaseOrderItems.id, poItemIds));
+        
+        for (const poItem of poItems) {
+          poIdsToSync.add(poItem.purchaseOrderId);
         }
       }
 
@@ -906,7 +1007,7 @@ export async function bulkConfirmArrival(ids: string[]) {
         await syncPurchaseOrderStatus(tx, poId);
       }
 
-      return { success: true, message: `Đã xác nhận về kho thành công cho ${ids.length} máy!` };
+      return { success: true, message: `Đã xác nhận về kho thành công cho ${itemsToConfirm.length} máy!` };
     });
 
     if (result.success) {
@@ -935,36 +1036,43 @@ export async function bulkDeleteInventoryItems(ids: string[], isHardDelete: bool
       const performedById = ownerProfiles[0]?.id;
       if (!performedById) throw new Error("Hệ thống chưa có tài khoản nhân viên");
 
-      for (const id of ids) {
-        if (isHardDelete) {
-          // Xóa thẻ kho trước
-          await tx.delete(inventoryMovements).where(eq(inventoryMovements.inventoryItemId, id));
-          // Xóa sản phẩm
-          await tx.delete(inventoryItems).where(eq(inventoryItems.id, id));
-        } else {
-          const existing = await tx.select().from(inventoryItems).where(eq(inventoryItems.id, id)).limit(1);
-          if (existing.length > 0) {
-            const oldStatus = existing[0].status;
-            await tx.update(inventoryItems)
-              .set({
-                status: 'deleted',
-                notes: 'Xóa hàng loạt khỏi kho hàng',
-                updatedAt: new Date(),
-              })
-              .where(eq(inventoryItems.id, id));
+      if (isHardDelete) {
+        // 1. Xóa thẻ kho của tất cả sản phẩm
+        await tx.delete(inventoryMovements).where(inArray(inventoryMovements.inventoryItemId, ids));
+        // 2. Xóa tất cả sản phẩm
+        await tx.delete(inventoryItems).where(inArray(inventoryItems.id, ids));
+      } else {
+        // 1. Lấy trạng thái của các items cần xóa mềm
+        const existing = await tx
+          .select()
+          .from(inventoryItems)
+          .where(inArray(inventoryItems.id, ids));
 
-            // Ghi thẻ kho
-            await tx.insert(inventoryMovements).values({
-              inventoryItemId: id,
-              movementType: 'adjusted',
-              fromStatus: oldStatus,
-              toStatus: 'deleted',
-              referenceType: 'manual',
-              quantityChange: -1,
-              performedBy: performedById,
-              notes: 'Xóa hàng loạt khỏi kho hàng (Ẩn lưu trữ)',
-            });
-          }
+        if (existing.length > 0) {
+          const existingIds = existing.map(item => item.id);
+          
+          // 2. Cập nhật trạng thái sang 'deleted' hàng loạt
+          await tx.update(inventoryItems)
+            .set({
+              status: 'deleted',
+              notes: 'Xóa hàng loạt khỏi kho hàng',
+              updatedAt: new Date(),
+            })
+            .where(inArray(inventoryItems.id, existingIds));
+
+          // 3. Ghi nhận thẻ kho hàng loạt (bulk insert)
+          const movementsToInsert = existing.map(item => ({
+            inventoryItemId: item.id,
+            movementType: 'adjusted' as const,
+            fromStatus: item.status,
+            toStatus: 'deleted' as const,
+            referenceType: 'manual' as const,
+            quantityChange: -1,
+            performedBy: performedById,
+            notes: 'Xóa hàng loạt khỏi kho hàng (Ẩn lưu trữ)',
+          }));
+
+          await tx.insert(inventoryMovements).values(movementsToInsert);
         }
       }
       return { success: true, message: `Đã xóa thành công ${ids.length} sản phẩm!` };
@@ -990,8 +1098,6 @@ export async function getInventoryItemLifecycle(serialNumber: string) {
         status: inventoryItems.status,
         costPrice: inventoryItems.costPrice,
         sellingPrice: inventoryItems.sellingPrice,
-        accessoryCost: inventoryItems.accessoryCost,
-        accessoryNotes: inventoryItems.accessoryNotes,
         stockedDate: inventoryItems.stockedDate,
         expectedArrivalDate: inventoryItems.expectedArrivalDate,
         receivedDate: inventoryItems.receivedDate,
@@ -1134,7 +1240,7 @@ export async function getInventoryItemLifecycle(serialNumber: string) {
     // 1. Nhập kho gốc (Stocked)
     milestones.push({
       type: "purchase",
-      date: item.stockedDate || item.createdAt.toISOString().split("T")[0],
+      date: item.createdAt ? item.createdAt.toISOString() : (item.stockedDate ? new Date(item.stockedDate).toISOString() : new Date().toISOString()),
       title: "Nhập kho sản phẩm",
       description: `Nhập kho thiết bị tình trạng ${item.condition === 'new' ? 'Mới 100%' : 'Đã qua sử dụng'}. Giá vốn gốc nhập PO: ${Math.round(Number(item.costPrice)).toLocaleString("vi-VN")}đ.`,
       meta: {
@@ -1151,7 +1257,7 @@ export async function getInventoryItemLifecycle(serialNumber: string) {
     sales.forEach((s) => {
       milestones.push({
         type: "sale",
-        date: new Date(s.createdAt).toISOString().split("T")[0],
+        date: new Date(s.createdAt).toISOString(),
         title: "Bán hàng thành công",
         description: `Bán thành công cho khách hàng ${s.customerName} (${s.customerPhone}) theo hóa đơn ${s.orderNumber}. Trị giá bán lẻ: ${Math.round(Number(s.sellingPrice)).toLocaleString("vi-VN")}đ.`,
         meta: {
@@ -1168,7 +1274,7 @@ export async function getInventoryItemLifecycle(serialNumber: string) {
       const typeLabel = r.type === "return" ? "Trả hàng hoàn tiền" : "Đổi hàng lấy máy khác";
       milestones.push({
         type: "return",
-        date: new Date(r.createdAt).toISOString().split("T")[0],
+        date: new Date(r.createdAt).toISOString(),
         title: `Phiếu đổi/trả phát sinh (${typeLabel})`,
         description: `Khách hàng ${r.customerName} yêu cầu ${typeLabel.toLowerCase()} máy. Tình trạng lúc nhận lại: ${
           r.conditionOnReturn === 'like_new' ? 'Mới 100%' : 
@@ -1188,7 +1294,7 @@ export async function getInventoryItemLifecycle(serialNumber: string) {
     replacementForList.forEach((r) => {
       milestones.push({
         type: "return",
-        date: new Date(r.createdAt).toISOString().split("T")[0],
+        date: new Date(r.createdAt).toISOString(),
         title: `Được xuất đổi thế cho máy lỗi`,
         description: `Xuất thiết bị này để đổi thế cho máy lỗi (Serial cũ: ${r.oldItemSerial}) của khách hàng ${r.customerName} theo Phiếu đổi trả ${r.returnNumber}.`,
         meta: {
@@ -1202,7 +1308,7 @@ export async function getInventoryItemLifecycle(serialNumber: string) {
     warranties.forEach((w) => {
       milestones.push({
         type: "warranty",
-        date: w.receivedDate,
+        date: new Date(w.receivedDate).toISOString(),
         title: `Tiếp nhận Bảo hành dịch vụ`,
         description: `Mã phiếu nhận bảo hành: ${w.claimNumber}. Khách bảo hành: ${w.customerName}. Mô tả lỗi: "${w.issueDescription}". Chi phí sửa chữa phát sinh: ${Math.round(Number(w.repairCost || 0)).toLocaleString("vi-VN")}đ. ${w.technicianNotes ? `Ghi chú kỹ thuật: "${w.technicianNotes}"` : ""}`,
         meta: {
@@ -1216,12 +1322,31 @@ export async function getInventoryItemLifecycle(serialNumber: string) {
 
     // 5. Thẻ kho thô (Movements) quan trọng
     movements.forEach((m) => {
-      if (m.movementType === 'adjusted' || m.movementType === 'warranty_in' || m.movementType === 'warranty_out') {
-        const typeLabel = m.movementType === 'adjusted' ? 'Điều chỉnh kho' : (m.movementType === 'warranty_in' ? 'Nhập kho bảo hành' : 'Xuất kho bảo hành');
+      if (
+        m.movementType === 'adjusted' || 
+        m.movementType === 'warranty_in' || 
+        m.movementType === 'warranty_out' ||
+        m.movementType === 'defective' ||
+        (m.movementType === 'returned' && m.toStatus === 'returned')
+      ) {
+        let typeLabel = m.movementType === 'adjusted' ? 'Điều chỉnh kho' : 
+                        m.movementType === 'warranty_in' ? 'Nhập kho bảo hành' : 
+                        m.movementType === 'warranty_out' ? 'Xuất kho bảo hành' : 
+                        m.movementType === 'defective' ? 'Báo máy lỗi (Kho lỗi)' : 
+                        'Xuất trả Nhà cung cấp';
+        if (m.movementType === 'warranty_out' && m.notes) {
+          if (m.notes.includes('Sửa chữa nội bộ')) {
+            typeLabel = 'Xuất sửa nội bộ';
+          } else if (m.notes.includes('Gửi bảo hành NCC')) {
+            typeLabel = 'Gửi bảo hành NCC';
+          }
+        }
         milestones.push({
-          type: "movement",
-          date: new Date(m.performedAt).toISOString().split("T")[0],
-          title: `Giao dịch thẻ kho: ${typeLabel}`,
+          type: m.movementType === 'returned' ? "return" : "movement",
+          date: new Date(m.performedAt).toISOString(),
+          title: m.movementType === 'returned' ? 'Xuất trả Nhà cung cấp' : 
+                 m.movementType === 'defective' ? 'Báo hỏng / lỗi thiết bị' : 
+                 `Giao dịch thẻ kho: ${typeLabel}`,
           description: `Giao dịch được thực hiện bởi nhân viên ${m.performedByName || 'Hệ thống'}. Ghi chú: ${m.notes || 'Không có'}`,
           meta: {
             fromStatus: m.fromStatus,
@@ -1231,12 +1356,32 @@ export async function getInventoryItemLifecycle(serialNumber: string) {
       }
     });
 
-    // Sắp xếp Milestones tăng dần theo ngày
-    const sortedMilestones = milestones.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    // Sắp xếp Milestones giảm dần theo ngày và giờ (Mốc mới nhất lên đầu)
+    const sortedMilestones = milestones.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    // Fetch attached accessories
+    const attachedAccs = await db
+      .select({
+        id: accessoryItems.id,
+        serialNumber: accessoryItems.serialNumber,
+        unitCost: accessoryItems.unitCost,
+        sellingPrice: accessoryItems.sellingPrice,
+        catalogName: accessoryCatalog.name,
+      })
+      .from(accessoryItems)
+      .innerJoin(accessoryCatalog, eq(accessoryItems.accessoryCatalogId, accessoryCatalog.id))
+      .where(and(eq(accessoryItems.inventoryItemId, item.id), eq(accessoryItems.status, "attached")));
+
+    const itemWithAccessories = {
+      ...item,
+      accessoryCost: "0",
+      accessoryNotes: null,
+      accessories: attachedAccs,
+    };
 
     return {
       success: true,
-      item,
+      item: itemWithAccessories,
       milestones: sortedMilestones,
     };
   } catch (error: any) {
@@ -1331,6 +1476,7 @@ export async function sendToRepairAction(
         .update(inventoryItems)
         .set({
           status: 'warranty_repair',
+          location: repairType === 'internal' ? 'internal_repair' : 'supplier_warranty',
           updatedAt: new Date(),
         })
         .where(eq(inventoryItems.id, itemId));
@@ -1386,6 +1532,7 @@ export async function completeRepairAction(
         .update(inventoryItems)
         .set({
           status: 'in_stock',
+          location: null,
           updatedAt: new Date(),
         })
         .where(eq(inventoryItems.id, itemId));
@@ -1404,7 +1551,7 @@ export async function completeRepairAction(
       const costVal = Number(repairCost || 0);
       if (costVal > 0) {
         const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-        const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+        const randomSuffix = crypto.randomUUID().replace(/-/g, "").substring(0, 8).toUpperCase();
         const entryNumber = `CB${dateStr}-${randomSuffix}`;
 
         await tx.insert(cashBookEntries).values({
@@ -1428,7 +1575,10 @@ export async function completeRepairAction(
     });
   } catch (error: any) {
     console.error("Lỗi hoàn tất sửa chữa:", error);
-    return { success: false, message: error.message || "Lỗi hoàn tất sửa chữa" };
+    const msg = error?.message?.includes("unique") || error?.message?.includes("duplicate")
+      ? "Lỗi trùng mã phiếu sổ quỹ, vui lòng thử lại"
+      : (error.message || "Lỗi hoàn tất sửa chữa");
+    return { success: false, message: msg };
   }
 }
 
@@ -1481,7 +1631,7 @@ export async function supplierRefundAction(
       const refundVal = Number(refundAmount || 0);
       if (refundVal > 0) {
         const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-        const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+        const randomSuffix = crypto.randomUUID().replace(/-/g, "").substring(0, 8).toUpperCase();
         const entryNumber = `CB${dateStr}-${randomSuffix}`;
 
         await tx.insert(cashBookEntries).values({
@@ -1505,7 +1655,10 @@ export async function supplierRefundAction(
     });
   } catch (error: any) {
     console.error("Lỗi xuất trả hoàn tiền NCC:", error);
-    return { success: false, message: error.message || "Lỗi xuất trả hoàn tiền NCC" };
+    const msg = error?.message?.includes("unique") || error?.message?.includes("duplicate")
+      ? "Lỗi trùng mã phiếu sổ quỹ, vui lòng thử lại"
+      : (error.message || "Lỗi xuất trả hoàn tiền NCC");
+    return { success: false, message: msg };
   }
 }
 
@@ -1555,5 +1708,465 @@ export async function supplierReturnWriteOffAction(itemId: string) {
   } catch (error: any) {
     console.error("Lỗi xuất trả máy đổi trả NCC:", error);
     return { success: false, message: error.message || "Lỗi xuất trả máy đổi trả NCC" };
+  }
+}
+
+// ============================================================
+// ACCESSORY CATALOG ACTIONS
+// ============================================================
+
+export async function getAccessoryCatalog() {
+  try {
+    const list = await db
+      .select()
+      .from(accessoryCatalog)
+      .orderBy(accessoryCatalog.name);
+    return { success: true, catalog: list };
+  } catch (error: any) {
+    console.error("Lỗi lấy danh mục phụ kiện:", error);
+    return { success: false, message: error.message || "Lỗi truy vấn danh mục phụ kiện" };
+  }
+}
+
+export async function createAccessoryCatalogItem(data: {
+  name: string;
+  defaultCost: string;
+  defaultSellingPrice: string;
+  description?: string;
+}) {
+  try {
+    const [newItem] = await db
+      .insert(accessoryCatalog)
+      .values({
+        name: data.name.trim(),
+        defaultCost: data.defaultCost,
+        defaultSellingPrice: data.defaultSellingPrice,
+        description: data.description || null,
+        isActive: true,
+      })
+      .returning();
+    return { success: true, message: "Tạo danh mục phụ kiện thành công", item: newItem };
+  } catch (error: any) {
+    console.error("Lỗi tạo danh mục phụ kiện:", error);
+    if (error.code === '23505') {
+      return { success: false, message: "Tên phụ kiện đã tồn tại trong danh mục" };
+    }
+    return { success: false, message: error.message || "Lỗi tạo danh mục phụ kiện" };
+  }
+}
+
+export async function updateAccessoryCatalogItem(
+  id: string,
+  data: Partial<Omit<typeof accessoryCatalog.$inferInsert, "id" | "createdAt">>
+) {
+  try {
+    const [updatedItem] = await db
+      .update(accessoryCatalog)
+      .set(data)
+      .where(eq(accessoryCatalog.id, id))
+      .returning();
+    return { success: true, message: "Cập nhật danh mục thành công", item: updatedItem };
+  } catch (error: any) {
+    console.error("Lỗi cập nhật danh mục phụ kiện:", error);
+    return { success: false, message: error.message || "Lỗi cập nhật danh mục" };
+  }
+}
+
+export async function toggleAccessoryCatalogItem(id: string) {
+  try {
+    const existing = await db.select().from(accessoryCatalog).where(eq(accessoryCatalog.id, id)).limit(1);
+    if (existing.length === 0) return { success: false, message: "Không tìm thấy phụ kiện" };
+
+    const [updatedItem] = await db
+      .update(accessoryCatalog)
+      .set({ isActive: !existing[0].isActive })
+      .where(eq(accessoryCatalog.id, id))
+      .returning();
+
+    return { success: true, message: "Cập nhật trạng thái thành công", item: updatedItem };
+  } catch (error: any) {
+    console.error("Lỗi đổi trạng thái hoạt động phụ kiện:", error);
+    return { success: false, message: error.message || "Lỗi đổi trạng thái hoạt động" };
+  }
+}
+
+// ============================================================
+// ACCESSORY ITEMS & IMPORT ACTIONS
+// ============================================================
+
+export async function importAccessoryItems(data: {
+  catalogId: string;
+  quantity: number;
+  unitCost: string;
+  supplierId: string;
+  serialNumbers?: string[];
+  notes?: string;
+}) {
+  try {
+    const result = await db.transaction(async (tx) => {
+      const ownerProfiles = await tx.select().from(profiles).limit(1);
+      const performedById = ownerProfiles[0]?.id;
+
+      // Sinh PO mới cho phụ kiện
+      const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, "");
+      const poNumber = `PO-ACC-${dateStr}-${rand}`;
+
+      const totalCost = (Number(data.unitCost) * data.quantity).toFixed(2);
+
+      const [newPo] = await tx.insert(purchaseOrders).values({
+        poNumber,
+        supplierId: data.supplierId,
+        status: "received", // Always received immediately since accessories are imported in-place
+        originCountry: "VN",
+        shippingCost: "0",
+        totalCost: String(totalCost),
+        notes: data.notes || "Nhập kho phụ kiện",
+        actualArrival: new Date().toISOString().split('T')[0],
+        createdBy: performedById || null,
+      }).returning();
+
+      // Sinh mã lô nhập
+      const batchCode = `BAT-ACC-${dateStr}-${rand}`;
+
+      const itemsToInsert: any[] = [];
+      const serials = data.serialNumbers || [];
+
+      // Lọc bỏ serials trống và trim
+      const cleanSerials = serials.map(s => s.trim()).filter(Boolean);
+
+      // Nếu số lượng nhập ít hơn số serial nhập vào, tăng số lượng nhập lên bằng số serial
+      const finalQuantity = Math.max(data.quantity, cleanSerials.length);
+
+      // Tạo các item có serial
+      for (let i = 0; i < cleanSerials.length; i++) {
+        itemsToInsert.push({
+          accessoryCatalogId: data.catalogId,
+          serialNumber: cleanSerials[i],
+          unitCost: data.unitCost,
+          status: "in_stock" as const,
+          sellingPrice: "0", // Default to 0, will be set when sold or attached
+          supplierId: data.supplierId,
+          purchaseOrderId: newPo.id,
+          batchCode,
+          notes: data.notes || null,
+        });
+      }
+
+      // Tạo các item còn lại không có serial
+      const remainingCount = finalQuantity - cleanSerials.length;
+      for (let i = 0; i < remainingCount; i++) {
+        itemsToInsert.push({
+          accessoryCatalogId: data.catalogId,
+          serialNumber: null,
+          unitCost: data.unitCost,
+          status: "in_stock" as const,
+          sellingPrice: "0",
+          supplierId: data.supplierId,
+          purchaseOrderId: newPo.id,
+          batchCode,
+          notes: data.notes || null,
+        });
+      }
+
+      const inserted = await tx.insert(accessoryItems).values(itemsToInsert).returning();
+
+      return { success: true, message: `Nhập kho thành công ${inserted.length} phụ kiện!`, items: inserted };
+    });
+
+    return result;
+  } catch (error: any) {
+    console.error("Lỗi nhập kho phụ kiện:", error);
+    return { success: false, message: error.message || "Lỗi nhập kho phụ kiện" };
+  }
+}
+
+export async function getAccessoryStockSummary() {
+  try {
+    // Truy vấn tổng hợp tồn kho từng loại phụ kiện
+    const catalog = await db.select().from(accessoryCatalog).orderBy(accessoryCatalog.name);
+    const items = await db.select().from(accessoryItems);
+
+    const summary = catalog.map(cat => {
+      const catItems = items.filter(i => i.accessoryCatalogId === cat.id);
+      const available = catItems.filter(i => i.status === 'in_stock').length;
+      const attached = catItems.filter(i => i.status === 'attached').length;
+      const sold = catItems.filter(i => i.status === 'sold').length;
+      const defective = catItems.filter(i => i.status === 'defective').length;
+
+      // Tính giá nhập trung bình
+      const totalCost = catItems.reduce((sum, item) => sum + Number(item.unitCost), 0);
+      const averageCost = catItems.length > 0 ? (totalCost / catItems.length).toFixed(0) : cat.defaultCost;
+
+      return {
+        id: cat.id,
+        name: cat.name,
+        description: cat.description,
+        defaultCost: cat.defaultCost,
+        defaultSellingPrice: cat.defaultSellingPrice,
+        isActive: cat.isActive,
+        averageCost: String(averageCost),
+        available,
+        attached,
+        sold,
+        defective,
+        total: catItems.length,
+      };
+    });
+
+    return { success: true, summary };
+  } catch (error: any) {
+    console.error("Lỗi thống kê tồn kho phụ kiện:", error);
+    return { success: false, message: error.message || "Lỗi thống kê tồn kho phụ kiện" };
+  }
+}
+
+export async function getAccessoryItemsByCatalog(catalogId: string) {
+  try {
+    const list = await db
+      .select({
+        id: accessoryItems.id,
+        serialNumber: accessoryItems.serialNumber,
+        unitCost: accessoryItems.unitCost,
+        status: accessoryItems.status,
+        sellingPrice: accessoryItems.sellingPrice,
+        batchCode: accessoryItems.batchCode,
+        notes: accessoryItems.notes,
+        createdAt: accessoryItems.createdAt,
+        inventoryItemId: accessoryItems.inventoryItemId,
+        machineSerialNumber: inventoryItems.serialNumber,
+        productName: products.name,
+        supplierName: suppliers.name,
+      })
+      .from(accessoryItems)
+      .leftJoin(suppliers, eq(accessoryItems.supplierId, suppliers.id))
+      .leftJoin(inventoryItems, eq(accessoryItems.inventoryItemId, inventoryItems.id))
+      .leftJoin(products, eq(inventoryItems.productId, products.id))
+      .where(eq(accessoryItems.accessoryCatalogId, catalogId))
+      .orderBy(desc(accessoryItems.createdAt));
+
+    return { success: true, items: list };
+  } catch (error: any) {
+    console.error("Lỗi lấy danh sách chi tiết phụ kiện:", error);
+    return { success: false, message: error.message || "Lỗi truy vấn phụ kiện" };
+  }
+}
+
+// ============================================================
+// ATTACH / DETACH / DEFECTIVE ACTIONS
+// ============================================================
+
+export async function attachAccessoryToMachine(
+  accessoryItemId: string,
+  inventoryItemId: string,
+  sellingPrice: string = "0"
+) {
+  try {
+    const result = await db.transaction(async (tx) => {
+      // 1. Lấy thông tin phụ kiện
+      const accs = await tx.select().from(accessoryItems).where(eq(accessoryItems.id, accessoryItemId)).limit(1);
+      if (accs.length === 0) return { success: false, message: "Không tìm thấy phụ kiện" };
+      const acc = accs[0];
+
+      if (acc.status !== 'in_stock') {
+        return { success: false, message: `Trạng thái phụ kiện không hợp lệ: ${acc.status}` };
+      }
+
+      // 2. Lấy thông tin máy lẻ
+      const machines = await tx.select().from(inventoryItems).where(eq(inventoryItems.id, inventoryItemId)).limit(1);
+      if (machines.length === 0) return { success: false, message: "Không tìm thấy máy lẻ" };
+      const machine = machines[0];
+
+      // 3. Cập nhật phụ kiện
+      await tx
+        .update(accessoryItems)
+        .set({
+          status: 'attached',
+          inventoryItemId: inventoryItemId,
+          sellingPrice: sellingPrice,
+          updatedAt: new Date(),
+        })
+        .where(eq(accessoryItems.id, accessoryItemId));
+
+      // 4. Cộng dồn chi phí mua phụ kiện vào giá vốn máy lẻ
+      const finalCostPrice = (Number(machine.costPrice) + Number(acc.unitCost)).toFixed(2);
+      await tx
+        .update(inventoryItems)
+        .set({
+          costPrice: finalCostPrice,
+          updatedAt: new Date(),
+        })
+        .where(eq(inventoryItems.id, inventoryItemId));
+
+      // 5. Ghi nhận thẻ kho máy lẻ
+      const ownerProfiles = await tx.select().from(profiles).limit(1);
+      const performedById = ownerProfiles[0]?.id;
+      if (performedById) {
+        const catalog = await tx.select().from(accessoryCatalog).where(eq(accessoryCatalog.id, acc.accessoryCatalogId)).limit(1);
+        await tx.insert(inventoryMovements).values({
+          inventoryItemId: inventoryItemId,
+          movementType: 'adjusted',
+          fromStatus: machine.status,
+          toStatus: machine.status,
+          referenceType: 'manual',
+          quantityChange: 0,
+          performedBy: performedById,
+          notes: `Gắn phụ kiện: ${catalog[0]?.name || "Phụ kiện"} (${acc.serialNumber ? "S/N: " + acc.serialNumber : "Không serial"}). Giá vốn tăng từ ${Number(machine.costPrice).toLocaleString("vi-VN")}đ ➔ ${Number(finalCostPrice).toLocaleString("vi-VN")}đ`,
+        });
+      }
+
+      return { success: true, message: "Gắn phụ kiện vào máy thành công!" };
+    });
+
+    return result;
+  } catch (error: any) {
+    console.error("Lỗi gắn phụ kiện vào máy:", error);
+    return { success: false, message: error.message || "Lỗi gắn phụ kiện" };
+  }
+}
+
+export async function detachAccessoryFromMachine(accessoryItemId: string) {
+  try {
+    const result = await db.transaction(async (tx) => {
+      // 1. Lấy thông tin phụ kiện
+      const accs = await tx.select().from(accessoryItems).where(eq(accessoryItems.id, accessoryItemId)).limit(1);
+      if (accs.length === 0) return { success: false, message: "Không tìm thấy phụ kiện" };
+      const acc = accs[0];
+
+      if (acc.status !== 'attached' || !acc.inventoryItemId) {
+        return { success: false, message: "Phụ kiện chưa được gắn vào máy" };
+      }
+
+      const inventoryItemId = acc.inventoryItemId;
+
+      // 2. Lấy thông tin máy lẻ
+      const machines = await tx.select().from(inventoryItems).where(eq(inventoryItems.id, inventoryItemId)).limit(1);
+      if (machines.length === 0) return { success: false, message: "Không tìm thấy máy lẻ" };
+      const machine = machines[0];
+
+      // 3. Cập nhật phụ kiện
+      await tx
+        .update(accessoryItems)
+        .set({
+          status: 'in_stock',
+          inventoryItemId: null,
+          sellingPrice: '0',
+          updatedAt: new Date(),
+        })
+        .where(eq(accessoryItems.id, accessoryItemId));
+
+      // 4. Giảm trừ chi phí mua phụ kiện khỏi giá vốn máy lẻ
+      const finalCostPrice = Math.max(0, Number(machine.costPrice) - Number(acc.unitCost)).toFixed(2);
+      await tx
+        .update(inventoryItems)
+        .set({
+          costPrice: finalCostPrice,
+          updatedAt: new Date(),
+        })
+        .where(eq(inventoryItems.id, inventoryItemId));
+
+      // 5. Ghi nhận thẻ kho máy lẻ
+      const ownerProfiles = await tx.select().from(profiles).limit(1);
+      const performedById = ownerProfiles[0]?.id;
+      if (performedById) {
+        const catalog = await tx.select().from(accessoryCatalog).where(eq(accessoryCatalog.id, acc.accessoryCatalogId)).limit(1);
+        await tx.insert(inventoryMovements).values({
+          inventoryItemId: inventoryItemId,
+          movementType: 'adjusted',
+          fromStatus: machine.status,
+          toStatus: machine.status,
+          referenceType: 'manual',
+          quantityChange: 0,
+          performedBy: performedById,
+          notes: `Tháo phụ kiện: ${catalog[0]?.name || "Phụ kiện"} (${acc.serialNumber ? "S/N: " + acc.serialNumber : "Không serial"}). Giá vốn giảm từ ${Number(machine.costPrice).toLocaleString("vi-VN")}đ ➔ ${Number(finalCostPrice).toLocaleString("vi-VN")}đ`,
+        });
+      }
+
+      return { success: true, message: "Tháo phụ kiện thành công, đã hoàn tồn kho phụ kiện." };
+    });
+
+    return result;
+  } catch (error: any) {
+    console.error("Lỗi tháo phụ kiện khỏi máy:", error);
+    return { success: false, message: error.message || "Lỗi tháo phụ kiện" };
+  }
+}
+
+export async function markAccessoryDefective(accessoryItemId: string) {
+  try {
+    const result = await db.transaction(async (tx) => {
+      // 1. Lấy thông tin phụ kiện
+      const accs = await tx.select().from(accessoryItems).where(eq(accessoryItems.id, accessoryItemId)).limit(1);
+      if (accs.length === 0) return { success: false, message: "Không tìm thấy phụ kiện" };
+      const acc = accs[0];
+
+      if (acc.status === 'defective') {
+        return { success: false, message: "Phụ kiện đã nằm trong kho lỗi" };
+      }
+
+      // Nếu đang gắn kèm máy, phải tháo ra trước
+      if (acc.status === 'attached' && acc.inventoryItemId) {
+        const inventoryItemId = acc.inventoryItemId;
+        const machines = await tx.select().from(inventoryItems).where(eq(inventoryItems.id, inventoryItemId)).limit(1);
+        if (machines.length > 0) {
+          const machine = machines[0];
+          // Giảm trừ chi phí khỏi máy
+          const finalCostPrice = Math.max(0, Number(machine.costPrice) - Number(acc.unitCost)).toFixed(2);
+          await tx.update(inventoryItems).set({ costPrice: finalCostPrice, updatedAt: new Date() }).where(eq(inventoryItems.id, inventoryItemId));
+          
+          // Ghi thẻ kho máy lẻ
+          const ownerProfiles = await tx.select().from(profiles).limit(1);
+          const performedById = ownerProfiles[0]?.id;
+          if (performedById) {
+            const catalog = await tx.select().from(accessoryCatalog).where(eq(accessoryCatalog.id, acc.accessoryCatalogId)).limit(1);
+            await tx.insert(inventoryMovements).values({
+              inventoryItemId: inventoryItemId,
+              movementType: 'adjusted',
+              fromStatus: machine.status,
+              toStatus: machine.status,
+              referenceType: 'manual',
+              quantityChange: 0,
+              performedBy: performedById,
+              notes: `Tháo phụ kiện hỏng: ${catalog[0]?.name || "Phụ kiện"}. Giá vốn giảm từ ${Number(machine.costPrice).toLocaleString("vi-VN")}đ ➔ ${Number(finalCostPrice).toLocaleString("vi-VN")}đ`,
+            });
+          }
+        }
+      }
+
+      // Cập nhật phụ kiện sang defective
+      await tx
+        .update(accessoryItems)
+        .set({
+          status: 'defective',
+          inventoryItemId: null,
+          sellingPrice: '0',
+          updatedAt: new Date(),
+        })
+        .where(eq(accessoryItems.id, accessoryItemId));
+
+      return { success: true, message: "Đã chuyển phụ kiện sang kho lỗi thành công" };
+    });
+
+    return result;
+  } catch (error: any) {
+    console.error("Lỗi đánh dấu phụ kiện lỗi:", error);
+    return { success: false, message: error.message || "Lỗi cập nhật phụ kiện" };
+  }
+}
+
+export async function restoreAccessoryFromDefective(accessoryItemId: string) {
+  try {
+    const [updated] = await db
+      .update(accessoryItems)
+      .set({
+        status: 'in_stock',
+        updatedAt: new Date(),
+      })
+      .where(eq(accessoryItems.id, accessoryItemId))
+      .returning();
+    return { success: true, message: "Đã khôi phục phụ kiện từ kho lỗi", item: updated };
+  } catch (error: any) {
+    console.error("Lỗi khôi phục phụ kiện:", error);
+    return { success: false, message: error.message || "Lỗi khôi phục phụ kiện" };
   }
 }

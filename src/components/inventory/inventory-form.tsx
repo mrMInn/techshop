@@ -55,6 +55,7 @@ const inventorySchema = z.object({
   originCountry: z.string().optional(),
   shippingMethod: z.string().optional(),
   trackingNumber: z.string().optional(),
+  shippingCost: z.string().optional().refine((val) => !val || (!isNaN(Number(val)) && Number(val) >= 0), "Chi phí phải là số hợp lệ"),
 }).superRefine((data, ctx) => {
   // Date validations
   if (data.status === "in_stock" && !data.stockedDate) {
@@ -138,6 +139,9 @@ export function InventoryForm({ initialData, onSubmit, onCancel, isLoading }: In
   const [sellingPriceDisplay, setSellingPriceDisplay] = useState(
     initialData?.sellingPrice ? formatVND(initialData.sellingPrice) : ""
   );
+  const [shippingCostDisplay, setShippingCostDisplay] = useState(
+    initialData?.shippingCost ? formatVND(initialData.shippingCost) : ""
+  );
 
   const [priceInputMode, setPriceInputMode] = useState<"unit" | "total">("unit");
 
@@ -172,6 +176,7 @@ export function InventoryForm({ initialData, onSubmit, onCancel, isLoading }: In
       originCountry: initialData?.originCountry || "US",
       shippingMethod: initialData?.shippingMethod || "",
       trackingNumber: initialData?.trackingNumber || "",
+      shippingCost: initialData?.shippingCost ? Math.round(Number(initialData.shippingCost)).toString() : "",
     },
   });
 
@@ -223,13 +228,15 @@ export function InventoryForm({ initialData, onSubmit, onCancel, isLoading }: In
   }, [isInternational, setValue]);
 
   const handlePriceChange = useCallback(
-    (field: "costPrice" | "sellingPrice", rawValue: string) => {
+    (field: "costPrice" | "sellingPrice" | "shippingCost", rawValue: string) => {
       const digits = parseVND(rawValue);
       setValue(field, digits, { shouldValidate: true });
       if (field === "costPrice") {
         setCostPriceDisplay(formatVND(digits));
       } else if (field === "sellingPrice") {
         setSellingPriceDisplay(formatVND(digits));
+      } else if (field === "shippingCost") {
+        setShippingCostDisplay(formatVND(digits));
       }
     },
     [setValue]
@@ -326,6 +333,7 @@ export function InventoryForm({ initialData, onSubmit, onCancel, isLoading }: In
       originCountry: values.isInternational ? values.originCountry : "VN",
       shippingMethod: values.isInternational ? values.shippingMethod : undefined,
       trackingNumber: values.isInternational ? values.trackingNumber : undefined,
+      shippingCost: values.shippingCost || undefined,
     };
 
     if (values.entryMode === "batch") {
@@ -611,6 +619,27 @@ export function InventoryForm({ initialData, onSubmit, onCancel, isLoading }: In
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[14px] text-[#7a7a7a] font-medium pointer-events-none">₫</span>
               </div>
               {errors.sellingPrice && <p className="text-[12px] text-[#b91c1c] mt-1">{errors.sellingPrice.message}</p>}
+            </div>
+          </div>
+
+          {/* Shipping Cost */}
+          <div className="grid grid-cols-2 gap-4 border-t border-[#f5f5f7] pt-4 animate-fade-in">
+            <div className="space-y-1">
+              <label className="block text-[14px] font-semibold text-[#1d1d1f]">Phí vận chuyển nhập kho (phân bổ)</label>
+              <div className="relative">
+                <input
+                  value={shippingCostDisplay}
+                  onChange={(e) => handlePriceChange("shippingCost", e.target.value)}
+                  placeholder="Phí vận chuyển lô/đơn"
+                  inputMode="numeric"
+                  className="w-full h-[44px] px-4 pr-10 rounded-lg bg-[#f5f5f7] border border-[#e0e0e0] text-[17px] text-[#1d1d1f] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 transition-all"
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[14px] text-[#7a7a7a] font-medium pointer-events-none">₫</span>
+              </div>
+              {errors.shippingCost && <p className="text-[12px] text-[#b91c1c] mt-1">{errors.shippingCost.message}</p>}
+            </div>
+            <div className="flex items-center text-[13px] text-[#7a7a7a] pt-6 italic">
+              * Phí vận chuyển này sẽ được cộng trực tiếp và chia đều vào giá vốn máy khi nhập kho.
             </div>
           </div>
 

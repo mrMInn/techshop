@@ -127,14 +127,7 @@ export default function ReturnsPage() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row gap-6 items-start md:items-center justify-between pb-6 border-b border-[#e0e0e0]">
-        <div>
-          <h1 className="text-[40px] font-semibold tracking-tight leading-[1.10] bg-clip-text text-transparent select-none" style={{ backgroundImage: "linear-gradient(90deg, #2997ff, #a855f7, #ec4899)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-            Đổi trả
-          </h1>
-        </div>
-        
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+      <div className="flex flex-wrap items-center gap-3 justify-start pb-6 border-b border-[#e0e0e0]">
           <div className="relative w-full sm:w-60">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7a7a7a]" size={14} />
             <input 
@@ -154,7 +147,6 @@ export default function ReturnsPage() {
             <span>Tạo Phiếu Đổi/Trả</span>
           </button>
         </div>
-      </div>
 
 
 

@@ -47,10 +47,13 @@ async function clearAllDatabaseTables() {
         public.brands,
         public.suppliers,
         public.expense_categories,
+        public.income_categories,
         public.accounting_periods,
         public.customers,
         public.lead_sources,
-        public.telegram_settings
+        public.telegram_settings,
+        public.countries,
+        public.shipping_carriers
       RESTART IDENTITY CASCADE;
     `);
 
