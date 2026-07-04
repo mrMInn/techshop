@@ -737,10 +737,10 @@ function InventoryPageContent() {
             )}
 
             {/* Nhập kho Button */}
-            {activeTab !== "purchase_orders" && (
+            {activeTab === "active" && (
               <button 
                 onClick={handleOpenCreateDialog}
-                className="flex items-center gap-1.5 px-4 h-[40px] bg-[#0066cc] text-white text-[13px] font-semibold rounded-full hover:bg-[#0071e3] transition-all cursor-pointer shadow-sm active:scale-95 duration-200 shrink-0 ml-auto"
+                className="flex items-center gap-1.5 px-4 h-[40px] bg-[#0066cc] text-white text-[13px] font-semibold rounded-full hover:bg-[#0071e3] transition-all cursor-pointer shadow-sm active:scale-95 duration-200 shrink-0"
               >
                 <SFSymbolPlus size={13} />
                 <span>Nhập kho</span>

@@ -1790,6 +1790,20 @@ export async function toggleAccessoryCatalogItem(id: string) {
   }
 }
 
+export async function deleteAccessoryCatalogItem(id: string) {
+  try {
+    const items = await db.select().from(accessoryItems).where(eq(accessoryItems.accessoryCatalogId, id)).limit(1);
+    if (items.length > 0) {
+      return { success: false, message: "Không thể xóa danh mục này vì đã có phụ kiện trong kho thuộc danh mục này. Hãy chuyển trạng thái ngưng hoạt động thay vì xóa." };
+    }
+    await db.delete(accessoryCatalog).where(eq(accessoryCatalog.id, id));
+    return { success: true, message: "Xóa danh mục phụ kiện thành công" };
+  } catch (error: any) {
+    console.error("Lỗi xóa danh mục phụ kiện:", error);
+    return { success: false, message: error.message || "Lỗi xóa danh mục phụ kiện" };
+  }
+}
+
 // ============================================================
 // ACCESSORY ITEMS & IMPORT ACTIONS
 // ============================================================

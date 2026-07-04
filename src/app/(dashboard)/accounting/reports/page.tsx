@@ -210,7 +210,7 @@ export default function ReportsPage() {
                   : "text-slate-600 hover:text-slate-900 font-semibold"
               }`}
             >
-              Báo cáo lời / lỗ
+              Báo cáo lãi lỗ
             </button>
             <button
               onClick={() => setActiveReportTab("cashflow")}

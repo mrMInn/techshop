@@ -172,7 +172,7 @@ export default function DashboardLayout({
         <div className="max-w-[1200px] mx-auto relative z-10 space-y-6">
           {/* Global Top Header: Title & Profile Info */}
           <div className="flex justify-between items-center pb-6 border-b border-[#e0e0e0] select-none">
-            <h1 className="text-[40px] font-semibold tracking-tight leading-[1.10] bg-clip-text text-transparent select-none shrink-0" style={{ backgroundImage: "linear-gradient(90deg, #2997ff, #a855f7, #ec4899)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+            <h1 className="text-[40px] font-semibold tracking-tight leading-normal py-1 bg-clip-text text-transparent select-none shrink-0" style={{ backgroundImage: "linear-gradient(90deg, #2997ff, #a855f7, #ec4899)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
               {getPageTitle(pathname)}
             </h1>
 
@@ -209,10 +209,10 @@ export default function DashboardLayout({
                     transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
                     transitionDelay: "300ms"
                   }}
-                  className="w-7 h-7 rounded-full hover:bg-rose-500 hover:text-white text-[#7a7a7a] flex items-center justify-center cursor-pointer ml-2.5 active:scale-90 opacity-0 transform scale-50 group-hover:opacity-100 group-hover:scale-100 shrink-0 mr-1.5"
+                  className="w-8 h-8 rounded-full hover:bg-rose-500 hover:text-white text-[#7a7a7a] flex items-center justify-center cursor-pointer ml-2.5 active:scale-90 opacity-0 transform scale-50 group-hover:opacity-100 group-hover:scale-100 shrink-0 mr-1.5"
                   title="Đăng xuất"
                 >
-                  <LogOut size={12} />
+                  <LogOut size={16} />
                 </button>
               )}
             </div>
@@ -251,22 +251,23 @@ function SidebarLink({
     <Link
       href={href}
       onClick={onClick}
-      className={`group relative z-10 flex items-center gap-3 px-3 py-2 rounded-[14px] transition-all duration-300 ease-out text-[13px] active:scale-[0.97] ${
+      prefetch={false}
+      className={`group relative z-10 flex items-center gap-3 px-3.5 py-2 rounded-full transition-all duration-150 ease-out text-[13px] active:scale-[0.98] ${
         active 
-          ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white font-bold shadow-md shadow-blue-500/18 border border-white/10" 
-          : "text-slate-600 hover:text-white hover:bg-gradient-to-br hover:from-blue-500/75 hover:to-blue-600/75 hover:shadow-sm hover:shadow-blue-500/12 font-semibold"
+          ? "bg-[#0071e3] text-white font-bold shadow-[0_2px_8px_rgba(0,113,227,0.18)]" 
+          : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/60 font-semibold"
       }`}
     >
-      <div className={`flex h-7.5 w-7.5 items-center justify-center rounded-[9.5px] shadow-sm border shrink-0 transition-all duration-300 ease-out group-hover:scale-105 ${
+      <div className={`flex h-7.5 w-7.5 items-center justify-center rounded-[9px] shadow-sm border shrink-0 transition-all duration-150 ease-out group-hover:scale-[1.03] ${
         active 
-          ? "bg-white/25 text-white border-white/20" 
+          ? "bg-white/20 text-white border-transparent" 
           : `${bgColor} text-white border-white/20 group-hover:bg-white/25 group-hover:shadow-none`
       }`}>
         {icon}
       </div>
       <span className="truncate">{label}</span>
       {hasSubmenu && (
-        <span className={`ml-auto transition-transform duration-200 ${active ? "text-white" : "text-slate-400 group-hover:text-white"}`}>
+        <span className={`ml-auto transition-transform duration-200 ${active ? "text-white" : "text-slate-400 group-hover:text-slate-600"}`}>
           {isSubmenuExpanded ? (
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
           ) : (
@@ -385,22 +386,22 @@ function SidebarNavList({
             <div className="mt-1 mb-2 ml-4 pl-3.5 border-l border-slate-200/80 flex flex-col gap-1.5 animate-in slide-in-from-top-2 duration-200">
               <SubmenuLink 
                 href="/inventory?tab=active" 
-                label="Kho thiết bị bán" 
+                label="Kho bán" 
                 active={activeTab === "active"} 
               />
               <SubmenuLink 
                 href="/inventory?tab=defective" 
-                label="Kho thiết bị lỗi" 
+                label="Kho lỗi" 
                 active={activeTab === "defective"} 
               />
               <SubmenuLink 
                 href="/inventory?tab=purchase_orders" 
-                label="Đơn nhập PO" 
+                label="Đơn nhập hàng" 
                 active={activeTab === "purchase_orders"} 
               />
               <SubmenuLink 
                 href="/inventory?tab=returned" 
-                label="Đã trả NCC" 
+                label="Trả NCC" 
                 active={activeTab === "returned"} 
               />
               <SubmenuLink 
@@ -440,10 +441,11 @@ function SubmenuLink({ href, label, active }: { href: string; label: string; act
     <Link
       href={href}
       scroll={false}
-      className={`group flex items-center py-1.5 px-4 rounded-full text-[12.5px] transition-[background-color,color,transform,box-shadow] duration-200 ease-out cursor-pointer active:scale-[0.98] select-none ${
+      prefetch={false}
+      className={`group flex items-center py-2 px-4 rounded-full text-[12.5px] transition-all duration-150 ease-out cursor-pointer active:scale-[0.98] select-none ${
         active
-          ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-md shadow-[0_3px_8px_rgba(0,102,204,0.15)] border border-white/10 font-bold scale-[1.01]"
-          : "text-slate-600 hover:text-white hover:bg-gradient-to-br hover:from-blue-500/75 hover:to-blue-600/75 hover:shadow-sm hover:shadow-blue-500/12 font-semibold"
+          ? "bg-[#0071e3] text-white font-bold shadow-[0_2px_6px_rgba(0,113,227,0.12)]"
+          : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 font-semibold"
       }`}
     >
       <span>{label}</span>
