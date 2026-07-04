@@ -1,5 +1,6 @@
 # Dependency directories
 node_modules/
+dist/
 /dist/
 /coverage/
 
@@ -21,6 +22,11 @@ tsconfig.tsbuildinfo
 .env.development.local
 .env.test.local
 .env.production.local
+.env*.local
+
+# IDE & Tool directories
+.gemini/
+.antigravity/
 
 # Operating System files
 .DS_Store
