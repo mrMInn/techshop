@@ -626,11 +626,127 @@ function InventoryPageContent() {
     return items.filter((item: any) => item.productId === activeDrawerProduct.productId && (item.status === 'defective' || item.status === 'warranty_repair')).length;
   }, [activeDrawerProduct, items]);
 
+  // Determine active tab index for sliding indicator position and width in Segmented Control
+  const activeSegmentIndex = useMemo(() => {
+    if (activeTab === "defective") return 3;
+    if (selectedStatus === "all") return 0;
+    if (selectedStatus === "in_stock") return 1;
+    if (selectedStatus === "incoming") return 2;
+    return 0;
+  }, [activeTab, selectedStatus]);
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Dropdown Filters & Search & Action Buttons */}
       {activeTab !== "accessories" && (
         <div className="flex flex-wrap items-center gap-3 pb-6 border-b border-[#e0e0e0]">
+
+            {/* Status Segmented Control (replaces Status Dropdown for Active/Defective tabs) */}
+            {(activeTab === "active" || activeTab === "defective") ? (
+              <div className="relative flex bg-[#f5f5f7] p-[3px] rounded-full border border-[#e0e0e0] h-[40px] w-full sm:w-[480px] shrink-0 select-none overflow-hidden">
+                {/* Sliding active indicator */}
+                <div 
+                  className="absolute top-[3px] bottom-[3px] rounded-full bg-[#0066cc] shadow-[0_2px_4px_rgba(0,102,204,0.25)]"
+                  style={{
+                    width: "calc(25% - 6px)",
+                    left: `calc(${activeSegmentIndex * 25}% + 3px)`,
+                    transition: "left 280ms cubic-bezier(0.16, 1, 0.3, 1)"
+                  }}
+                />
+
+                {/* Tab 1: Tất cả */}
+                <button
+                  onClick={() => {
+                    setActiveTab("active");
+                    setSelectedStatus("all");
+                  }}
+                  className={`w-1/4 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                    activeSegmentIndex === 0 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
+                  }`}
+                >
+                  <div className={`w-5.5 h-5.5 rounded-full flex items-center justify-center text-white shrink-0 transition-all duration-200 ${
+                    activeSegmentIndex === 0
+                      ? "bg-transparent shadow-none"
+                      : "bg-gradient-to-br from-[#2ea1ff] to-[#0066cc] shadow-[0_1px_2px_rgba(0,102,204,0.1)]"
+                  }`}>
+                    <SFSymbolShippingBox size={activeSegmentIndex === 0 ? 13 : 10} className="transition-all duration-200" />
+                  </div>
+                  <span className="truncate">Tất cả</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 0 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
+                    {items?.filter((i) => i.status !== "deleted" && i.status !== "sold" && i.status !== "returned").length || 0}
+                  </span>
+                </button>
+
+                {/* Tab 2: Sẵn kho */}
+                <button
+                  onClick={() => {
+                    setActiveTab("active");
+                    setSelectedStatus("in_stock");
+                  }}
+                  className={`w-1/4 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                    activeSegmentIndex === 1 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
+                  }`}
+                >
+                  <div className={`w-5.5 h-5.5 rounded-full flex items-center justify-center text-white shrink-0 transition-all duration-200 ${
+                    activeSegmentIndex === 1
+                      ? "bg-transparent shadow-none"
+                      : "bg-gradient-to-br from-[#34c759] to-[#28a745] shadow-[0_1px_2px_rgba(52,199,89,0.1)]"
+                  }`}>
+                    <SFSymbolLaptopComputer size={activeSegmentIndex === 1 ? 13 : 10} className="transition-all duration-200" />
+                  </div>
+                  <span className="truncate">Sẵn kho</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 1 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
+                    {items?.filter((i) => i.status === "in_stock").length || 0}
+                  </span>
+                </button>
+
+                {/* Tab 3: Đang về */}
+                <button
+                  onClick={() => {
+                    setActiveTab("active");
+                    setSelectedStatus("incoming");
+                  }}
+                  className={`w-1/4 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                    activeSegmentIndex === 2 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
+                  }`}
+                >
+                  <div className={`w-5.5 h-5.5 rounded-full flex items-center justify-center text-white shrink-0 transition-all duration-200 ${
+                    activeSegmentIndex === 2
+                      ? "bg-transparent shadow-none"
+                      : "bg-gradient-to-br from-[#ff9f0a] to-[#ff7b00] shadow-[0_1px_2px_rgba(255,159,10,0.1)]"
+                  }`}>
+                    <SFSymbolTruck size={activeSegmentIndex === 2 ? 13 : 10} className="transition-all duration-200" />
+                  </div>
+                  <span className="truncate">Đang về</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 2 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
+                    {items?.filter((i) => i.status === "incoming").length || 0}
+                  </span>
+                </button>
+
+                {/* Tab 4: Máy lỗi */}
+                <button
+                  onClick={() => {
+                    setActiveTab("defective");
+                    setSelectedStatus("all");
+                  }}
+                  className={`w-1/4 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                    activeSegmentIndex === 3 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
+                  }`}
+                >
+                  <div className={`w-5.5 h-5.5 rounded-full flex items-center justify-center text-white shrink-0 transition-all duration-200 ${
+                    activeSegmentIndex === 3
+                      ? "bg-transparent shadow-none"
+                      : "bg-gradient-to-br from-[#ff2d55] to-[#d6001c] shadow-[0_1px_2px_rgba(255,45,85,0.15)]"
+                  }`}>
+                    <SFSymbolExclamationTriangle size={activeSegmentIndex === 3 ? 13 : 10} className="transition-all duration-200" />
+                  </div>
+                  <span className="truncate">Máy lỗi</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 3 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
+                    {items?.filter((i) => i.status === "defective" || i.status === "warranty_repair").length || 0}
+                  </span>
+                </button>
+              </div>
+            ) : null}
 
             {/* Category Filter */}
             {activeTab !== "purchase_orders" && (
@@ -653,20 +769,6 @@ function InventoryPageContent() {
                   options={brandOptions}
                   value={selectedBrand}
                   onChange={setSelectedBrand}
-                  size="sm"
-                  rounded="full"
-                  dropdownWidth="full"
-                />
-              </div>
-            )}
-
-            {/* Status Filter */}
-            {activeTab !== "purchase_orders" && (
-              <div className="w-full sm:w-40">
-                <CustomSelect
-                  options={statusOptions}
-                  value={selectedStatus}
-                  onChange={setSelectedStatus}
                   size="sm"
                   rounded="full"
                   dropdownWidth="full"
@@ -703,7 +805,7 @@ function InventoryPageContent() {
             )}
 
             {/* Search Input */}
-            <div className="relative w-full sm:w-48 shrink-0">
+            <div className="relative w-full sm:w-64 shrink-0">
               <SFSymbolMagnifyingGlass className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7a7a7a]" size={14} />
               <input 
                 type="text" 
@@ -737,7 +839,7 @@ function InventoryPageContent() {
             )}
 
             {/* Nhập kho Button */}
-            {activeTab === "active" && (
+            {(activeTab === "active" || activeTab === "defective") && (
               <button 
                 onClick={handleOpenCreateDialog}
                 className="flex items-center gap-1.5 px-4 h-[40px] bg-[#0066cc] text-white text-[13px] font-semibold rounded-full hover:bg-[#0071e3] transition-all cursor-pointer shadow-sm active:scale-95 duration-200 shrink-0"
@@ -749,172 +851,8 @@ function InventoryPageContent() {
           </div>
         )}
 
-      {/* Stats Cards - Premium Apple Shortcuts style */}
-      {activeTab === "active" && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* Card 1: Tổng sản phẩm */}
-          <div 
-            onClick={() => setSelectedStatus("all")}
-            className={`group relative overflow-hidden rounded-[22px] p-5 h-[120px] flex flex-col justify-between transition-all duration-300 cursor-pointer select-none active:scale-[0.97] border border-white/10 ${
-              selectedStatus === "all"
-                ? "bg-gradient-to-br from-[#2ea1ff] to-[#0066cc] shadow-[0_10px_25px_rgba(0,102,204,0.3)] opacity-100 scale-100 ring-2 ring-[#0066cc]/40 ring-offset-2 ring-offset-white"
-                : "bg-gradient-to-br from-[#2ea1ff]/90 to-[#0066cc]/90 shadow-[0_4px_12px_rgba(0,0,0,0.05)] opacity-80 hover:opacity-100 hover:scale-[1.02] hover:shadow-[0_8px_20px_rgba(0,102,204,0.15)]"
-            }`}
-          >
-            {/* Top Row with Label and Icon */}
-            <div className="relative z-20 flex justify-between items-start">
-              <span className="text-[12px] font-bold uppercase tracking-wider text-white/70">
-                Tổng sản phẩm
-              </span>
-              <div className="relative w-8 h-8 shrink-0">
-                {/* Main Icon */}
-                <div className="absolute inset-0 rounded-[9px] bg-white/20 flex items-center justify-center text-white backdrop-blur-md border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] group-hover:opacity-0 group-hover:scale-75 transition-all duration-200">
-                  <SFSymbolShippingBox size={16} />
-                </div>
-                {/* Play Icon on Hover */}
-                <div className="absolute inset-0 rounded-[9px] bg-white/35 flex items-center justify-center text-white backdrop-blur-md border border-white/10 opacity-0 scale-75 group-hover:opacity-100 group-hover:scale-100 transition-all duration-200 shadow-sm">
-                  <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-            {/* Bottom Value */}
-            <div className="relative z-20 text-[28px] font-black text-white tracking-tight leading-none tabular-nums mt-auto">
-              {items?.filter((i) => i.status !== "deleted" && i.status !== "sold" && i.status !== "returned").length || 0}
-            </div>
-            {/* Gloss shine overlay */}
-            <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-          </div>
-
-          {/* Card 2: Đang sẵn hàng */}
-          <div 
-            onClick={() => setSelectedStatus("in_stock")}
-            className={`group relative overflow-hidden rounded-[22px] p-5 h-[120px] flex flex-col justify-between transition-all duration-300 cursor-pointer select-none active:scale-[0.97] border border-white/10 ${
-              selectedStatus === "in_stock"
-                ? "bg-gradient-to-br from-[#34c759] to-[#28a745] shadow-[0_10px_25px_rgba(52,199,89,0.3)] opacity-100 scale-100 ring-2 ring-[#34c759]/40 ring-offset-2 ring-offset-white"
-                : "bg-gradient-to-br from-[#34c759]/90 to-[#28a745]/90 shadow-[0_4px_12px_rgba(0,0,0,0.05)] opacity-80 hover:opacity-100 hover:scale-[1.02] hover:shadow-[0_8px_20px_rgba(52,199,89,0.15)]"
-            }`}
-          >
-            {/* Top Row with Label and Icon */}
-            <div className="relative z-20 flex justify-between items-start">
-              <span className="text-[12px] font-bold uppercase tracking-wider text-white/70">
-                Đang sẵn hàng
-              </span>
-              <div className="relative w-8 h-8 shrink-0">
-                {/* Main Icon */}
-                <div className="absolute inset-0 rounded-[9px] bg-white/20 flex items-center justify-center text-white backdrop-blur-md border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] group-hover:opacity-0 group-hover:scale-75 transition-all duration-200">
-                  <SFSymbolLaptopComputer size={16} />
-                </div>
-                {/* Play Icon on Hover */}
-                <div className="absolute inset-0 rounded-[9px] bg-white/35 flex items-center justify-center text-white backdrop-blur-md border border-white/10 opacity-0 scale-75 group-hover:opacity-100 group-hover:scale-100 transition-all duration-200 shadow-sm">
-                  <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-            {/* Bottom Value */}
-            <div className="relative z-20 text-[28px] font-black text-white tracking-tight leading-none tabular-nums mt-auto">
-              {items?.filter((i) => i.status === "in_stock").length || 0}
-            </div>
-            {/* Gloss shine overlay */}
-            <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-          </div>
-
-          {/* Card 3: Đang về */}
-          <div 
-            onClick={() => setSelectedStatus("incoming")}
-            className={`group relative overflow-hidden rounded-[22px] p-5 h-[120px] flex flex-col justify-between transition-all duration-300 cursor-pointer select-none active:scale-[0.97] border border-white/10 ${
-              selectedStatus === "incoming"
-                ? "bg-gradient-to-br from-[#ff9f0a] to-[#ff7b00] shadow-[0_10px_25px_rgba(255,159,10,0.3)] opacity-100 scale-100 ring-2 ring-[#ff9f0a]/40 ring-offset-2 ring-offset-white"
-                : "bg-gradient-to-br from-[#ff9f0a]/90 to-[#ff7b00]/90 shadow-[0_4px_12px_rgba(0,0,0,0.05)] opacity-80 hover:opacity-100 hover:scale-[1.02] hover:shadow-[0_8px_20px_rgba(255,159,10,0.15)]"
-            }`}
-          >
-            {/* Top Row with Label and Icon */}
-            <div className="relative z-20 flex justify-between items-start">
-              <span className="text-[12px] font-bold uppercase tracking-wider text-white/70">
-                Đang về
-              </span>
-              <div className="relative w-8 h-8 shrink-0">
-                {/* Main Icon */}
-                <div className="absolute inset-0 rounded-[9px] bg-white/20 flex items-center justify-center text-white backdrop-blur-md border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] group-hover:opacity-0 group-hover:scale-75 transition-all duration-200">
-                  <SFSymbolTruck size={16} />
-                </div>
-                {/* Play Icon on Hover */}
-                <div className="absolute inset-0 rounded-[9px] bg-white/35 flex items-center justify-center text-white backdrop-blur-md border border-white/10 opacity-0 scale-75 group-hover:opacity-100 group-hover:scale-100 transition-all duration-200 shadow-sm">
-                  <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-            {/* Bottom Value */}
-            <div className="relative z-20 text-[28px] font-black text-white tracking-tight leading-none tabular-nums mt-auto">
-              {items?.filter((i) => i.status === "incoming").length || 0}
-            </div>
-            {/* Gloss shine overlay */}
-            <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-          </div>
-
-          {/* Card 4: Đang bị lỗi */}
-          <div 
-            onClick={() => {
-              setActiveTab("defective");
-              setSelectedStatus("all");
-            }}
-            className="group relative overflow-hidden rounded-[22px] bg-gradient-to-br from-[#ff2d55] to-[#d6001c] p-5 h-[120px] flex flex-col justify-between shadow-[0_4px_12px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_20px_rgba(255,45,85,0.15)] hover:scale-[1.02] transition-all duration-300 cursor-pointer select-none active:scale-[0.97] border border-white/10 opacity-80 hover:opacity-100"
-          >
-            {/* Top Row with Label and Icon */}
-            <div className="relative z-20 flex justify-between items-start">
-              <span className="text-[12px] font-bold uppercase tracking-wider text-white/70">
-                Đang bị lỗi
-              </span>
-              <div className="relative w-8 h-8 shrink-0">
-                {/* Main Icon */}
-                <div className="absolute inset-0 rounded-[9px] bg-white/20 flex items-center justify-center text-white backdrop-blur-md border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] group-hover:opacity-0 group-hover:scale-75 transition-all duration-200">
-                  <SFSymbolExclamationTriangle size={16} />
-                </div>
-                {/* Play Icon on Hover */}
-                <div className="absolute inset-0 rounded-[9px] bg-white/35 flex items-center justify-center text-white backdrop-blur-md border border-white/10 opacity-0 scale-75 group-hover:opacity-100 group-hover:scale-100 transition-all duration-200 shadow-sm">
-                  <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-            {/* Bottom Value */}
-            <div className="relative z-20 text-[28px] font-black text-white tracking-tight leading-none tabular-nums mt-auto">
-              {items?.filter((i) => i.status === "defective" || i.status === "warranty_repair").length || 0}
-            </div>
-            {/* Gloss shine overlay */}
-            <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-          </div>
-        </div>
-      )}
 
 
-      {/* Smart Model Summary Header */}
-      {(activeTab === "active" || activeTab === "defective" || activeTab === "returned") && (
-        <div className="flex items-center justify-between text-[13px] text-[#7a7a7a] font-medium px-1">
-          {activeTab === "active" ? (
-            <>
-              <div>Đang quản lý <span className="font-bold text-[#1d1d1f]">{groupedItems.length}</span> cấu hình sản phẩm khác nhau.</div>
-              <div>Tổng tồn trong kho: <span className="font-bold text-[#0066cc]">{items?.filter(i => i.status === "in_stock").length || 0}</span> máy.</div>
-            </>
-          ) : activeTab === "defective" ? (
-            <>
-              <div>Có <span className="font-bold text-[#1d1d1f]">{groupedItems.length}</span> cấu hình sản phẩm đang có thiết bị lỗi.</div>
-              <div>Tổng máy lỗi/đang sửa: <span className="font-bold text-red-500">{items?.filter(i => i.status === "defective" || i.status === "warranty_repair").length || 0}</span> máy.</div>
-            </>
-          ) : activeTab === "returned" ? (
-            <>
-              <div>Có <span className="font-bold text-[#1d1d1f]">{groupedItems.length}</span> cấu hình sản phẩm đã trả nhà cung cấp.</div>
-              <div>Tổng máy đã trả NCC: <span className="font-bold text-slate-500">{items?.filter(i => i.status === "returned").length || 0}</span> máy.</div>
-            </>
-          ) : null}
-        </div>
-      )}
 
       {/* 4. Main Data Card - Crisp Apple store card layout */}
       {activeTab === "accessories" ? (
@@ -933,14 +871,14 @@ function InventoryPageContent() {
           ) : activeTab === "purchase_orders" ? (
           filteredPurchaseOrders.length === 0 ? (
             <div className="p-20 flex flex-col items-center justify-center text-center">
-              <div className="w-16 h-16 bg-[#f5f5f7] rounded-full border border-[#e0e0e0] flex items-center justify-center mb-6 text-[#7a7a7a]">
-                <SFSymbolShippingBox size={24} />
+              <div className="w-12 h-12 bg-[#f5f5f7] rounded-full border border-[#e0e0e0] flex items-center justify-center mb-4 text-[#7a7a7a]/60">
+                <SFSymbolShippingBox size={18} />
               </div>
-              <h3 className="text-[21px] font-semibold text-[#1d1d1f] mb-2">
-                Không tìm thấy đơn nhập hàng nào
+              <h3 className="text-[15px] font-semibold text-[#1d1d1f] mb-1">
+                Không tìm thấy đơn nhập hàng
               </h3>
-              <p className="text-[17px] text-[#7a7a7a] mb-8 max-w-md leading-[1.47]">
-                Hệ thống chưa ghi nhận đơn nhập hàng (Purchase Order) nào phù hợp với tìm kiếm của bạn.
+              <p className="text-[13px] text-[#7a7a7a]">
+                Không có dữ liệu đơn nhập nào khớp với bộ lọc hoặc tìm kiếm.
               </p>
             </div>
           ) : (
@@ -1027,32 +965,15 @@ function InventoryPageContent() {
           )
         ) : filteredItems?.length === 0 ? (
           <div className="p-20 flex flex-col items-center justify-center text-center">
-            <div className="w-16 h-16 bg-[#f5f5f7] rounded-full border border-[#e0e0e0] flex items-center justify-center mb-6 text-[#7a7a7a]">
-              <SFSymbolShippingBox size={24} />
+            <div className="w-12 h-12 bg-[#f5f5f7] rounded-full border border-[#e0e0e0] flex items-center justify-center mb-4 text-[#7a7a7a]/60">
+              <SFSymbolShippingBox size={18} />
             </div>
-            <h3 className="text-[21px] font-semibold text-[#1d1d1f] mb-2">
-              {activeTab === "active" 
-                ? "Kho hàng chưa có máy" 
-                : activeTab === "defective"
-                ? "Không tìm thấy máy lỗi nào"
-                : "Không tìm thấy máy nào đã trả NCC"}
+            <h3 className="text-[15px] font-semibold text-[#1d1d1f] mb-1">
+              Không tìm thấy sản phẩm
             </h3>
-            <p className="text-[17px] text-[#7a7a7a] mb-8 max-w-md leading-[1.47]">
-              {activeTab === "active"
-                ? "Hệ thống chưa ghi nhận chiếc máy nào bằng Serial cụ thể. Hãy bấm nút nhập kho bên dưới để bắt đầu thêm sản phẩm mới."
-                : activeTab === "defective"
-                ? "Chúc mừng! Hiện tại kho hàng hoạt động tốt và không ghi nhận máy nào bị lỗi hoặc đang bảo hành."
-                : "Hệ thống chưa ghi nhận chiếc máy nào đã xuất trả nhà cung cấp (NCC)."}
+            <p className="text-[13px] text-[#7a7a7a]">
+              Không có dữ liệu thiết bị nào khớp với bộ lọc hoặc tìm kiếm.
             </p>
-            {activeTab === "active" && (
-              <button 
-                onClick={handleOpenCreateDialog}
-                className="flex items-center gap-2 px-6 h-[44px] bg-[#0066cc] text-white text-[14px] font-normal rounded-full hover:bg-[#0071e3] transition-all cursor-pointer active:scale-95 duration-200"
-              >
-                <SFSymbolPlus size={16} />
-                <span>Nhập kho ngay</span>
-              </button>
-            )}
           </div>
         ) : (
           <div className="overflow-x-auto">

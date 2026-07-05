@@ -123,10 +123,11 @@ export async function getOrdersList(params?: {
         processingCount: sql<number>`count(case when ${orders.status} = 'processing' then 1 end)`,
         cancelledCount: sql<number>`count(case when ${orders.status} = 'cancelled' then 1 end)`,
         onlineCount: sql<number>`count(case when ${orders.saleChannel} = 'online' and ${orders.status} != 'cancelled' then 1 end)`,
+        unpaidCount: sql<number>`count(case when ${orders.paymentStatus} = 'unpaid' and ${orders.status} != 'cancelled' then 1 end)`,
       })
       .from(orders);
 
-    const stats = statsResult[0] || { completedCount: 0, processingCount: 0, cancelledCount: 0, onlineCount: 0 };
+    const stats = statsResult[0] || { completedCount: 0, processingCount: 0, cancelledCount: 0, onlineCount: 0, unpaidCount: 0 };
 
     return {
       orders: list,
@@ -141,6 +142,7 @@ export async function getOrdersList(params?: {
         processingCount: Number(stats.processingCount || 0),
         cancelledCount: Number(stats.cancelledCount || 0),
         onlineCount: Number(stats.onlineCount || 0),
+        unpaidCount: Number(stats.unpaidCount || 0),
       }
     };
   } catch (error) {

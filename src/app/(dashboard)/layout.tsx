@@ -102,28 +102,28 @@ export default function DashboardLayout({
 
   // Build menu items list based on role
   const menuItems = [
-    ...(isAdmin ? [{ href: "/", label: "Dashboard", icon: <BarChart2 size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-blue-500 to-blue-600 shadow-[0_2px_6px_rgba(0,113,227,0.15)]", match: (p: string) => p === "/" }] : []),
-    { href: "/inventory", label: "Quản lý kho", icon: <Package size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-teal-500 to-emerald-600 shadow-[0_2px_6px_rgba(48,209,88,0.15)]", match: (p: string) => p.startsWith("/inventory") },
-    { href: "/orders", label: "Đơn hàng", icon: <ShoppingCart size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-pink-500 to-rose-600 shadow-[0_2px_6px_rgba(255,45,85,0.15)]", match: (p: string) => p.startsWith("/orders") },
-    { href: "/quotations", label: "Báo giá", icon: <FileText size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-amber-500 to-orange-600 shadow-[0_2px_6px_rgba(255,159,10,0.15)]", match: (p: string) => p.startsWith("/quotations") },
-    { href: "/warranty", label: "Bảo hành", icon: <Wrench size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-purple-500 to-indigo-600 shadow-[0_2px_6px_rgba(175,82,222,0.15)]", match: (p: string) => p.startsWith("/warranty") },
-    { href: "/returns", label: "Đổi trả", icon: <RefreshCcw size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-sky-400 to-sky-500 shadow-[0_2px_6px_rgba(90,200,250,0.15)]", match: (p: string) => p.startsWith("/returns") },
-    { href: "/lookup", label: "Tra cứu", icon: <Search size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-yellow-400 to-amber-500 shadow-[0_2px_6px_rgba(255,204,0,0.15)]", match: (p: string) => p.startsWith("/lookup") },
-    ...(isAdmin ? [{ href: "/accounting", label: "Sổ quỹ", icon: <Wallet size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-emerald-500 to-green-600 shadow-[0_2px_6px_rgba(48,209,88,0.15)]", match: (p: string) => p.startsWith("/accounting") }] : []),
+    ...(isAdmin ? [{ href: "/", label: "Dashboard", icon: <BarChart2 size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-[#2ea1ff] to-[#0066cc]", match: (p: string) => p === "/" }] : []),
+    { href: "/inventory", label: "Quản lý kho", icon: <Package size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-[#34c759] to-[#28a745]", match: (p: string) => p.startsWith("/inventory") },
+    { href: "/orders", label: "Đơn hàng", icon: <ShoppingCart size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-[#ff2d55] to-[#d6001c]", match: (p: string) => p.startsWith("/orders") },
+    { href: "/quotations", label: "Báo giá", icon: <FileText size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-[#ff9f0a] to-[#ff7b00]", match: (p: string) => p.startsWith("/quotations") },
+    { href: "/warranty", label: "Bảo hành", icon: <Wrench size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-[#af52de] to-[#7a2bc2]", match: (p: string) => p.startsWith("/warranty") },
+    { href: "/returns", label: "Đổi trả", icon: <RefreshCcw size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-[#5ac8fa] to-[#0071e3]", match: (p: string) => p.startsWith("/returns") },
+    { href: "/lookup", label: "Tra cứu", icon: <Search size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-[#ffcc00] to-[#ff9500]", match: (p: string) => p.startsWith("/lookup") },
+    ...(isAdmin ? [{ href: "/accounting", label: "Sổ quỹ", icon: <Wallet size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-[#34c759] to-[#28a745]", match: (p: string) => p.startsWith("/accounting") }] : []),
   ];
 
-  const settingsItem = isAdmin ? { href: "/settings", label: "Cấu hình hệ thống", icon: <Settings size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-slate-400 to-slate-500 shadow-[0_2px_6px_rgba(142,142,147,0.15)]", match: (p: string) => p.startsWith("/settings") } : null;
+  const settingsItem = isAdmin ? { href: "/settings", label: "Cấu hình hệ thống", icon: <Settings size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-[#8e8e93] to-[#636366]", match: (p: string) => p.startsWith("/settings") } : null;
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50 antialiased font-sans">
       
       {/* Apple Premium Frosted Glass Sidebar */}
-      <aside className="w-64 bg-[#f8f9fa]/75 backdrop-blur-2xl border-r border-slate-200/80 hidden md:flex flex-col p-5 justify-between z-40 select-none">
+      <aside className="w-64 bg-[#f5f5f7]/80 backdrop-blur-2xl border-r border-[#e0e0e0]/80 hidden md:flex flex-col p-5 justify-between z-40 select-none">
         
         <div className="space-y-6">
           {/* Glowing Brand Header */}
-          <div className="flex items-center gap-3 px-2.5 py-1.5 border-b border-slate-200/50 pb-4.5 mb-2">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#0066cc] to-[#0088ff] flex items-center justify-center shadow-[0_4px_12px_rgba(0,102,204,0.22)] transform hover:rotate-6 transition-all duration-300">
+          <div className="flex items-center gap-3 px-2.5 py-1.5 border-b border-[#e0e0e0]/50 pb-4.5 mb-2">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#2ea1ff] to-[#0066cc] flex items-center justify-center transform hover:rotate-6 transition-all duration-300">
               <BarChart2 className="text-white" size={17} />
             </div>
             <div className="min-w-0">
@@ -150,7 +150,7 @@ export default function DashboardLayout({
         </div>
 
         {/* Sidebar Footer: System Config & Profile */}
-        <div className="space-y-3.5 border-t border-slate-200/50 pt-4">
+        <div className="space-y-3.5 border-t border-[#e0e0e0]/50 pt-4">
           {settingsItem && (
             <SidebarLink
               href={settingsItem.href}
@@ -169,12 +169,16 @@ export default function DashboardLayout({
         {/* Decorative Liquid Glass light beam background */}
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#0066cc]/2 blur-[100px] rounded-full pointer-events-none z-0" />
         
-        <div className="max-w-[1200px] mx-auto relative z-10 space-y-6">
+        <div className="max-w-[1440px] mx-auto relative z-10 space-y-6">
           {/* Global Top Header: Title & Profile Info */}
           <div className="flex justify-between items-center pb-6 border-b border-[#e0e0e0] select-none">
-            <h1 className="text-[40px] font-semibold tracking-tight leading-normal py-1 bg-clip-text text-transparent select-none shrink-0" style={{ backgroundImage: "linear-gradient(90deg, #2997ff, #a855f7, #ec4899)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-              {getPageTitle(pathname)}
-            </h1>
+            <div className="flex items-center gap-6 min-w-0">
+              <h1 className="text-[40px] font-semibold tracking-tight leading-normal py-1 bg-clip-text text-transparent select-none shrink-0" style={{ backgroundImage: "linear-gradient(90deg, #2997ff, #a855f7, #ec4899)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+                {getPageTitle(pathname)}
+              </h1>
+              {/* Portal target for custom header components (like page stats) */}
+              <div id="header-custom-portal" className="hidden lg:flex items-center gap-2.5" />
+            </div>
 
             <div 
               style={{
@@ -252,22 +256,18 @@ function SidebarLink({
       href={href}
       onClick={onClick}
       prefetch={false}
-      className={`group relative z-10 flex items-center gap-3 px-3.5 py-2 rounded-full transition-all duration-150 ease-out text-[13px] active:scale-[0.98] ${
+      className={`group relative z-10 flex items-center gap-3 px-3.5 py-2 rounded-full transition-all duration-200 ease-out text-[13px] active:scale-[0.98] hover:translate-x-[2px] ${
         active 
-          ? "bg-[#0071e3] text-white font-bold shadow-[0_2px_8px_rgba(0,113,227,0.18)]" 
-          : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/60 font-semibold"
+          ? "bg-[#0066cc]/10 text-[#0066cc] font-semibold" 
+          : "text-[#1d1d1f] hover:bg-slate-200/60 font-semibold"
       }`}
     >
-      <div className={`flex h-7.5 w-7.5 items-center justify-center rounded-[9px] shadow-sm border shrink-0 transition-all duration-150 ease-out group-hover:scale-[1.03] ${
-        active 
-          ? "bg-white/20 text-white border-transparent" 
-          : `${bgColor} text-white border-white/20 group-hover:bg-white/25 group-hover:shadow-none`
-      }`}>
+      <div className={`sidebar-icon-container flex h-7.5 w-7.5 items-center justify-center rounded-[8px] border border-white/10 shrink-0 transition-transform duration-200 ease-out group-hover:scale-[1.08] ${bgColor} text-white shadow-[0_1px_3px_rgba(0,0,0,0.02)]`}>
         {icon}
       </div>
       <span className="truncate">{label}</span>
       {hasSubmenu && (
-        <span className={`ml-auto transition-transform duration-200 ${active ? "text-white" : "text-slate-400 group-hover:text-slate-600"}`}>
+        <span className={`ml-auto transition-transform duration-200 ${active ? "text-[#0066cc]" : "text-slate-400 group-hover:text-slate-600"}`}>
           {isSubmenuExpanded ? (
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
           ) : (
@@ -343,7 +343,7 @@ function SidebarNavList({
   }, [pathname]);
 
   return (
-    <>
+    <div className="flex flex-col gap-1">
       {menuItems.map((item) => (
         <Fragment key={item.href}>
           <SidebarLink
@@ -383,7 +383,7 @@ function SidebarNavList({
             }}
           />
           {item.href === "/inventory" && inventoryExpanded && (
-            <div className="mt-1 mb-2 ml-4 pl-3.5 border-l border-slate-200/80 flex flex-col gap-1.5 animate-in slide-in-from-top-2 duration-200">
+            <div className="mt-1 mb-2 ml-4 pl-3.5 border-l border-[#e0e0e0]/80 flex flex-col gap-1.5 animate-in slide-in-from-top-2 duration-200">
               <SubmenuLink 
                 href="/inventory?tab=active" 
                 label="Kho bán" 
@@ -412,7 +412,7 @@ function SidebarNavList({
             </div>
           )}
           {item.href === "/accounting" && accountingExpanded && (
-            <div className="mt-1 mb-2 ml-4 pl-3.5 border-l border-slate-200/80 flex flex-col gap-1.5 animate-in slide-in-from-top-2 duration-200">
+            <div className="mt-1 mb-2 ml-4 pl-3.5 border-l border-[#e0e0e0]/80 flex flex-col gap-1.5 animate-in slide-in-from-top-2 duration-200">
               <SubmenuLink 
                 href="/accounting" 
                 label="Nhật ký thu chi" 
@@ -432,7 +432,7 @@ function SidebarNavList({
           )}
         </Fragment>
       ))}
-    </>
+    </div>
   );
 }
 
@@ -444,7 +444,7 @@ function SubmenuLink({ href, label, active }: { href: string; label: string; act
       prefetch={false}
       className={`group flex items-center py-2 px-4 rounded-full text-[12.5px] transition-all duration-150 ease-out cursor-pointer active:scale-[0.98] select-none ${
         active
-          ? "bg-[#0071e3] text-white font-bold shadow-[0_2px_6px_rgba(0,113,227,0.12)]"
+          ? "bg-[#0066cc]/10 text-[#0066cc] font-semibold"
           : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 font-semibold"
       }`}
     >

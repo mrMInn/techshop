@@ -4,9 +4,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getQuotationsList, createQuotation, convertQuotationToOrder } from "@/app/actions/quotations";
 import { GlassCard } from "@/components/ui/glass-card";
 import { 
-  Search, Plus, Copy, ShoppingCart, Landmark, Eye, Loader2
+  Search, Plus, Copy, ShoppingCart, Landmark, Eye, Loader2,
+  FileText, CheckCircle, XCircle, RefreshCw
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import { Dialog } from "@/components/ui/dialog";
 import { QuotationForm } from "@/components/quotations/quotation-form";
@@ -117,183 +118,329 @@ export default function QuotationsPage() {
 
 
 
+  // Segmented Control counts
+  const totalCount = quotationsData?.length || 0;
+  const draftCount = quotationsData?.filter(q => q.status === "draft" || q.status === "sent").length || 0;
+  const viewedCount = quotationsData?.filter(q => q.status === "viewed").length || 0;
+  const acceptedCount = quotationsData?.filter(q => q.status === "accepted").length || 0;
+  const rejectedCount = quotationsData?.filter(q => q.status === "rejected").length || 0;
+  const convertedCount = quotationsData?.filter(q => q.status === "converted").length || 0;
+
+  const activeSegmentIndex = useMemo(() => {
+    if (statusFilter === "all") return 0;
+    if (statusFilter === "draft") return 1;
+    if (statusFilter === "viewed") return 2;
+    if (statusFilter === "accepted") return 3;
+    if (statusFilter === "rejected") return 4;
+    if (statusFilter === "converted") return 5;
+    return 0;
+  }, [statusFilter]);
+
   return (
-    <div className="space-y-8 pb-10">
+    <div className="space-y-6 pb-10">
       
-      {/* Header */}
-      <div className="flex flex-wrap items-center gap-3 justify-start pb-6 border-b border-[#e0e0e0]">
-          <div className="relative w-full sm:w-60">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7a7a7a]" size={14} />
-            <input 
-              type="text" 
-              placeholder="Tìm số báo giá, khách hàng..." 
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 h-[40px] rounded-full bg-[#f5f5f7] border border-[#e0e0e0] text-[13px] font-medium text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 transition-all placeholder:text-[#7a7a7a]/60"
-            />
-          </div>
+      {/* Header Section - Apple premium single-row layout */}
+      <div className="pb-6 border-b border-[#e0e0e0]">
+        <div className="flex flex-wrap items-center gap-3 justify-start">
+            
+            {/* Status Segmented Control */}
+            <div className="relative flex bg-[#f5f5f7] p-[3px] rounded-full border border-[#e0e0e0] h-[40px] w-full sm:w-[720px] shrink-0 select-none overflow-hidden">
+              {/* Sliding active indicator */}
+              <div 
+                className="absolute top-[3px] bottom-[3px] rounded-full bg-[#0066cc] shadow-[0_2px_4px_rgba(0,102,204,0.25)]"
+                style={{
+                  width: "calc(16.66667% - 6px)",
+                  left: `calc(${activeSegmentIndex * 16.66667}% + 3px)`,
+                  transition: "left 280ms cubic-bezier(0.16, 1, 0.3, 1)"
+                }}
+              />
 
-          <button 
-            onClick={() => setIsQuotationOpen(true)}
-            className="flex items-center gap-1.5 px-5 h-[40px] bg-[#0066cc] text-white text-[13px] font-medium rounded-full hover:bg-[#0071e3] transition-all cursor-pointer shadow-sm active:scale-95 duration-200"
-          >
-            <Plus size={14} />
-            <span>Tạo Báo Giá</span>
-          </button>
-        </div>
+              {/* Tab 1: Tất cả */}
+              <button
+                type="button"
+                onClick={() => setStatusFilter("all")}
+                className={`w-1/6 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[12.5px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                  activeSegmentIndex === 0 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
+                }`}
+              >
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white shrink-0 transition-all duration-200 ${
+                  activeSegmentIndex === 0
+                    ? "bg-transparent shadow-none"
+                    : "bg-gradient-to-br from-[#2ea1ff] to-[#0066cc] shadow-[0_1px_2px_rgba(0,102,204,0.1)]"
+                }`}>
+                  <FileText size={activeSegmentIndex === 0 ? 12 : 9} className="transition-all duration-200" />
+                </div>
+                <span className="truncate">Tất cả</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 0 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
+                  {totalCount}
+                </span>
+              </button>
 
+              {/* Tab 2: Nháp */}
+              <button
+                type="button"
+                onClick={() => setStatusFilter("draft")}
+                className={`w-1/6 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[12.5px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                  activeSegmentIndex === 1 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
+                }`}
+              >
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white shrink-0 transition-all duration-200 ${
+                  activeSegmentIndex === 1
+                    ? "bg-transparent shadow-none"
+                    : "bg-gradient-to-br from-slate-400 to-slate-600 shadow-[0_1px_2px_rgba(100,116,139,0.15)]"
+                }`}>
+                  <FileText size={activeSegmentIndex === 1 ? 12 : 9} className="transition-all duration-200" />
+                </div>
+                <span className="truncate">Nháp</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 1 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
+                  {draftCount}
+                </span>
+              </button>
 
-      {/* Filter Tabs & Table Workspace */}
-      <div className="space-y-4">
-        {/* Apple Segmented Control Filter Tabs */}
-        <div className="flex overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-none relative z-10">
-          <div className="flex bg-[#f5f5f7] p-[3px] rounded-full text-[12.5px] border border-[#e0e0e0] shadow-[inset_0_1px_1.5px_rgba(0,0,0,0.03)] gap-1 min-w-max select-none">
-            {["all", "draft", "viewed", "accepted", "rejected", "converted"].map((st) => {
-              const labelMap: Record<string, string> = {
-                all: "Tất cả",
-                draft: "Nháp / Chưa xem",
-                viewed: "Khách đã xem",
-                accepted: "Khách đồng ý",
-                rejected: "Khách từ chối",
-                converted: "Đã chuyển thành đơn hàng",
-              };
-              const isActive = statusFilter === st;
+              {/* Tab 3: Đã xem */}
+              <button
+                type="button"
+                onClick={() => setStatusFilter("viewed")}
+                className={`w-1/6 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[12.5px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                  activeSegmentIndex === 2 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
+                }`}
+              >
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white shrink-0 transition-all duration-200 ${
+                  activeSegmentIndex === 2
+                    ? "bg-transparent shadow-none"
+                    : "bg-gradient-to-br from-[#af52de] to-[#892ec0] shadow-[0_1px_2px_rgba(175,82,222,0.1)]"
+                }`}>
+                  <Eye size={activeSegmentIndex === 2 ? 12 : 9} className="transition-all duration-200" />
+                </div>
+                <span className="truncate">Đã xem</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 2 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
+                  {viewedCount}
+                </span>
+              </button>
 
-              return (
-                <button
-                  key={st}
-                  type="button"
-                  onClick={() => setStatusFilter(st)}
-                  className={`px-4.5 py-1.5 rounded-full transition-all duration-200 select-none cursor-pointer flex items-center justify-center active:scale-[0.98] ${
-                    isActive 
-                      ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-md shadow-[0_3px_8px_rgba(0,102,204,0.15)] border border-white/10 font-bold scale-[1.01]" 
-                      : "text-slate-600 hover:text-slate-900 font-semibold"
-                  }`}
-                >
-                  {labelMap[st]}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+              {/* Tab 4: Đồng ý */}
+              <button
+                type="button"
+                onClick={() => setStatusFilter("accepted")}
+                className={`w-1/6 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[12.5px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                  activeSegmentIndex === 3 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
+                }`}
+              >
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white shrink-0 transition-all duration-200 ${
+                  activeSegmentIndex === 3
+                    ? "bg-transparent shadow-none"
+                    : "bg-gradient-to-br from-[#34c759] to-[#28a745] shadow-[0_1px_2px_rgba(52,199,89,0.1)]"
+                }`}>
+                  <CheckCircle size={activeSegmentIndex === 3 ? 12 : 9} className="transition-all duration-200" />
+                </div>
+                <span className="truncate">Đồng ý</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 3 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
+                  {acceptedCount}
+                </span>
+              </button>
 
-        {/* Main List Table */}
-        <GlassCard className="p-0 overflow-hidden shadow-sm">
-          {isLoadingQuotations ? (
-            <div className="p-20 text-center flex flex-col items-center justify-center text-[#7a7a7a]">
-              <Loader2 className="animate-spin mb-3 text-[#0066cc]" size={26} />
-              <p className="text-[14px]">Đang kết nối cơ sở dữ liệu báo giá...</p>
+              {/* Tab 5: Từ chối */}
+              <button
+                type="button"
+                onClick={() => setStatusFilter("rejected")}
+                className={`w-1/6 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[12.5px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                  activeSegmentIndex === 4 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
+                }`}
+              >
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white shrink-0 transition-all duration-200 ${
+                  activeSegmentIndex === 4
+                    ? "bg-transparent shadow-none"
+                    : "bg-gradient-to-br from-[#ff2d55] to-[#d6001c] shadow-[0_1px_2px_rgba(255,45,85,0.15)]"
+                }`}>
+                  <XCircle size={activeSegmentIndex === 4 ? 12 : 9} className="transition-all duration-200" />
+                </div>
+                <span className="truncate">Từ chối</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 4 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
+                  {rejectedCount}
+                </span>
+              </button>
+
+              {/* Tab 6: Đã chuyển */}
+              <button
+                type="button"
+                onClick={() => setStatusFilter("converted")}
+                className={`w-1/6 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[12.5px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                  activeSegmentIndex === 5 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
+                }`}
+              >
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white shrink-0 transition-all duration-200 ${
+                  activeSegmentIndex === 5
+                    ? "bg-transparent shadow-none"
+                    : "bg-gradient-to-br from-amber-500 to-orange-600 shadow-[0_1px_2px_rgba(245,158,11,0.15)]"
+                }`}>
+                  <RefreshCw size={activeSegmentIndex === 5 ? 12 : 9} className="transition-all duration-200" />
+                </div>
+                <span className="truncate">Đã chuyển</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 5 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
+                  {convertedCount}
+                </span>
+              </button>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-[#e0e0e0] bg-[#f5f5f7]/50 text-[12px] font-semibold text-[#7a7a7a] uppercase tracking-wider">
-                    <th className="px-6 py-4 w-12 text-center whitespace-nowrap">STT</th>
-                    <th className="px-6 py-4 w-40 whitespace-nowrap">Mã Báo Giá</th>
-                    <th className="px-6 py-4 whitespace-nowrap">Khách Hàng</th>
-                    <th className="px-6 py-4 w-32 text-right whitespace-nowrap">Tổng Tiền</th>
-                    <th className="px-6 py-4 w-36 text-center whitespace-nowrap">Trạng Thái</th>
-                    <th className="px-6 py-4 w-28 text-center whitespace-nowrap">Lượt Xem</th>
-                    <th className="px-6 py-4 w-40 text-right whitespace-nowrap">Tác Vụ</th>
-                  </tr>
-                </thead>
-                <tbody className="text-[14px] text-[#1d1d1f]">
-                  {filteredQuotations?.map((q, index) => {
-                    const badge = QUOTATION_STATUS[q.status as keyof typeof QUOTATION_STATUS] || { label: q.status, color: "bg-slate-100 text-slate-700" };
-                    return (
-                      <tr key={q.id} className="border-b border-[#e0e0e0] last:border-0 hover:bg-[#f5f5f7]/40 transition-colors">
-                        <td className="px-6 py-5 text-center font-semibold text-[#7a7a7a] whitespace-nowrap">{index + 1}</td>
-                        <td className="px-6 py-5 whitespace-nowrap">
-                          <p className="font-semibold text-slate-800 tracking-tight leading-none mb-1">{q.quoteNumber}</p>
-                          <span className="text-[11px] font-bold text-slate-400 tracking-tight">{formatToDDMMYYYY(q.createdAt)}</span>
-                        </td>
-                        <td className="px-6 py-5 whitespace-nowrap">
-                          <p className="font-semibold">{q.customerName || "Khách lẻ vãng lai"}</p>
-                          <p className="text-[12px] text-[#7a7a7a] font-semibold mt-0.5">{q.customerPhone || "N/A"}</p>
-                        </td>
-                        <td className="px-6 py-5 text-right font-bold text-[#0066cc] whitespace-nowrap">
-                          {formatPrice(q.totalAmount)}
-                        </td>
-                        <td className="px-6 py-5 text-center whitespace-nowrap">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[12px] font-semibold border ${badge.color}`}>
-                            {badge.label}
+
+            {/* Search Input */}
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7a7a7a]" size={14} />
+              <input 
+                type="text" 
+                placeholder="Tìm số báo giá, khách hàng..." 
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-9 pr-4 h-[40px] rounded-full bg-[#f5f5f7] border border-[#e0e0e0] text-[13px] font-medium text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 transition-all placeholder:text-[#7a7a7a]/60"
+              />
+            </div>
+
+            {/* Reset Button */}
+            {(statusFilter !== "all" || search !== "") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setStatusFilter("all");
+                  setSearch("");
+                }}
+                className="h-[40px] w-[40px] bg-[#f5f5f7] hover:bg-[#e8e8ed] border border-[#e0e0e0] text-[#7a7a7a] hover:text-[#1d1d1f] rounded-full transition-all cursor-pointer flex items-center justify-center shrink-0 active:scale-95 duration-200"
+                title="Đặt lại bộ lọc"
+              >
+                <RefreshCw size={14} />
+              </button>
+            )}
+
+            {/* CTA Button */}
+            <button 
+              onClick={() => setIsQuotationOpen(true)}
+              className="flex items-center gap-1.5 px-5 h-[40px] bg-[#0066cc] text-white text-[13px] font-medium rounded-full hover:bg-[#0071e3] transition-all cursor-pointer shadow-sm active:scale-95 duration-200 shrink-0"
+            >
+              <Plus size={14} />
+              <span>Tạo Báo Giá</span>
+            </button>
+        </div>
+      </div>
+
+      {/* Main List Table */}
+      <GlassCard className="p-0 overflow-hidden shadow-sm">
+        {isLoadingQuotations ? (
+          <div className="p-20 text-center flex flex-col items-center justify-center text-[#7a7a7a]">
+            <Loader2 className="animate-spin mb-3 text-[#0066cc]" size={26} />
+            <p className="text-[14px]">Đang kết nối cơ sở dữ liệu báo giá...</p>
+          </div>
+        ) : filteredQuotations?.length === 0 ? (
+          <div className="p-20 flex flex-col items-center justify-center text-center">
+            <div className="w-12 h-12 bg-[#f5f5f7] rounded-full border border-[#e0e0e0] flex items-center justify-center mb-4 text-[#7a7a7a]/60">
+              <FileText size={18} />
+            </div>
+            <h3 className="text-[15px] font-semibold text-[#1d1d1f] mb-1">Không tìm thấy báo giá</h3>
+            <p className="text-[13px] text-[#7a7a7a]">
+              Không có dữ liệu báo giá nào khớp với bộ lọc hoặc tìm kiếm.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-[#e0e0e0] bg-[#f5f5f7]/50 text-[12px] font-semibold text-[#7a7a7a] uppercase tracking-wider">
+                  <th className="px-6 py-4 w-12 text-center whitespace-nowrap">STT</th>
+                  <th className="px-6 py-4 w-40 whitespace-nowrap">Mã Báo Giá</th>
+                  <th className="px-6 py-4 whitespace-nowrap">Khách Hàng</th>
+                  <th className="px-6 py-4 w-32 text-right whitespace-nowrap">Tổng Tiền</th>
+                  <th className="px-6 py-4 w-36 text-center whitespace-nowrap">Trạng Thái</th>
+                  <th className="px-6 py-4 w-28 text-center whitespace-nowrap">Lượt Xem</th>
+                  <th className="px-6 py-4 w-40 text-right whitespace-nowrap">Tác Vụ</th>
+                </tr>
+              </thead>
+              <tbody className="text-[14px] text-[#1d1d1f]">
+                {filteredQuotations?.map((q, index) => {
+                  const badge = QUOTATION_STATUS[q.status as keyof typeof QUOTATION_STATUS] || { label: q.status, color: "bg-slate-100 text-slate-700" };
+                  return (
+                    <tr key={q.id} className="border-b border-[#e0e0e0] last:border-0 hover:bg-[#f5f5f7]/40 transition-colors">
+                      <td className="px-6 py-5 text-center font-semibold text-[#7a7a7a] whitespace-nowrap">{index + 1}</td>
+                      <td className="px-6 py-5 whitespace-nowrap">
+                        <p className="font-semibold text-slate-800 tracking-tight leading-none mb-1">{q.quoteNumber}</p>
+                        <span className="text-[11px] font-bold text-slate-400 tracking-tight">{formatToDDMMYYYY(q.createdAt)}</span>
+                      </td>
+                      <td className="px-6 py-5 whitespace-nowrap">
+                        <p className="font-semibold">{q.customerName || "Khách lẻ vãng lai"}</p>
+                        <p className="text-[12px] text-[#7a7a7a] font-semibold mt-0.5">{q.customerPhone || "N/A"}</p>
+                      </td>
+                      <td className="px-6 py-5 text-right font-bold text-[#0066cc] whitespace-nowrap">
+                        {formatPrice(q.totalAmount)}
+                      </td>
+                      <td className="px-6 py-5 text-center whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[12px] font-semibold border ${badge.color}`}>
+                          {badge.label}
+                        </span>
+                      </td>
+                      <td className="px-6 py-5 text-center font-semibold text-[#515154] whitespace-nowrap">
+                        <div className="flex items-center justify-center gap-1">
+                          <Eye size={12} className="text-slate-400" />
+                          <span>{q.viewCount}</span>
+                        </div>
+                        {q.lastViewedAt && (
+                          <span className="text-[9px] block text-[#7a7a7a] mt-0.5 font-bold">
+                            {new Date(q.lastViewedAt).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' })}
                           </span>
-                        </td>
-                        <td className="px-6 py-5 text-center font-semibold text-[#515154] whitespace-nowrap">
-                          <div className="flex items-center justify-center gap-1">
-                            <Eye size={12} className="text-slate-400" />
-                            <span>{q.viewCount}</span>
-                          </div>
-                          {q.lastViewedAt && (
-                            <span className="text-[9px] block text-[#7a7a7a] mt-0.5 font-bold">
-                              {new Date(q.lastViewedAt).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-6 py-5 text-right whitespace-nowrap">
-                          <div className="flex items-center justify-end gap-1.5">
-                            {/* Copy Shareable Link */}
+                        )}
+                      </td>
+                      <td className="px-6 py-5 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {/* Copy Shareable Link */}
+                          <button
+                            type="button"
+                            onClick={() => handleCopyLink(q.shareToken)}
+                            className="w-8 h-8 rounded-lg bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#4b5563] hover:text-slate-900 flex items-center justify-center cursor-pointer border border-[#e0e0e0] transition-all active:scale-95 duration-150"
+                            title="Sao chép link gửi khách"
+                          >
+                            <Copy size={14} />
+                          </button>
+
+                          {/* Public Link Preview */}
+                          <a
+                            href={`/quotations/share/${q.shareToken}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="w-8 h-8 rounded-lg bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#0066cc] hover:text-[#0071e3] flex items-center justify-center cursor-pointer border border-[#e0e0e0] transition-all active:scale-95 duration-150"
+                            title="Xem trang báo giá điện tử"
+                          >
+                            <Eye size={14} />
+                          </a>
+
+                          {/* Convert to Order trigger */}
+                          {q.status !== "converted" ? (
                             <button
                               type="button"
-                              onClick={() => handleCopyLink(q.shareToken)}
-                              className="w-8 h-8 rounded-lg bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#4b5563] hover:text-slate-900 flex items-center justify-center cursor-pointer border border-[#e0e0e0] transition-all active:scale-95 duration-150"
-                              title="Sao chép link gửi khách"
+                              onClick={() => setSelectedConvertQuote(q)}
+                              className={`w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer border transition-all active:scale-95 duration-150 ${
+                                q.status === "accepted" 
+                                  ? "bg-emerald-50 hover:bg-emerald-100 text-emerald-600 hover:text-emerald-700 border-emerald-200/50" 
+                                  : "bg-blue-50 hover:bg-blue-100 text-[#0066cc] hover:text-[#0071e3] border-blue-200/30"
+                              }`}
+                              title="Tạo đơn hàng từ báo giá"
                             >
-                              <Copy size={14} />
+                              <ShoppingCart size={14} />
                             </button>
-
-                            {/* Public Link Preview */}
+                          ) : (
                             <a
-                              href={`/quotations/share/${q.shareToken}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="w-8 h-8 rounded-lg bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#0066cc] hover:text-[#0071e3] flex items-center justify-center cursor-pointer border border-[#e0e0e0] transition-all active:scale-95 duration-150"
-                              title="Xem trang báo giá điện tử"
+                              href={`/orders?search=${q.convertedOrderNumber || ""}`}
+                              className="px-2 h-8 rounded-lg text-[11px] font-bold text-slate-500 bg-[#f5f5f7] hover:bg-[#e8e8ed] hover:text-slate-800 border border-[#e0e0e0] transition-all duration-150 active:scale-95 flex items-center justify-center gap-1"
+                              title={`Xem đơn hàng ${q.convertedOrderNumber || ""}`}
                             >
-                              <Eye size={14} />
+                              <ShoppingCart size={11} className="text-slate-400" />
+                              <span>#{q.convertedOrderNumber?.split('-').pop() || ""}</span>
                             </a>
-
-                            {/* Convert to Order trigger */}
-                            {q.status !== "converted" ? (
-                              <button
-                                type="button"
-                                onClick={() => setSelectedConvertQuote(q)}
-                                className={`w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer border transition-all active:scale-95 duration-150 ${
-                                  q.status === "accepted" 
-                                    ? "bg-emerald-50 hover:bg-emerald-100 text-emerald-600 hover:text-emerald-700 border-emerald-200/50" 
-                                    : "bg-blue-50 hover:bg-blue-100 text-[#0066cc] hover:text-[#0071e3] border-blue-200/30"
-                                }`}
-                                title="Tạo đơn hàng từ báo giá"
-                              >
-                                <ShoppingCart size={14} />
-                              </button>
-                            ) : (
-                              <a
-                                href={`/orders?search=${q.convertedOrderNumber || ""}`}
-                                className="px-2 h-8 rounded-lg text-[11px] font-bold text-slate-500 bg-[#f5f5f7] hover:bg-[#e8e8ed] hover:text-slate-800 border border-[#e0e0e0] transition-all duration-150 active:scale-95 flex items-center justify-center gap-1"
-                                title={`Xem đơn hàng ${q.convertedOrderNumber || ""}`}
-                              >
-                                <ShoppingCart size={11} className="text-slate-400" />
-                                <span>#{q.convertedOrderNumber?.split('-').pop() || ""}</span>
-                              </a>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {filteredQuotations?.length === 0 && (
-                    <tr>
-                      <td colSpan={7} className="px-6 py-10 text-center text-[#7a7a7a]">Không tìm thấy dữ liệu báo giá nào phù hợp.</td>
+                          )}
+                        </div>
+                      </td>
                     </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </GlassCard>
-      </div>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </GlassCard>
 
       {/* MODAL 1: Quotation Creation Form */}
       <Dialog

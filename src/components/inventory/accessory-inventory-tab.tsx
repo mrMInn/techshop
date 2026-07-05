@@ -150,11 +150,114 @@ export function AccessoryInventoryTab() {
     setIsAttachOpen(true);
   };
 
+  // Determine active tab index for sliding indicator position and width in Segmented Control
+  const activeSegmentIndex = useMemo(() => {
+    if (selectedStatus === "all") return 0;
+    if (selectedStatus === "in_stock") return 1;
+    if (selectedStatus === "attached") return 2;
+    if (selectedStatus === "defective") return 3;
+    return 0;
+  }, [selectedStatus]);
+
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       
       {/* 1. Filter Bar - Unified style */}
       <div className="flex flex-wrap items-center gap-3 pb-6 border-b border-[#e0e0e0]">
+        
+        {/* Status Segmented Control (replaces Status Dropdown) */}
+        <div className="relative flex bg-[#f5f5f7] p-[3px] rounded-full border border-[#e0e0e0] h-[40px] w-full sm:w-[480px] shrink-0 select-none overflow-hidden">
+          {/* Sliding active indicator */}
+          <div 
+            className="absolute top-[3px] bottom-[3px] rounded-full bg-[#0066cc] shadow-[0_2px_4px_rgba(0,102,204,0.25)]"
+            style={{
+              width: "calc(25% - 6px)",
+              left: `calc(${activeSegmentIndex * 25}% + 3px)`,
+              transition: "left 280ms cubic-bezier(0.16, 1, 0.3, 1)"
+            }}
+          />
+
+          {/* Tab 1: Tất cả */}
+          <button
+            onClick={() => setSelectedStatus("all")}
+            className={`w-1/4 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+              activeSegmentIndex === 0 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
+            }`}
+          >
+            <div className={`w-5.5 h-5.5 rounded-full flex items-center justify-center text-white shrink-0 transition-all duration-200 ${
+              activeSegmentIndex === 0
+                ? "bg-transparent shadow-none"
+                : "bg-gradient-to-br from-[#2ea1ff] to-[#0066cc] shadow-[0_1px_2px_rgba(0,102,204,0.1)]"
+            }`}>
+              <SFSymbolShippingBox size={activeSegmentIndex === 0 ? 13 : 10} className="transition-all duration-200" />
+            </div>
+            <span className="truncate">Tất cả</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 0 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
+              {stats.total || 0}
+            </span>
+          </button>
+
+          {/* Tab 2: Sẵn kho */}
+          <button
+            onClick={() => setSelectedStatus("in_stock")}
+            className={`w-1/4 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+              activeSegmentIndex === 1 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
+            }`}
+          >
+            <div className={`w-5.5 h-5.5 rounded-full flex items-center justify-center text-white shrink-0 transition-all duration-200 ${
+              activeSegmentIndex === 1
+                ? "bg-transparent shadow-none"
+                : "bg-gradient-to-br from-[#34c759] to-[#28a745] shadow-[0_1px_2px_rgba(52,199,89,0.1)]"
+            }`}>
+              <SFSymbolCheckmarkCircle size={activeSegmentIndex === 1 ? 13 : 10} className="transition-all duration-200" />
+            </div>
+            <span className="truncate">Sẵn kho</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 1 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
+              {stats.available || 0}
+            </span>
+          </button>
+
+          {/* Tab 3: Đang gắn */}
+          <button
+            onClick={() => setSelectedStatus("attached")}
+            className={`w-1/4 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+              activeSegmentIndex === 2 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
+            }`}
+          >
+            <div className={`w-5.5 h-5.5 rounded-full flex items-center justify-center text-white shrink-0 transition-all duration-200 ${
+              activeSegmentIndex === 2
+                ? "bg-transparent shadow-none"
+                : "bg-gradient-to-br from-[#af52de] to-[#7a2bc2] shadow-[0_1px_2px_rgba(175,82,222,0.1)]"
+            }`}>
+              <SFSymbolWrench size={activeSegmentIndex === 2 ? 13 : 10} className="transition-all duration-200" />
+            </div>
+            <span className="truncate">Đang gắn</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 2 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
+              {stats.attached || 0}
+            </span>
+          </button>
+
+          {/* Tab 4: Hàng lỗi */}
+          <button
+            onClick={() => setSelectedStatus("defective")}
+            className={`w-1/4 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+              activeSegmentIndex === 3 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
+            }`}
+          >
+            <div className={`w-5.5 h-5.5 rounded-full flex items-center justify-center text-white shrink-0 transition-all duration-200 ${
+              activeSegmentIndex === 3
+                ? "bg-transparent shadow-none"
+                : "bg-gradient-to-br from-[#ff2d55] to-[#d6001c] shadow-[0_1px_2px_rgba(255,45,85,0.15)]"
+            }`}>
+              <SFSymbolExclamationTriangle size={activeSegmentIndex === 3 ? 13 : 10} className="transition-all duration-200" />
+            </div>
+            <span className="truncate">Hàng lỗi</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 3 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
+              {stats.defective || 0}
+            </span>
+          </button>
+        </div>
+
         {/* Search Input */}
         <div className="relative w-full sm:w-64 shrink-0">
           <SFSymbolMagnifyingGlass className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7a7a7a]" size={14} />
@@ -164,25 +267,6 @@ export function AccessoryInventoryTab() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-4 h-[40px] rounded-full bg-[#f5f5f7] border border-[#e0e0e0] text-[13px] font-medium text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 transition-all placeholder:text-[#7a7a7a]/60"
-          />
-        </div>
-
-        {/* Status Filter */}
-        <div className="w-full sm:w-48">
-          <CustomSelect
-            options={[
-              { value: "all", label: "Tất cả trạng thái" },
-              { value: "in_stock", label: "Sẵn có trong kho" },
-              { value: "attached", label: "Đang gắn kèm máy" },
-              { value: "defective", label: "Hàng bị lỗi" },
-              { value: "sold", label: "Đã bán / Quà tặng" },
-              { value: "returned", label: "Đã trả NCC" },
-            ]}
-            value={selectedStatus}
-            onChange={setSelectedStatus}
-            size="sm"
-            rounded="full"
-            dropdownWidth="full"
           />
         </div>
 
@@ -208,135 +292,6 @@ export function AccessoryInventoryTab() {
           <SFSymbolPlus size={13} />
           <span>Nhập kho phụ kiện</span>
         </button>
-      </div>
-
-      {/* 2. Stats Cards - Unified Premium Apple Shortcuts style */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Card 1: Tổng loại */}
-        <div 
-          onClick={() => setSelectedStatus("all")}
-          className={`group relative overflow-hidden rounded-[22px] p-5 h-[120px] flex flex-col justify-between transition-all duration-300 cursor-pointer select-none active:scale-[0.97] border border-white/10 ${
-            selectedStatus === "all"
-              ? "bg-gradient-to-br from-[#2ea1ff] to-[#0066cc] shadow-[0_10px_25px_rgba(0,102,204,0.3)] opacity-100 scale-100 ring-2 ring-[#0066cc]/40 ring-offset-2 ring-offset-white"
-              : "bg-gradient-to-br from-[#2ea1ff]/90 to-[#0066cc]/90 shadow-[0_4px_12px_rgba(0,0,0,0.05)] opacity-80 hover:opacity-100 hover:scale-[1.02] hover:shadow-[0_8px_20px_rgba(0,102,204,0.15)]"
-          }`}
-        >
-          <div className="relative z-20 flex justify-between items-start">
-            <span className="text-[12px] font-bold uppercase tracking-wider text-white/70">
-              Tổng loại phụ kiện
-            </span>
-            <div className="relative w-8 h-8 shrink-0">
-              <div className="absolute inset-0 rounded-[9px] bg-white/20 flex items-center justify-center text-white backdrop-blur-md border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] group-hover:opacity-0 group-hover:scale-75 transition-all duration-200">
-                <SFSymbolShippingBox size={16} />
-              </div>
-              <div className="absolute inset-0 rounded-[9px] bg-white/35 flex items-center justify-center text-white backdrop-blur-md border border-white/10 opacity-0 scale-75 group-hover:opacity-100 group-hover:scale-100 transition-all duration-200 shadow-sm">
-                <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-          <div className="relative z-20 text-[28px] font-black text-white tracking-tight leading-none tabular-nums mt-auto">
-            {summary.length || 0} loại
-          </div>
-          <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-        </div>
-
-        {/* Card 2: Sẵn hàng */}
-        <div 
-          onClick={() => setSelectedStatus("in_stock")}
-          className={`group relative overflow-hidden rounded-[22px] p-5 h-[120px] flex flex-col justify-between transition-all duration-300 cursor-pointer select-none active:scale-[0.97] border border-white/10 ${
-            selectedStatus === "in_stock"
-              ? "bg-gradient-to-br from-[#34c759] to-[#28a745] shadow-[0_10px_25px_rgba(52,199,89,0.3)] opacity-100 scale-100 ring-2 ring-[#34c759]/40 ring-offset-2 ring-offset-white"
-              : "bg-gradient-to-br from-[#34c759]/90 to-[#28a745]/90 shadow-[0_4px_12px_rgba(0,0,0,0.05)] opacity-80 hover:opacity-100 hover:scale-[1.02] hover:shadow-[0_8px_20px_rgba(52,199,89,0.15)]"
-          }`}
-        >
-          <div className="relative z-20 flex justify-between items-start">
-            <span className="text-[12px] font-bold uppercase tracking-wider text-white/70">
-              Sẵn có trong kho
-            </span>
-            <div className="relative w-8 h-8 shrink-0">
-              <div className="absolute inset-0 rounded-[9px] bg-white/20 flex items-center justify-center text-white backdrop-blur-md border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] group-hover:opacity-0 group-hover:scale-75 transition-all duration-200">
-                <SFSymbolCheckmarkCircle size={16} />
-              </div>
-              <div className="absolute inset-0 rounded-[9px] bg-white/35 flex items-center justify-center text-white backdrop-blur-md border border-white/10 opacity-0 scale-75 group-hover:opacity-100 group-hover:scale-100 transition-all duration-200 shadow-sm">
-                <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-          <div className="relative z-20 text-[28px] font-black text-white tracking-tight leading-none tabular-nums mt-auto">
-            {stats.available || 0} cái
-          </div>
-          <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-        </div>
-
-        {/* Card 3: Đang gắn máy */}
-        <div 
-          onClick={() => setSelectedStatus("attached")}
-          className={`group relative overflow-hidden rounded-[22px] p-5 h-[120px] flex flex-col justify-between transition-all duration-300 cursor-pointer select-none active:scale-[0.97] border border-white/10 ${
-            selectedStatus === "attached"
-              ? "bg-gradient-to-br from-[#af52de] to-[#7a2bc2] shadow-[0_10px_25px_rgba(175,82,222,0.3)] opacity-100 scale-100 ring-2 ring-[#af52de]/40 ring-offset-2 ring-offset-white"
-              : "bg-gradient-to-br from-[#af52de]/90 to-[#7a2bc2]/90 shadow-[0_4px_12px_rgba(0,0,0,0.05)] opacity-80 hover:opacity-100 hover:scale-[1.02] hover:shadow-[0_8px_20px_rgba(175,82,222,0.15)]"
-          }`}
-        >
-          <div className="relative z-20 flex justify-between items-start">
-            <span className="text-[12px] font-bold uppercase tracking-wider text-white/70">
-              Đang gắn kèm máy
-            </span>
-            <div className="relative w-8 h-8 shrink-0">
-              <div className="absolute inset-0 rounded-[9px] bg-white/20 flex items-center justify-center text-white backdrop-blur-md border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] group-hover:opacity-0 group-hover:scale-75 transition-all duration-200">
-                <SFSymbolWrench size={16} />
-              </div>
-              <div className="absolute inset-0 rounded-[9px] bg-white/35 flex items-center justify-center text-white backdrop-blur-md border border-white/10 opacity-0 scale-75 group-hover:opacity-100 group-hover:scale-100 transition-all duration-200 shadow-sm">
-                <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-          <div className="relative z-20 text-[28px] font-black text-white tracking-tight leading-none tabular-nums mt-auto">
-            {stats.attached || 0} cái
-          </div>
-          <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-        </div>
-
-        {/* Card 4: Hàng bị lỗi */}
-        <div 
-          onClick={() => setSelectedStatus("defective")}
-          className={`group relative overflow-hidden rounded-[22px] p-5 h-[120px] flex flex-col justify-between transition-all duration-300 cursor-pointer select-none active:scale-[0.97] border border-white/10 ${
-            selectedStatus === "defective"
-              ? "bg-gradient-to-br from-[#ff2d55] to-[#d6001c] shadow-[0_10px_25px_rgba(255,45,85,0.3)] opacity-100 scale-100 ring-2 ring-[#ff2d55]/40 ring-offset-2 ring-offset-white"
-              : "bg-gradient-to-br from-[#ff2d55]/90 to-[#d6001c]/90 shadow-[0_4px_12px_rgba(0,0,0,0.05)] opacity-80 hover:opacity-100 hover:scale-[1.02] hover:shadow-[0_8px_20px_rgba(255,45,85,0.15)]"
-          }`}
-        >
-          <div className="relative z-20 flex justify-between items-start">
-            <span className="text-[12px] font-bold uppercase tracking-wider text-white/70">
-              Hàng bị lỗi
-            </span>
-            <div className="relative w-8 h-8 shrink-0">
-              <div className="absolute inset-0 rounded-[9px] bg-white/20 flex items-center justify-center text-white backdrop-blur-md border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] group-hover:opacity-0 group-hover:scale-75 transition-all duration-200">
-                <SFSymbolExclamationTriangle size={16} />
-              </div>
-              <div className="absolute inset-0 rounded-[9px] bg-white/35 flex items-center justify-center text-white backdrop-blur-md border border-white/10 opacity-0 scale-75 group-hover:opacity-100 group-hover:scale-100 transition-all duration-200 shadow-sm">
-                <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-          <div className="relative z-20 text-[28px] font-black text-white tracking-tight leading-none tabular-nums mt-auto">
-            {stats.defective || 0} cái
-          </div>
-          <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-        </div>
-      </div>
-
-      {/* 3. Summary Header */}
-      <div className="flex items-center justify-between text-[13px] text-[#7a7a7a] font-medium px-1">
-        <div>Đang quản lý <span className="font-bold text-[#1d1d1f]">{summary.length}</span> danh mục phụ kiện khác nhau.</div>
-        <div>Tổng số lượng trong kho: <span className="font-bold text-[#0066cc]">{stats.total}</span> cái.</div>
       </div>
 
       {/* 4. Main Data Card - Uniform GlassCard Style */}
