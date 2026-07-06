@@ -5,9 +5,9 @@ import { getWarrantyClaims, createWarrantyClaim, deleteWarrantyClaim } from "@/a
 import { GlassCard } from "@/components/ui/glass-card";
 import { 
   Search, Plus, ShieldAlert, Wrench, PackageCheck, AlertCircle,
-  Eye, Pencil, Trash2
+  Eye, Pencil, Trash2, RefreshCw
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import { Dialog } from "@/components/ui/dialog";
 import { WarrantyForm } from "@/components/warranty/warranty-form";
@@ -41,6 +41,7 @@ const getStatusBadge = (status: string) => {
 export default function WarrantyPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState<string>("all");
   
   // Modals & States
   const [isWarrantyOpen, setIsWarrantyOpen] = useState(false);
@@ -95,11 +96,29 @@ export default function WarrantyPage() {
   };
 
   // Lọc dữ liệu
-  const filteredWarranties = warranties?.filter(w => 
-    w.claimNumber.toLowerCase().includes(search.toLowerCase()) ||
-    w.serialNumber.toLowerCase().includes(search.toLowerCase()) ||
-    (w.customerPhone || "").includes(search)
-  );
+  const filteredWarranties = warranties?.filter(w => {
+    const matchesSearch = 
+      w.claimNumber.toLowerCase().includes(search.toLowerCase()) ||
+      w.serialNumber.toLowerCase().includes(search.toLowerCase()) ||
+      (w.customerPhone || "").includes(search);
+      
+    if (!matchesSearch) return false;
+    
+    if (selectedStatus === "all") return true;
+    if (selectedStatus === "pending") return w.status === "pending";
+    if (selectedStatus === "processing") return w.status === "repairing" || w.status === "inspecting" || w.status === "waiting_parts";
+    if (selectedStatus === "completed") return w.status === "completed" || w.status === "replaced" || w.status === "rejected";
+    
+    return true;
+  });
+
+  const activeSegmentIndex = useMemo(() => {
+    if (selectedStatus === "all") return 0;
+    if (selectedStatus === "pending") return 1;
+    if (selectedStatus === "processing") return 2;
+    if (selectedStatus === "completed") return 3;
+    return 0;
+  }, [selectedStatus]);
 
   const formatToDDMMYYYY = (dateString: string | Date | null) => {
     if (!dateString) return "N/A";
@@ -120,109 +139,153 @@ export default function WarrantyPage() {
   const completedCount = warranties?.filter(w => w.status === 'completed' || w.status === 'replaced' || w.status === 'rejected').length || 0;
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
-      {/* Header */}
-      <div className="flex flex-wrap items-center gap-3 justify-start pb-6 border-b border-[#e0e0e0]">
-          <div className="relative w-full sm:w-60">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7a7a7a]" size={14} />
-            <input 
-              type="text" 
-              placeholder="Tìm mã phiếu, Serial, SĐT..." 
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 h-[40px] rounded-full bg-[#f5f5f7] border border-[#e0e0e0] text-[13px] font-medium text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 transition-all placeholder:text-[#7a7a7a]/60"
-            />
-          </div>
+    <div className="space-y-6 animate-in fade-in duration-300">
+      {/* Header - Apple premium single-row layout */}
+      <div className="pb-6 border-b border-[#e0e0e0]">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 w-full">
+          
+          {/* Left side: Status Segmented Control & Create Button on Tablet/Mobile */}
+          <div className="flex items-center justify-between gap-3 w-full lg:w-auto">
+            <div className="relative flex bg-[#f5f5f7] p-[3px] rounded-full border border-[#e0e0e0] h-[40px] w-full sm:w-[600px] shrink-0 select-none overflow-hidden">
+              {/* Sliding active indicator */}
+              <div 
+                className="absolute top-[3px] bottom-[3px] rounded-full bg-[#0066cc] shadow-[0_2px_4px_rgba(0,102,204,0.25)]"
+                style={{
+                  width: "calc(25% - 6px)",
+                  left: `calc(${activeSegmentIndex * 25}% + 3px)`,
+                  transition: "left 280ms cubic-bezier(0.16, 1, 0.3, 1)"
+                }}
+              />
 
-          <button 
-            onClick={() => setIsWarrantyOpen(true)}
-            className="flex items-center gap-1.5 px-5 h-[40px] bg-[#0066cc] text-white text-[13px] font-medium rounded-full hover:bg-[#0071e3] transition-all cursor-pointer shadow-sm active:scale-95 duration-200"
-          >
-            <Plus size={14} />
-            <span>Tạo Phiếu Bảo Hành</span>
-          </button>
-        </div>
+              {/* Tab 1: Tất cả */}
+              <button
+                onClick={() => setSelectedStatus("all")}
+                className={`w-1/4 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[12.5px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                  activeSegmentIndex === 0 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
+                }`}
+              >
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white shrink-0 transition-all duration-200 ${
+                  activeSegmentIndex === 0
+                    ? "bg-transparent shadow-none"
+                    : "bg-gradient-to-br from-[#2ea1ff] to-[#0066cc] shadow-[0_1px_2px_rgba(0,102,204,0.1)]"
+                }`}>
+                  <SFSymbolDocText size={activeSegmentIndex === 0 ? 12 : 9} className="transition-all duration-200" />
+                </div>
+                <span className="truncate">Tất cả</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 0 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
+                  {warranties?.length || 0}
+                </span>
+              </button>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Card 1: Tổng Phiếu */}
-        <div 
-          className="group relative overflow-hidden rounded-[22px] p-5 h-[120px] flex flex-col justify-between transition-all duration-300 select-none border border-white/10 bg-gradient-to-br from-[#2ea1ff] to-[#0066cc] shadow-[0_4px_12px_rgba(0,0,0,0.05)] hover:scale-[1.02] hover:shadow-[0_8px_20px_rgba(0,102,204,0.15)]"
-        >
-          {/* Top Row with Label and Icon */}
-          <div className="relative z-20 flex justify-between items-start">
-            <span className="text-[12px] font-bold uppercase tracking-wider text-white/70">
-              Tổng Phiếu
-            </span>
-            <div className="w-8 h-8 rounded-[9px] bg-white/20 flex items-center justify-center text-white backdrop-blur-md border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
-              <SFSymbolDocText size={16} />
+              {/* Tab 2: Tiếp nhận */}
+              <button
+                onClick={() => setSelectedStatus("pending")}
+                className={`w-1/4 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[12.5px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                  activeSegmentIndex === 1 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
+                }`}
+              >
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white shrink-0 transition-all duration-200 ${
+                  activeSegmentIndex === 1
+                    ? "bg-transparent shadow-none"
+                    : "bg-gradient-to-br from-[#af52de] to-[#892ec0] shadow-[0_1px_2px_rgba(175,82,222,0.1)]"
+                }`}>
+                  <SFSymbolShieldCheck size={activeSegmentIndex === 1 ? 12 : 9} className="transition-all duration-200" />
+                </div>
+                <span className="truncate">Tiếp nhận</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 1 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
+                  {pendingCount || 0}
+                </span>
+              </button>
+
+              {/* Tab 3: Đang xử lý */}
+              <button
+                onClick={() => setSelectedStatus("processing")}
+                className={`w-1/4 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[12.5px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                  activeSegmentIndex === 2 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
+                }`}
+              >
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white shrink-0 transition-all duration-200 ${
+                  activeSegmentIndex === 2
+                    ? "bg-transparent shadow-none"
+                    : "bg-gradient-to-br from-[#ff9f0a] to-[#ff7b00] shadow-[0_1px_2px_rgba(255,159,10,0.1)]"
+                }`}>
+                  <SFSymbolWrench size={activeSegmentIndex === 2 ? 12 : 9} className="transition-all duration-200" />
+                </div>
+                <span className="truncate">Đang xử lý</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 2 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
+                  {processingCount || 0}
+                </span>
+              </button>
+
+              {/* Tab 4: Hoàn tất */}
+              <button
+                onClick={() => setSelectedStatus("completed")}
+                className={`w-1/4 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[12.5px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                  activeSegmentIndex === 3 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
+                }`}
+              >
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white shrink-0 transition-all duration-200 ${
+                  activeSegmentIndex === 3
+                    ? "bg-transparent shadow-none"
+                    : "bg-gradient-to-br from-[#34c759] to-[#28a745] shadow-[0_1px_2px_rgba(52,199,89,0.1)]"
+                }`}>
+                  <SFSymbolCheckmarkCircle size={activeSegmentIndex === 3 ? 12 : 9} className="transition-all duration-200" />
+                </div>
+                <span className="truncate">Hoàn tất</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 3 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
+                  {completedCount || 0}
+                </span>
+              </button>
             </div>
-          </div>
-          {/* Bottom Value */}
-          <div className="relative z-20 text-[28px] font-black text-white tracking-tight leading-none tabular-nums mt-auto">
-            {warranties?.length || 0}
-          </div>
-          <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-        </div>
 
-        {/* Card 2: Đã Tiếp Nhận */}
-        <div 
-          className="group relative overflow-hidden rounded-[22px] p-5 h-[120px] flex flex-col justify-between transition-all duration-300 select-none border border-white/10 bg-gradient-to-br from-[#af52de] to-[#892ec0] shadow-[0_4px_12px_rgba(0,0,0,0.05)] hover:scale-[1.02] hover:shadow-[0_8px_20px_rgba(175,82,222,0.15)]"
-        >
-          {/* Top Row with Label and Icon */}
-          <div className="relative z-20 flex justify-between items-start">
-            <span className="text-[12px] font-bold uppercase tracking-wider text-white/70">
-              Đã Tiếp Nhận
-            </span>
-            <div className="w-8 h-8 rounded-[9px] bg-white/20 flex items-center justify-center text-white backdrop-blur-md border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
-              <SFSymbolShieldCheck size={16} />
-            </div>
+            {/* Create Button on Tablet/Mobile */}
+            <button 
+              onClick={() => setIsWarrantyOpen(true)}
+              className="flex lg:hidden items-center gap-1.5 px-5 h-[40px] bg-[#0066cc] text-white text-[13px] font-medium rounded-full hover:bg-[#0071e3] transition-all cursor-pointer shadow-sm active:scale-95 duration-200 shrink-0"
+            >
+              <Plus size={14} />
+              <span>Tạo phiếu</span>
+            </button>
           </div>
-          {/* Bottom Value */}
-          <div className="relative z-20 text-[28px] font-black text-white tracking-tight leading-none tabular-nums mt-auto">
-            {pendingCount}
-          </div>
-          <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-        </div>
 
-        {/* Card 3: Đang Xử Lý */}
-        <div 
-          className="group relative overflow-hidden rounded-[22px] p-5 h-[120px] flex flex-col justify-between transition-all duration-300 select-none border border-white/10 bg-gradient-to-br from-[#ff9f0a] to-[#ff7b00] shadow-[0_4px_12px_rgba(0,0,0,0.05)] hover:scale-[1.02] hover:shadow-[0_8px_20px_rgba(255,159,10,0.15)]"
-        >
-          {/* Top Row with Label and Icon */}
-          <div className="relative z-20 flex justify-between items-start">
-            <span className="text-[12px] font-bold uppercase tracking-wider text-white/70">
-              Đang Xử Lý
-            </span>
-            <div className="w-8 h-8 rounded-[9px] bg-white/20 flex items-center justify-center text-white backdrop-blur-md border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
-              <SFSymbolWrench size={16} />
+          {/* Right side: Search, Reset, and Create Button on Desktop */}
+          <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto lg:justify-end">
+            {/* Search Input */}
+            <div className="relative w-full sm:w-60">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7a7a7a]" size={14} />
+              <input 
+                type="text" 
+                placeholder="Tìm mã phiếu, Serial, SĐT..." 
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-9 pr-4 h-[40px] rounded-full bg-[#f5f5f7] border border-[#e0e0e0] text-[13px] font-medium text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 transition-all placeholder:text-[#7a7a7a]/60"
+              />
             </div>
-          </div>
-          {/* Bottom Value */}
-          <div className="relative z-20 text-[28px] font-black text-white tracking-tight leading-none tabular-nums mt-auto">
-            {processingCount}
-          </div>
-          <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-        </div>
 
-        {/* Card 4: Đã Hoàn Tất */}
-        <div 
-          className="group relative overflow-hidden rounded-[22px] p-5 h-[120px] flex flex-col justify-between transition-all duration-300 select-none border border-white/10 bg-gradient-to-br from-[#34c759] to-[#28a745] shadow-[0_4px_12px_rgba(0,0,0,0.05)] hover:scale-[1.02] hover:shadow-[0_8px_20px_rgba(52,199,89,0.15)]"
-        >
-          {/* Top Row with Label and Icon */}
-          <div className="relative z-20 flex justify-between items-start">
-            <span className="text-[12px] font-bold uppercase tracking-wider text-white/70">
-              Đã Hoàn Tất
-            </span>
-            <div className="w-8 h-8 rounded-[9px] bg-white/20 flex items-center justify-center text-white backdrop-blur-md border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
-              <SFSymbolCheckmarkCircle size={16} />
-            </div>
+            {/* Reset Button */}
+            {(selectedStatus !== "all" || search !== "") && (
+              <button
+                onClick={() => {
+                  setSelectedStatus("all");
+                  setSearch("");
+                }}
+                className="h-[40px] w-[40px] bg-[#f5f5f7] hover:bg-[#e8e8ed] border border-[#e0e0e0] text-[#7a7a7a] hover:text-[#1d1d1f] rounded-full transition-all cursor-pointer flex items-center justify-center shrink-0 active:scale-95 duration-200"
+                title="Đặt lại bộ lọc"
+              >
+                <RefreshCw size={14} />
+              </button>
+            )}
+
+            {/* Create Button on Desktop */}
+            <button 
+              onClick={() => setIsWarrantyOpen(true)}
+              className="hidden lg:flex items-center gap-1.5 px-5 h-[40px] bg-[#0066cc] text-white text-[13px] font-medium rounded-full hover:bg-[#0071e3] transition-all cursor-pointer shadow-sm active:scale-95 duration-200 shrink-0"
+            >
+              <Plus size={14} />
+              <span>Tạo Phiếu Bảo Hành</span>
+            </button>
           </div>
-          {/* Bottom Value */}
-          <div className="relative z-20 text-[28px] font-black text-white tracking-tight leading-none tabular-nums mt-auto">
-            {completedCount}
-          </div>
-          <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+
         </div>
       </div>
 

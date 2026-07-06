@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { CustomSelect } from "@/components/ui/custom-select";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getAccessoryCatalog, importAccessoryItems } from "@/app/actions/inventory";
 import { getSuppliersList } from "@/app/actions/suppliers";
@@ -49,6 +50,21 @@ export function AccessoryImportDialog({ isOpen, onClose }: AccessoryImportDialog
   const activeCatalog = catalogData?.catalog?.filter((c: any) => c.isActive) || [];
   const activeSuppliers = (suppliersData || []).filter((s: any) => s.isActive);
 
+  const catalogOptions = useMemo(() => {
+    return activeCatalog.map((c: any) => ({
+      value: c.id,
+      label: c.name,
+      subLabel: Number(c.defaultCost) > 0 ? `Giá gốc: ${Number(c.defaultCost).toLocaleString("vi-VN")}đ` : undefined,
+    }));
+  }, [activeCatalog]);
+
+  const supplierOptions = useMemo(() => {
+    return activeSuppliers.map((s: any) => ({
+      value: s.id,
+      label: s.name,
+    }));
+  }, [activeSuppliers]);
+
   // Auto-set unitCost when catalog selection changes
   useEffect(() => {
     if (catalogId) {
@@ -59,17 +75,7 @@ export function AccessoryImportDialog({ isOpen, onClose }: AccessoryImportDialog
     }
   }, [catalogId]);
 
-  // Auto-set supplierId when suppliers load
-  useEffect(() => {
-    if (activeSuppliers.length > 0 && !supplierId) {
-      const defaultSupplier = activeSuppliers.find((s: any) => s.name === "Nhập khẩu quốc tế");
-      if (defaultSupplier) {
-        setSupplierId(defaultSupplier.id);
-      } else {
-        setSupplierId(activeSuppliers[0].id);
-      }
-    }
-  }, [activeSuppliers, supplierId]);
+
 
   const importMutation = useMutation({
     mutationFn: importAccessoryItems,
@@ -93,7 +99,8 @@ export function AccessoryImportDialog({ isOpen, onClose }: AccessoryImportDialog
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!catalogId) return toast.error("Vui lòng chọn loại phụ kiện");
-    if (!supplierId) return toast.error("Vui lòng chọn nhà cung cấp");
+
+    const finalSupplierId = supplierId || null;
     
     const rawCost = parseCommaNumber(unitCost);
     const costNum = rawCost ? Number(rawCost) : 0;
@@ -112,7 +119,7 @@ export function AccessoryImportDialog({ isOpen, onClose }: AccessoryImportDialog
       catalogId,
       quantity: qtyNum,
       unitCost: rawCost || "0",
-      supplierId,
+      supplierId: finalSupplierId,
       serialNumbers: serials,
       notes,
     });
@@ -140,20 +147,19 @@ export function AccessoryImportDialog({ isOpen, onClose }: AccessoryImportDialog
                 Quản lý danh mục
               </button>
             </div>
-            <div className="flex gap-2 items-center">
-              <select
-                value={catalogId}
-                onChange={(e) => setCatalogId(e.target.value)}
-                className="flex-1 h-[40px] px-4 rounded-lg bg-[#f5f5f7] border border-[#e0e0e0] text-[15px] text-[#1d1d1f] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 transition-all cursor-pointer"
-                required
-              >
-                <option value="">-- Chọn phụ kiện --</option>
-                {activeCatalog.map((c: any) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} {Number(c.defaultCost) > 0 ? `(Gốc: ${Number(c.defaultCost).toLocaleString("vi-VN")}đ)` : ""}
-                  </option>
-                ))}
-              </select>
+            <div className="flex gap-2 items-center w-full">
+              <div className="flex-1">
+                <CustomSelect
+                  options={catalogOptions}
+                  value={catalogId}
+                  onChange={setCatalogId}
+                  placeholder="-- Chọn phụ kiện --"
+                  size="md"
+                  rounded="default"
+                  dropdownWidth="full"
+                  searchable={true}
+                />
+              </div>
               <button 
                 type="button" 
                 onClick={() => setIsCatalogOpen(true)}
@@ -190,21 +196,32 @@ export function AccessoryImportDialog({ isOpen, onClose }: AccessoryImportDialog
             </div>
           </div>
 
+          {(() => {
+            const parsedCost = unitCost ? Number(unitCost.replace(/,/g, "")) : 0;
+            const parsedQty = Number(quantity) || 0;
+            const calculatedTotal = parsedCost * parsedQty;
+            if (calculatedTotal <= 0) return null;
+            return (
+              <div className="text-[12.5px] px-3.5 py-2 bg-blue-50/30 border border-blue-100/50 rounded-xl flex justify-between items-center text-[#7a7a7a] font-medium animate-in fade-in duration-150 -mt-1">
+                <span>Tổng giá trị lô nhập (Số lượng × Đơn giá):</span>
+                <span className="font-bold text-[#0066cc] text-[13.5px]">
+                  {calculatedTotal.toLocaleString("vi-VN")}đ
+                </span>
+              </div>
+            );
+          })()}
+
           <div className="space-y-1">
-            <label className="block text-[13px] font-semibold text-[#1d1d1f]">Nhà cung cấp *</label>
-            <select
+            <label className="block text-[13px] font-semibold text-[#1d1d1f]">Nhà cung cấp <span className="text-[11px] text-slate-400 font-normal italic">(Không bắt buộc)</span></label>
+            <CustomSelect
+              options={supplierOptions}
               value={supplierId}
-              onChange={(e) => setSupplierId(e.target.value)}
-              className="w-full h-[40px] px-4 rounded-lg bg-[#f5f5f7] border border-[#e0e0e0] text-[15px] text-[#1d1d1f] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 transition-all cursor-pointer"
-              required
-            >
-              <option value="">-- Chọn nhà cung cấp --</option>
-              {activeSuppliers.map((s: any) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
+              onChange={setSupplierId}
+              placeholder="-- Không chọn --"
+              size="md"
+              rounded="default"
+              dropdownWidth="full"
+            />
           </div>
 
           <div className="space-y-1">

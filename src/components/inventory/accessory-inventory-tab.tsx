@@ -163,10 +163,10 @@ export function AccessoryInventoryTab() {
     <div className="space-y-6 animate-in fade-in duration-200">
       
       {/* 1. Filter Bar - Unified style */}
-      <div className="flex flex-wrap items-center gap-3 pb-6 border-b border-[#e0e0e0]">
+      <div className="flex flex-wrap items-center gap-3 pb-6 border-b border-[#e0e0e0] w-full">
         
         {/* Status Segmented Control (replaces Status Dropdown) */}
-        <div className="relative flex bg-[#f5f5f7] p-[3px] rounded-full border border-[#e0e0e0] h-[40px] w-full sm:w-[480px] shrink-0 select-none overflow-hidden">
+        <div className="relative flex bg-[#f5f5f7] p-[3px] rounded-full border border-[#e0e0e0] h-[40px] w-full sm:w-[540px] shrink-0 select-none overflow-hidden">
           {/* Sliding active indicator */}
           <div 
             className="absolute top-[3px] bottom-[3px] rounded-full bg-[#0066cc] shadow-[0_2px_4px_rgba(0,102,204,0.25)]"
@@ -258,15 +258,15 @@ export function AccessoryInventoryTab() {
           </button>
         </div>
 
-        {/* Search Input */}
-        <div className="relative w-full sm:w-64 shrink-0">
+        {/* Search Input - Spotlight dynamic layout */}
+        <div className="relative flex-1 min-w-[180px] max-w-[320px] transition-all duration-300">
           <SFSymbolMagnifyingGlass className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7a7a7a]" size={14} />
           <input 
             type="text" 
             placeholder="Tìm phụ kiện..." 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 h-[40px] rounded-full bg-[#f5f5f7] border border-[#e0e0e0] text-[13px] font-medium text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 transition-all placeholder:text-[#7a7a7a]/60"
+            className="w-full pl-9 pr-4 h-[40px] rounded-full bg-[#f5f5f7] border border-[#e0e0e0] text-[13px] font-medium text-[#1d1d1f] focus:bg-white focus:border-[#0066cc] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/20 transition-all placeholder:text-[#7a7a7a]/60 shadow-sm"
           />
         </div>
 
@@ -287,7 +287,7 @@ export function AccessoryInventoryTab() {
         {/* Nhập kho Button */}
         <button 
           onClick={() => setIsImportOpen(true)}
-          className="flex items-center gap-1.5 px-4 h-[40px] bg-[#0066cc] text-white text-[13px] font-semibold rounded-full hover:bg-[#0071e3] transition-all cursor-pointer shadow-sm active:scale-95 duration-200 shrink-0"
+          className="flex items-center gap-1.5 px-5 h-[40px] bg-[#0066cc] text-white text-[13px] font-semibold rounded-full hover:bg-[#0071e3] transition-all cursor-pointer shadow-sm active:scale-95 duration-200 shrink-0 sm:ml-auto"
         >
           <SFSymbolPlus size={13} />
           <span>Nhập kho phụ kiện</span>
@@ -418,11 +418,11 @@ export function AccessoryInventoryTab() {
           <div className="max-h-[60vh] overflow-y-auto pr-1 flex flex-col gap-4">
             {filteredDetails.map((item: any) => {
               const statusConfig: Record<string, { label: string; class: string }> = {
-                in_stock: { label: "Sẵn có", class: "bg-emerald-50 text-emerald-600 border border-emerald-200" },
-                attached: { label: "Đang gắn", class: "bg-blue-50 text-blue-600 border border-blue-200" },
-                sold: { label: "Đã bán/tặng", class: "bg-slate-100 text-slate-600 border border-slate-200" },
-                defective: { label: "Kho lỗi", class: "bg-red-50 text-red-600 border border-red-200" },
-                returned: { label: "Trả NCC", class: "bg-amber-50 text-amber-600 border border-amber-200" },
+                in_stock: { label: "Sẵn hàng", class: "bg-emerald-50 text-emerald-700 border border-emerald-200/50" },
+                attached: { label: "Đang gắn", class: "bg-blue-50 text-blue-700 border border-blue-200/50" },
+                sold: { label: "Đã bán", class: "bg-slate-50 text-slate-500 border-slate-200/50" },
+                defective: { label: "Lỗi", class: "bg-red-50 text-red-600 border-red-200/50" },
+                returned: { label: "Đã trả NCC", class: "bg-slate-50 text-slate-500 border-slate-200/50" },
               };
               const cfg = statusConfig[item.status] || { label: item.status, class: "bg-slate-100" };
 
@@ -432,7 +432,7 @@ export function AccessoryInventoryTab() {
                   className="p-4 bg-white/70 border border-[#e0e0e0] rounded-2xl flex flex-col gap-3 shadow-[0_2px_8px_rgba(0,0,0,0.02)]"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[13.5px] font-mono font-bold text-[#1d1d1f]">
+                    <span className="text-[13.5px] font-semibold text-[#1d1d1f]">
                       {item.serialNumber ? `S/N: ${item.serialNumber}` : "Không Serial"}
                     </span>
                     <span className={`px-2 py-0.5 text-[11px] font-bold rounded-full leading-none ${cfg.class}`}>
@@ -443,7 +443,7 @@ export function AccessoryInventoryTab() {
                   <div className="text-[13px] text-[#7a7a7a] flex flex-col gap-1 border-t border-slate-100 pt-2">
                     <div className="flex justify-between">
                       <span>Mã lô nhập:</span>
-                      <span className="font-mono text-slate-800">{item.batchCode?.slice(0, 16) || "N/A"}</span>
+                      <span className="font-semibold text-slate-800">{item.batchCode?.slice(0, 16) || "N/A"}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Giá vốn nhập:</span>
@@ -460,7 +460,7 @@ export function AccessoryInventoryTab() {
                       <div className="bg-blue-50/50 p-2.5 rounded-lg border border-blue-100/50 mt-1.5 flex flex-col gap-1 text-[12px]">
                         <span className="font-bold text-blue-800">Gắn vào thiết bị:</span>
                         <span className="text-blue-900 font-semibold">{item.productName}</span>
-                        <span className="font-mono text-blue-700">S/N máy: {item.machineSerialNumber}</span>
+                        <span className="font-semibold text-blue-700">S/N máy: {item.machineSerialNumber}</span>
                       </div>
                     )}
                   </div>

@@ -234,13 +234,15 @@ export function AccessoryCatalogDialog({ isOpen, onClose }: AccessoryCatalogDial
                     <button
                       type="button"
                       onClick={() => toggleMutation.mutate(item.id)}
-                      className={`px-3 py-1 text-[12px] font-semibold rounded-full transition active:scale-95 cursor-pointer ${
-                        item.isActive 
-                          ? "bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-100" 
-                          : "bg-slate-100 text-slate-500 hover:bg-slate-200 border border-slate-200"
-                      }`}
+                      className="flex items-center gap-2 cursor-pointer select-none active:scale-95 transition-all duration-200"
+                      title={item.isActive ? "Ngưng hoạt động" : "Hoạt động"}
                     >
-                      {item.isActive ? "Hoạt động" : "Ngưng"}
+                      <span className={`text-[12px] font-semibold transition-colors duration-200 ${item.isActive ? "text-[#34c759]" : "text-slate-400"}`}>
+                        {item.isActive ? "Hoạt động" : "Ngưng"}
+                      </span>
+                      <div className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${item.isActive ? "bg-[#34c759]" : "bg-[#e9e9ea]"}`}>
+                        <div className={`absolute top-[1.5px] w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${item.isActive ? "translate-x-[17px]" : "translate-x-[1.5px]"}`} />
+                      </div>
                     </button>
                   </div>
                 </div>

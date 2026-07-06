@@ -15,7 +15,10 @@ import {
   createIncomeCategory,
   updateIncomeCategory,
   deleteIncomeCategory,
-  getFinancialSummary
+  getFinancialSummary,
+  createExpense,
+  createExpenseCategory,
+  getWarrantyClaimsForSelect
 } from "@/app/actions/accounting";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useRealtimeSubscription } from "@/hooks/use-realtime";
@@ -49,7 +52,8 @@ import {
   Plus,
   Check,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  SlidersHorizontal
 } from "lucide-react";
 import { CustomSelect } from "@/components/ui/custom-select";
 import { CustomDatePicker } from "@/components/ui/custom-date-picker";
@@ -272,6 +276,20 @@ export default function CashBookPage() {
   const [incomeDate, setIncomeDate] = useState("2026-05-30");
   const [incomePaymentMethod, setIncomePaymentMethod] = useState<any>("cash");
 
+  // Create manual expense (phiếu chi) states
+  const [isCreateExpenseOpen, setIsCreateExpenseOpen] = useState(false);
+  const [expenseCategoryId, setExpenseCategoryId] = useState("");
+  const [expenseAmount, setExpenseAmount] = useState("");
+  const [expenseDescription, setExpenseDescription] = useState("");
+  const [expenseDate, setExpenseDate] = useState("2026-05-30");
+  const [expensePaymentMethod, setExpensePaymentMethod] = useState<any>("cash");
+
+  // Expense Category Management Dialog states
+  const [isExpenseCategoryDialogOpen, setIsExpenseCategoryDialogOpen] = useState(false);
+  const [newExpCatName, setNewExpCatName] = useState("");
+  const [newExpCatType, setNewExpCatType] = useState<"fixed" | "variable" | "one_time">("variable");
+  const [newExpCatDesc, setNewExpCatDesc] = useState("");
+
   // Income Category Management Dialog states
   const [isIncomeCategoryDialogOpen, setIsIncomeCategoryDialogOpen] = useState(false);
   const [newIncCatName, setNewIncCatName] = useState("");
@@ -362,6 +380,14 @@ export default function CashBookPage() {
     queryFn: getExpenseCategories,
   });
 
+  const manualExpenseOptions = useMemo(() => {
+    if (!categoriesData) return [];
+    return categoriesData.map((c) => ({
+      value: c.id,
+      label: c.name,
+    }));
+  }, [categoriesData]);
+
   const { data: expenseDetails, isLoading: isLoadingExpenseDetails } = useQuery({
     queryKey: ["expense_details", selectedEntry?.referenceId],
     queryFn: () => getExpenseById(selectedEntry.referenceId),
@@ -413,6 +439,83 @@ export default function CashBookPage() {
       }
     },
   });
+
+  const createExpenseMutation = useMutation({
+    mutationFn: createExpense,
+    onSuccess: (res) => {
+      if (res.success) {
+        toast.success(res.message);
+        queryClient.invalidateQueries({ queryKey: ["cashbook_entries"] });
+        queryClient.invalidateQueries({ queryKey: ["dashboard_bento_stats"] });
+        queryClient.invalidateQueries({ queryKey: ["financial_summary"] });
+        queryClient.invalidateQueries({ queryKey: ["expenses"] });
+        
+        // Reset form
+        setExpenseCategoryId("");
+        setExpenseAmount("");
+        setExpenseDescription("");
+        setExpenseDate("2026-05-30");
+        setExpensePaymentMethod("cash");
+        setIsCreateExpenseOpen(false);
+      } else {
+        toast.error(res.message);
+      }
+    },
+  });
+
+  const createExpenseCategoryMutation = useMutation({
+    mutationFn: createExpenseCategory,
+    onSuccess: (res) => {
+      if (res.success && res.category) {
+        toast.success(res.message);
+        queryClient.invalidateQueries({ queryKey: ["expense_categories"] });
+        setExpenseCategoryId(res.category.id);
+        setNewExpCatName("");
+        setNewExpCatDesc("");
+        setIsExpenseCategoryDialogOpen(false);
+      } else {
+        toast.error(res.message);
+      }
+    },
+  });
+
+  const handleCreateExpenseSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!expenseCategoryId) {
+      toast.error("Vui lòng chọn danh mục chi phí");
+      return;
+    }
+    const cleanAmount = parseInt(expenseAmount.replace(/\D/g, ""), 10);
+    if (isNaN(cleanAmount) || cleanAmount <= 0) {
+      toast.error("Vui lòng nhập số tiền chi hợp lệ");
+      return;
+    }
+    if (!expenseDate) {
+      toast.error("Vui lòng chọn ngày chi");
+      return;
+    }
+
+    createExpenseMutation.mutate({
+      categoryId: expenseCategoryId,
+      amount: cleanAmount.toString(),
+      description: expenseDescription,
+      expenseDate,
+      paymentMethod: expensePaymentMethod,
+    });
+  };
+
+  const handleCreateExpenseCategorySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newExpCatName.trim()) {
+      toast.error("Vui lòng nhập tên danh mục chi phí");
+      return;
+    }
+    createExpenseCategoryMutation.mutate({
+      name: newExpCatName.trim(),
+      type: newExpCatType,
+      description: newExpCatDesc.trim(),
+    });
+  };
 
   const createManualIncomeMutation = useMutation({
     mutationFn: createManualIncome,
@@ -644,7 +747,6 @@ export default function CashBookPage() {
     toast.success("Đã lọc theo khoảng thời gian nhanh");
   };
 
-
   const formatPrice = (price: string | number) => {
     return Math.round(Number(price || 0)).toLocaleString("vi-VN") + "đ";
   };
@@ -661,200 +763,171 @@ export default function CashBookPage() {
       className="space-y-6 font-sans relative z-10"
       style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}
     >
-      {/* 1. Executive Summary Financial Banner */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
+      {/* 1. Header Section - Apple premium single-row layout */}
+      <div className="pb-6 border-b border-[#e0e0e0]">
+        <div className="flex flex-wrap items-center gap-3 justify-start">
+          
+          {/* Status Segmented Control */}
+          <div className="relative flex bg-[#f5f5f7] p-[3px] rounded-full border border-[#e0e0e0] h-[40px] w-full sm:w-[680px] shrink-0 select-none overflow-hidden">
+            {/* Sliding active indicator */}
+            <div 
+              className="absolute top-[3px] bottom-[3px] rounded-full bg-[#0066cc] shadow-[0_2px_4px_rgba(0,102,204,0.25)]"
+              style={{
+                width: "calc(33.333% - 6px)",
+                left: `calc(${(type === "" ? 0 : type === "income" ? 1 : 2) * 33.333}% + 3px)`,
+                transition: "left 280ms cubic-bezier(0.16, 1, 0.3, 1)"
+              }}
+            />
 
-        {/* Card 1: Số dư quỹ (Lũy kế) */}
-        <div 
-          className="group relative overflow-hidden rounded-[22px] p-5 h-[120px] flex flex-col justify-between transition-all duration-300 select-none border border-white/10 bg-gradient-to-br from-[#007aff] to-[#0056b3] shadow-[0_4px_12px_rgba(0,0,0,0.05)] hover:scale-[1.02] hover:shadow-[0_8px_20px_rgba(0,122,255,0.15)]"
-        >
-          {/* Top Row with Label and Icon */}
-          <div className="relative z-20 flex justify-between items-start">
-            <span className="text-[12px] font-bold uppercase tracking-wider text-white/70">
-              Số dư quỹ (Lũy kế)
-            </span>
-            <div className="w-8 h-8 rounded-[9px] bg-white/20 flex items-center justify-center text-white backdrop-blur-md border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
-              <Wallet size={16} />
-            </div>
-          </div>
-          {/* Bottom Value */}
-          <div className="relative z-20 text-[28px] font-black text-white tracking-tight leading-none tabular-nums mt-auto">
-            {formatPrice(cumulativeBalance)}
-          </div>
-          <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-        </div>
-
-        {/* Card 2: Tổng thu trong kỳ */}
-        <div 
-          className="group relative overflow-hidden rounded-[22px] p-5 h-[120px] flex flex-col justify-between transition-all duration-300 select-none border border-white/10 bg-gradient-to-br from-[#34c759] to-[#28a745] shadow-[0_4px_12px_rgba(0,0,0,0.05)] hover:scale-[1.02] hover:shadow-[0_8px_20px_rgba(52,199,89,0.15)]"
-        >
-          {/* Top Row with Label and Icon */}
-          <div className="relative z-20 flex justify-between items-start">
-            <span className="text-[12px] font-bold uppercase tracking-wider text-white/70">
-              Tổng thu trong kỳ
-            </span>
-            <div className="w-8 h-8 rounded-[9px] bg-white/20 flex items-center justify-center text-white backdrop-blur-md border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
-              <SFSymbolArrowUpRight size={16} />
-            </div>
-          </div>
-          {/* Bottom Value */}
-          <div className="relative z-20 text-[28px] font-black text-white tracking-tight leading-none tabular-nums mt-auto">
-            {formatPrice(totals.income)}
-          </div>
-          <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-        </div>
-
-        {/* Card 3: Tổng chi trong kỳ */}
-        <div 
-          className="group relative overflow-hidden rounded-[22px] p-5 h-[120px] flex flex-col justify-between transition-all duration-300 select-none border border-white/10 bg-gradient-to-br from-[#ff2d55] to-[#d6001c] shadow-[0_4px_12px_rgba(0,0,0,0.05)] hover:scale-[1.02] hover:shadow-[0_8px_20px_rgba(255,45,85,0.15)]"
-        >
-          {/* Top Row with Label and Icon */}
-          <div className="relative z-20 flex justify-between items-start">
-            <span className="text-[12px] font-bold uppercase tracking-wider text-white/70">
-              Tổng chi trong kỳ
-            </span>
-            <div className="w-8 h-8 rounded-[9px] bg-white/20 flex items-center justify-center text-white backdrop-blur-md border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
-              <SFSymbolArrowDownRight size={16} />
-            </div>
-          </div>
-          {/* Bottom Value */}
-          <div className="relative z-20 text-[28px] font-black text-white tracking-tight leading-none tabular-nums mt-auto">
-            {formatPrice(totals.expense)}
-          </div>
-          <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-        </div>
-
-        {/* Card 4: Cán cân ngân quỹ */}
-        <KinhPanel className="p-5 h-[120px] flex flex-col justify-center">
-          {/* Outflow vs Inflow analytics */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Cán cân ngân quỹ</span>
-              <span className="text-[11px] font-bold text-slate-800 tabular-nums">
-                Tỷ lệ: {flowPercentages.income.toFixed(0)}% / {flowPercentages.expense.toFixed(0)}%
+            {/* Tab 1: Tất cả */}
+            <button
+              onClick={() => setType("")}
+              className={`w-1/3 h-full relative z-10 flex items-center justify-center gap-1.5 px-2 rounded-full text-[12.5px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                type === "" ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
+              }`}
+            >
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white shrink-0 transition-all duration-200 ${
+                type === ""
+                  ? "bg-transparent shadow-none"
+                  : "bg-gradient-to-br from-[#2ea1ff] to-[#0066cc] shadow-[0_1px_2px_rgba(0,102,204,0.1)]"
+              }`}>
+                <Wallet size={type === "" ? 12 : 9} className="transition-all duration-200" />
+              </div>
+              <span className="whitespace-nowrap">Tất cả</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${type === "" ? "bg-white text-[#0066cc] shadow-[0_1px_2px_rgba(0,0,0,0.08)]" : "bg-slate-200 text-slate-800 border border-slate-300/20"}`}>
+                {formatPrice(cumulativeBalance)}
               </span>
-            </div>
+            </button>
 
+            {/* Tab 2: Thu */}
+            <button
+              onClick={() => setType("income")}
+              className={`w-1/3 h-full relative z-10 flex items-center justify-center gap-1.5 px-2 rounded-full text-[12.5px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                type === "income" ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
+              }`}
+            >
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white shrink-0 transition-all duration-200 ${
+                type === "income"
+                  ? "bg-transparent shadow-none"
+                  : "bg-gradient-to-br from-[#34c759] to-[#28a745] shadow-[0_1px_2px_rgba(52,199,89,0.1)]"
+              }`}>
+                <SFSymbolArrowUpRight size={type === "income" ? 12 : 9} className="transition-all duration-200" />
+              </div>
+              <span className="whitespace-nowrap">Tổng thu</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${type === "income" ? "bg-white text-[#0066cc] shadow-[0_1px_2px_rgba(0,0,0,0.08)]" : "bg-slate-200 text-slate-800 border border-slate-300/20"}`}>
+                {formatPrice(totals.income)}
+              </span>
+            </button>
+
+            {/* Tab 3: Chi */}
+            <button
+              onClick={() => setType("expense")}
+              className={`w-1/3 h-full relative z-10 flex items-center justify-center gap-1.5 px-2 rounded-full text-[12.5px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                type === "expense" ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
+              }`}
+            >
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white shrink-0 transition-all duration-200 ${
+                type === "expense"
+                  ? "bg-transparent shadow-none"
+                  : "bg-gradient-to-br from-[#ff2d55] to-[#d6001c] shadow-[0_1px_2px_rgba(255,45,85,0.15)]"
+              }`}>
+                <SFSymbolArrowDownRight size={type === "expense" ? 12 : 9} className="transition-all duration-200" />
+              </div>
+              <span className="whitespace-nowrap">Tổng chi</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${type === "expense" ? "bg-white text-[#0066cc] shadow-[0_1px_2px_rgba(0,0,0,0.08)]" : "bg-slate-200 text-slate-800 border border-slate-300/20"}`}>
+                {formatPrice(totals.expense)}
+              </span>
+            </button>
+          </div>
+
+          {/* Cán cân ngân quỹ (Balance Meter) - Compact Apple style */}
+          <div className="flex items-center gap-2 bg-[#f5f5f7] px-4 py-2 rounded-full border border-[#e0e0e0] h-[40px] w-full sm:w-[350px] shrink-0 select-none">
+            <span className="text-[11.5px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Cán cân:</span>
             {/* Glowing HSL percentage bar meter */}
-            <div className="w-full h-3 rounded-full bg-slate-200/50 overflow-hidden flex border border-white/60 shadow-inner">
+            <div className="flex-1 h-2 rounded-full bg-slate-200/50 overflow-hidden flex border border-white/60 shadow-inner">
               <div 
                 style={{ width: `${flowPercentages.income}%` }} 
-                className="h-full bg-gradient-to-r from-[#007aff] to-[#0056b3] shadow-[0_0_10px_rgba(0,122,255,0.2)] transition-all duration-500" 
-                title="Tỷ lệ dòng tiền thu"
+                className="h-full bg-gradient-to-r from-[#007aff] to-[#0056b3] shadow-[0_0_6px_rgba(0,122,255,0.2)] transition-all duration-500" 
+                title={`Thu: ${flowPercentages.income.toFixed(0)}%`}
               />
               <div 
                 style={{ width: `${flowPercentages.expense}%` }} 
-                className="h-full bg-gradient-to-r from-[#ff9500] to-[#e68100] shadow-[0_0_10px_rgba(255,149,0,0.2)] transition-all duration-500" 
-                title="Tỷ lệ dòng tiền chi"
+                className="h-full bg-gradient-to-r from-[#ff9500] to-[#e68100] shadow-[0_0_6px_rgba(255,149,0,0.2)] transition-all duration-500" 
+                title={`Chi: ${flowPercentages.expense.toFixed(0)}%`}
               />
             </div>
-
-            {/* Legend indicators */}
-            <div className="flex items-center justify-between text-[10px] text-slate-400 font-semibold pt-0.5 select-none">
-              <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-[#007aff] inline-block"/> Thu</span>
-              <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-[#ff9500] inline-block"/> Chi</span>
+            {/* Legend-colored percentage numbers */}
+            <div className="flex items-center gap-1.5 text-[11px] font-bold select-none whitespace-nowrap leading-none">
+              <span className="flex items-center gap-1 text-[#007aff] tabular-nums">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#007aff]" />
+                Thu: {flowPercentages.income.toFixed(0)}%
+              </span>
+              <span className="text-slate-400 font-normal">/</span>
+              <span className="flex items-center gap-1 text-[#ff9500] tabular-nums">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#ff9500]" />
+                Chi: {flowPercentages.expense.toFixed(0)}%
+              </span>
             </div>
           </div>
-        </KinhPanel>
 
+        </div>
       </div>
 
       {/* 2. Structured Filters & Date Range Controls */}
       <KinhPanel className="p-4 shadow-sm relative z-20" overflowVisible={true}>
         <div className="flex flex-wrap xl:flex-nowrap items-center gap-2 w-full">
-          
-          {/* Inflow/Outflow Apple Pill Slider */}
-          <div className="flex bg-[#f5f5f7] p-[3px] rounded-full border border-[#e0e0e0] gap-1 shrink-0 select-none h-9 items-center">
-            <button
-              onClick={() => setType("")}
-              className={`px-2.5 h-full rounded-full text-[12px] transition-all duration-200 cursor-pointer flex items-center justify-center active:scale-[0.98] ${
-                type === "" 
-                  ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white font-bold shadow-md shadow-[0_3px_8px_rgba(0,102,204,0.2)] border border-white/10 scale-[1.01]" 
-                  : "text-slate-600 hover:text-slate-900 font-semibold"
-              }`}
-            >
-              Tất cả
-            </button>
-            <button
-              onClick={() => setType("income")}
-              className={`px-2.5 h-full rounded-full text-[12px] transition-all duration-200 cursor-pointer flex items-center justify-center active:scale-[0.98] ${
-                type === "income" 
-                  ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white font-bold shadow-md shadow-[0_3px_8px_rgba(0,102,204,0.2)] border border-white/10 scale-[1.01]" 
-                  : "text-slate-600 hover:text-slate-900 font-semibold"
-              }`}
-            >
-              Thu
-            </button>
-            <button
-              onClick={() => setType("expense")}
-              className={`px-2.5 h-full rounded-full text-[12px] transition-all duration-200 cursor-pointer flex items-center justify-center active:scale-[0.98] ${
-                type === "expense" 
-                  ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white font-bold shadow-md shadow-[0_3px_8px_rgba(0,102,204,0.2)] border border-white/10 scale-[1.01]" 
-                  : "text-slate-600 hover:text-slate-900 font-semibold"
-              }`}
-            >
-              Chi
-            </button>
-          </div>
 
-          {/* Category select dropdown */}
-          <div className="w-[220px] shrink-0">
+
+          {/* Category select dropdown styled as a Filter Button */}
+          <div className="w-[180px] shrink-0">
             <CustomSelect
               options={dynamicCategoryOptions}
               value={category}
               onChange={setCategory}
-              placeholder="Tất cả danh mục"
-              dropdownWidth="full"
+              placeholder="Danh mục"
+              dropdownWidth="wide"
               size="sm"
               rounded="full"
+              triggerIcon={<SlidersHorizontal size={13} className="text-slate-500" />}
             />
           </div>
 
-          {/* Timeframe Selector (Tuần / Tháng / Năm) */}
-          <div className="relative flex bg-white/40 border border-white/60 backdrop-blur-md p-[3px] rounded-full w-[135px] h-9 select-none z-10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)] shrink-0">
+          {/* Timeframe Selector (Tuần / Tháng / Năm) - Standard sliding Segmented Control */}
+          <div className="relative flex bg-[#f5f5f7] border border-[#e0e0e0] p-[3px] rounded-full w-[185px] h-9 select-none z-10 shrink-0 overflow-hidden">
             {/* Sliding Active Capsule Overlay */}
             <div
-              className={cn(
-                "absolute top-[3px] bottom-[3px] left-[3px] w-[calc((100%-6px)/3)] rounded-full bg-gradient-to-br from-[#2ea1ff] to-[#0066cc] shadow-md shadow-[0_3px_8px_rgba(0,102,204,0.15)] border border-white/10 transition-all duration-250 ease-[cubic-bezier(0.16,1,0.3,1)]",
-                activeTimeframe === "weekly" && "translate-x-0 opacity-100",
-                activeTimeframe === "monthly" && "translate-x-full opacity-100",
-                activeTimeframe === "yearly" && "translate-x-[200%] opacity-100",
-                (activeTimeframe === "custom" || activeTimeframe === "month-select") && "opacity-0 scale-95 pointer-events-none"
-              )}
+              className="absolute top-[3px] bottom-[3px] rounded-full bg-[#0066cc] shadow-[0_2px_4px_rgba(0,102,204,0.25)]"
+              style={{
+                width: "calc(33.333% - 6px)",
+                left: `calc(${(activeTimeframe === "weekly" ? 0 : activeTimeframe === "monthly" ? 1 : 2) * 33.333}% + 3px)`,
+                opacity: (activeTimeframe === "weekly" || activeTimeframe === "monthly" || activeTimeframe === "yearly") ? 1 : 0,
+                transition: "left 280ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms"
+              }}
             />
 
             <button
               onClick={() => setActiveTimeframe("weekly")}
-              className="relative z-10 flex-1 h-full text-[12px] transition-colors duration-200 cursor-pointer flex items-center justify-center rounded-full focus:outline-none active:scale-[0.98] group"
-            >
-              <span className={cn(
-                "transition-all duration-200",
+              className={`relative z-10 flex-1 h-full text-[12px] transition-colors duration-200 cursor-pointer flex items-center justify-center rounded-full focus:outline-none active:scale-[0.98] ${
                 activeTimeframe === "weekly" ? "text-white font-bold" : "text-slate-600 font-semibold hover:text-slate-900"
-              )}>
-                Tuần
-              </span>
+              }`}
+            >
+              Tuần
             </button>
             <button
               onClick={() => setActiveTimeframe("monthly")}
-              className="relative z-10 flex-1 h-full text-[12px] transition-colors duration-200 cursor-pointer flex items-center justify-center rounded-full focus:outline-none active:scale-[0.98] group"
-            >
-              <span className={cn(
-                "transition-all duration-200",
+              className={`relative z-10 flex-1 h-full text-[12px] transition-colors duration-200 cursor-pointer flex items-center justify-center rounded-full focus:outline-none active:scale-[0.98] ${
                 activeTimeframe === "monthly" ? "text-white font-bold" : "text-slate-600 font-semibold hover:text-slate-900"
-              )}>
-                Tháng
-              </span>
+              }`}
+            >
+              Tháng
             </button>
             <button
               onClick={() => setActiveTimeframe("yearly")}
-              className="relative z-10 flex-1 h-full text-[12px] transition-colors duration-200 cursor-pointer flex items-center justify-center rounded-full focus:outline-none active:scale-[0.98] group"
-            >
-              <span className={cn(
-                "transition-all duration-200",
+              className={`relative z-10 flex-1 h-full text-[12px] transition-colors duration-200 cursor-pointer flex items-center justify-center rounded-full focus:outline-none active:scale-[0.98] ${
                 activeTimeframe === "yearly" ? "text-white font-bold" : "text-slate-600 font-semibold hover:text-slate-900"
-              )}>
-                Năm
-              </span>
+              }`}
+            >
+              Năm
             </button>
           </div>
 
@@ -926,6 +999,17 @@ export default function CashBookPage() {
             >
               <ArrowUpRight size={13} className="stroke-[2.5]" />
               Tạo phiếu thu
+            </button>
+
+            <button
+              onClick={() => {
+                setExpenseDate(new Date().toISOString().split("T")[0]);
+                setIsCreateExpenseOpen(true);
+              }}
+              className="px-3.5 h-9 bg-[#ff2d55] hover:bg-[#d6001c] active:scale-[0.97] text-white text-[12px] font-bold rounded-full transition-all cursor-pointer flex items-center justify-center gap-1.5 select-none shadow-[0_2px_6px_rgba(255,45,85,0.15)] hover:shadow-[0_4px_12px_rgba(255,45,85,0.25)] border border-[#ff2d55]/10"
+            >
+              <ArrowDownRight size={13} className="stroke-[2.5]" />
+              Tạo phiếu chi
             </button>
 
             <button
@@ -1596,6 +1680,189 @@ export default function CashBookPage() {
           </div>
         </div>
       )}
+
+      {/* Elegant Add Manual Expense Dialog Modal */}
+      {isCreateExpenseOpen && (
+        <div className="fixed inset-0 bg-[#1d1d1f]/40 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in p-4">
+          <div className="bg-white rounded-2xl border border-[#e0e0e0] w-full max-w-lg shadow-2xl overflow-visible animate-scale-up">
+            {/* Dialog Header */}
+            <div className="px-6 py-4 bg-[#f5f5f7] border-b border-[#e0e0e0] flex items-center justify-between rounded-t-2xl">
+              <h3 className="text-[16px] font-bold text-[#1d1d1f]">Tạo Phiếu Chi Thủ Công</h3>
+              <button
+                type="button"
+                onClick={() => setIsCreateExpenseOpen(false)}
+                className="p-1 hover:bg-[#e0e0e0]/40 rounded-lg text-[#7a7a7a] hover:text-[#1d1d1f] transition-all cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Dialog Form Body */}
+            <form onSubmit={handleCreateExpenseSubmit} className="p-6 space-y-4">
+              {/* Category Select */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between pl-0.5">
+                  <label className="text-[11px] font-bold text-[#7a7a7a] uppercase">Danh mục chi phí *</label>
+                  <button
+                    type="button"
+                    onClick={() => setIsExpenseCategoryDialogOpen(true)}
+                    className="text-[11px] font-semibold text-[#0066cc] hover:underline hover:text-[#0071e3]"
+                  >
+                    + Quản lý danh mục
+                  </button>
+                </div>
+                <CustomSelect
+                  options={manualExpenseOptions}
+                  value={expenseCategoryId}
+                  onChange={setExpenseCategoryId}
+                  placeholder="Chọn danh mục chi..."
+                  dropdownWidth="full"
+                />
+              </div>
+
+              {/* Amount input formatted in VND */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-[#7a7a7a] uppercase pl-0.5">Số tiền chi (VND) *</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={formatVNDInput(expenseAmount)}
+                    onChange={(e) => {
+                      const rawValue = e.target.value.replace(/\D/g, "");
+                      setExpenseAmount(rawValue);
+                    }}
+                    placeholder="0"
+                    className="w-full pl-3 pr-12 py-2 rounded-xl bg-[#f5f5f7] border border-[#e0e0e0] text-[13px] font-semibold focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40"
+                    required
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] font-bold text-[#7a7a7a]">VNĐ</span>
+                </div>
+              </div>
+
+              {/* Expense Date & Payment Method */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5 relative">
+                  <label className="text-[11px] font-bold text-[#7a7a7a] uppercase pl-0.5">Ngày chi *</label>
+                  <CustomDatePicker
+                    value={expenseDate}
+                    onChange={setExpenseDate}
+                    placeholder="Chọn ngày chi..."
+                    anchorDate="2026-05-30"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-[#7a7a7a] uppercase pl-0.5">Thanh toán bằng *</label>
+                  <CustomSelect
+                    options={[
+                      { value: "cash", label: "Tiền mặt" },
+                      { value: "bank_transfer", label: "Chuyển khoản" },
+                      { value: "card", label: "Thẻ ngân hàng" },
+                    ]}
+                    value={expensePaymentMethod}
+                    onChange={setExpensePaymentMethod}
+                    dropdownWidth="full"
+                  />
+                </div>
+              </div>
+
+              {/* Description */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-[#7a7a7a] uppercase pl-0.5">Diễn giải nội dung *</label>
+                <textarea
+                  value={expenseDescription}
+                  onChange={(e) => setExpenseDescription(e.target.value)}
+                  placeholder="Diễn giải chi tiết nội dung chi tiền..."
+                  className="w-full px-3 py-2 rounded-xl bg-[#f5f5f7] border border-[#e0e0e0] text-[13px] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40"
+                  rows={3}
+                  required
+                />
+              </div>
+
+              {/* Action buttons */}
+              <div className="pt-2 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateExpenseOpen(false)}
+                  disabled={createExpenseMutation.isPending}
+                  className="px-5 h-[40px] bg-gray-50 hover:bg-gray-100 border border-[#e0e0e0] text-[#1d1d1f] rounded-full text-[13px] font-semibold transition-all disabled:opacity-50 cursor-pointer active:scale-95 duration-200"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={createExpenseMutation.isPending}
+                  className="px-6 h-[40px] bg-[#ff2d55] text-white hover:bg-[#d6001c] rounded-full text-[13px] font-semibold transition-all disabled:opacity-50 cursor-pointer active:scale-95 duration-200 shadow-sm"
+                >
+                  {createExpenseMutation.isPending ? "Đang ghi..." : "Ghi nhận"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Elegant Add Expense Category Dialog Modal */}
+      <Dialog
+        isOpen={isExpenseCategoryDialogOpen}
+        onClose={() => setIsExpenseCategoryDialogOpen(false)}
+        title="Thêm Danh Mục Chi Phí"
+        description="Tạo danh mục phân loại chi phí vận hành mới."
+        size="lg"
+      >
+        <form onSubmit={handleCreateExpenseCategorySubmit} className="space-y-4 pt-2">
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold text-[#7a7a7a] uppercase pl-0.5">Tên danh mục *</label>
+            <input
+              type="text"
+              value={newExpCatName}
+              onChange={(e) => setNewExpCatName(e.target.value)}
+              placeholder="Ví dụ: Chi phí đóng gói, Điện nước..."
+              className="w-full px-3 py-2 rounded-xl bg-[#f5f5f7] border border-[#e0e0e0] text-[13px] font-semibold focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40"
+              required
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold text-[#7a7a7a] uppercase pl-0.5">Loại chi phí *</label>
+            <CustomSelect
+              options={[
+                { value: "variable", label: "Biến động" },
+                { value: "fixed", label: "Cố định" },
+                { value: "one_time", label: "Phát sinh một lần" },
+              ]}
+              value={newExpCatType}
+              onChange={(val: any) => setNewExpCatType(val)}
+              dropdownWidth="full"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold text-[#7a7a7a] uppercase pl-0.5">Mô tả chi tiết</label>
+            <textarea
+              value={newExpCatDesc}
+              onChange={(e) => setNewExpCatDesc(e.target.value)}
+              placeholder="Mô tả chi tiết về mục đích sử dụng danh mục chi phí này..."
+              className="w-full px-3 py-2 rounded-xl bg-[#f5f5f7] border border-[#e0e0e0] text-[13px] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40"
+              rows={3}
+            />
+          </div>
+          <div className="pt-2 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => setIsExpenseCategoryDialogOpen(false)}
+              disabled={createExpenseCategoryMutation.isPending}
+              className="px-5 h-[40px] bg-gray-50 hover:bg-gray-100 border border-[#e0e0e0] text-[#1d1d1f] rounded-full text-[13px] font-semibold transition-all disabled:opacity-50 cursor-pointer active:scale-95 duration-200"
+            >
+              Hủy
+            </button>
+            <button
+              type="submit"
+              disabled={createExpenseCategoryMutation.isPending}
+              className="px-6 h-[40px] bg-[#ff2d55] text-white hover:bg-[#d6001c] rounded-full text-[13px] font-semibold transition-all disabled:opacity-50 cursor-pointer active:scale-95 duration-200 shadow-sm"
+            >
+              {createExpenseCategoryMutation.isPending ? "Đang tạo..." : "Thêm mới"}
+            </button>
+          </div>
+        </form>
+      </Dialog>
 
       {/* Elegant Income Category Management Dialog Modal */}
       <Dialog

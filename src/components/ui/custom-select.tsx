@@ -27,6 +27,7 @@ interface CustomSelectProps {
   size?: "sm" | "md";
   dropdownWidth?: "full" | "wide";
   rounded?: "full" | "default";
+  triggerIcon?: React.ReactNode;
 }
 
 export function CustomSelect({
@@ -42,6 +43,7 @@ export function CustomSelect({
   size = "md",
   dropdownWidth = "wide",
   rounded = "default",
+  triggerIcon,
 }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -131,7 +133,7 @@ export function CustomSelect({
         onClick={() => setIsOpen(!isOpen)}
         className={`w-full min-w-0 flex items-center justify-between transition-all select-none cursor-pointer focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed bg-[#f5f5f7] border text-[#1d1d1f] hover:bg-[#e8e8ed] disabled:hover:bg-[#f5f5f7] ${
           isSm
-            ? `min-h-[40px] py-1.5 px-4 ${rounded === "full" ? "rounded-full" : "rounded-xl"} text-[13px] font-medium`
+            ? `min-h-[36px] py-1 px-4 ${rounded === "full" ? "rounded-full" : "rounded-xl"} text-[13px] font-medium`
             : `min-h-[44px] py-1.5 px-4 ${rounded === "full" ? "rounded-full" : "rounded-lg"} text-[17px]`
         } ${
           isOpen
@@ -141,49 +143,52 @@ export function CustomSelect({
             : "border-[#e0e0e0]"
         }`}
       >
-        <span className={`truncate flex-1 pr-2 flex justify-between items-center ${!selectedOption ? "text-[#7a7a7a] font-normal" : "font-normal"}`}>
-          {selectedOption ? (
-            selectedOption.extraBadge ? (
-              <div className="flex items-center justify-between w-full min-w-0">
-                <span className={`truncate pr-2 font-medium ${isSm ? "text-[14px]" : "text-[15px]"}`}>
-                  {selectedOption.label} {selectedOption.subLabel ? `(${selectedOption.subLabel})` : ""}
-                </span>
-                <span className="font-mono text-[12px] text-[#7a7a7a] bg-[#e8e8ed] px-1.5 py-0.5 rounded border border-[#d1d1d6] shrink-0">
-                  {selectedOption.extraBadge}
-                </span>
-              </div>
-            ) : (() => {
-              const match = selectedOption.label.match(/^(.*)\s\(([^)]+)\)$/);
-              if (match) {
-                const [, name, phone] = match;
-                return (
-                  <span className="flex items-center gap-2 min-w-0">
-                    <span className="truncate">{name}</span>
-                    <span className="text-[11px] font-semibold text-[#7a7a7a] bg-[#f5f5f7] px-2 py-0.5 rounded-md border border-[#e0e0e0] shrink-0">
-                      {phone.replace(/\D/g, "").length === 10
-                        ? `${phone.slice(0, 4)} ${phone.slice(4, 7)} ${phone.slice(7)}`
-                        : phone}
-                    </span>
+        <span className={`truncate flex-1 pr-2 flex items-center gap-1.5 ${!selectedOption ? "text-[#7a7a7a] font-normal" : "font-normal"}`}>
+          {triggerIcon && <span className="shrink-0 text-slate-500 flex items-center justify-center">{triggerIcon}</span>}
+          <span className="truncate flex-1 text-left flex justify-between items-center">
+            {selectedOption ? (
+              selectedOption.extraBadge ? (
+                <div className="flex items-center justify-between w-full min-w-0">
+                  <span className={`truncate pr-2 font-medium ${isSm ? "text-[14px]" : "text-[15px]"}`}>
+                    {selectedOption.label} {selectedOption.subLabel ? `(${selectedOption.subLabel})` : ""}
                   </span>
-                );
-              }
-              if (selectedOption.subLabel) {
-                return (
-                  <span className="flex flex-col text-left min-w-0 py-0.5">
-                    <span className="truncate font-semibold text-[14px] leading-tight text-[#1d1d1f]">
-                      {selectedOption.label}
-                    </span>
-                    <span className="truncate text-[11px] text-[#7a7a7a] font-normal leading-normal mt-0.5">
-                      {selectedOption.subLabel}
-                    </span>
+                  <span className="font-mono text-[12px] text-[#7a7a7a] bg-[#e8e8ed] px-1.5 py-0.5 rounded border border-[#d1d1d6] shrink-0">
+                    {selectedOption.extraBadge}
                   </span>
-                );
-              }
-              return selectedOption.label;
-            })()
-          ) : (
-            placeholder
-          )}
+                </div>
+              ) : (() => {
+                const match = selectedOption.label.match(/^(.*)\s\(([^)]+)\)$/);
+                if (match) {
+                  const [, name, phone] = match;
+                  return (
+                    <span className="flex items-center gap-2 min-w-0">
+                      <span className="truncate">{name}</span>
+                      <span className="text-[11px] font-semibold text-[#7a7a7a] bg-[#f5f5f7] px-2 py-0.5 rounded-md border border-[#e0e0e0] shrink-0">
+                        {phone.replace(/\D/g, "").length === 10
+                          ? `${phone.slice(0, 4)} ${phone.slice(4, 7)} ${phone.slice(7)}`
+                          : phone}
+                      </span>
+                    </span>
+                  );
+                }
+                if (selectedOption.subLabel) {
+                  return (
+                    <span className="flex flex-col text-left min-w-0 py-0.5">
+                      <span className="truncate font-semibold text-[14px] leading-tight text-[#1d1d1f]">
+                        {selectedOption.label}
+                      </span>
+                      <span className="truncate text-[11px] text-[#7a7a7a] font-normal leading-normal mt-0.5">
+                        {selectedOption.subLabel}
+                      </span>
+                    </span>
+                  );
+                }
+                return selectedOption.label;
+              })()
+            ) : (
+              placeholder
+            )}
+          </span>
         </span>
         <ChevronDown
           size={isSm ? 16 : 18}

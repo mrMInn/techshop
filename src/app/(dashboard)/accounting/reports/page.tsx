@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getIncomeStatementReport, getCashFlowStatementReport } from "@/app/actions/reports";
 import { useState, useMemo, useRef, useEffect } from "react";
 import { toast } from "sonner";
+import * as XLSX from "xlsx";
 import { 
   Loader2, 
   Printer, 
@@ -110,43 +111,78 @@ export default function ReportsPage() {
     window.print();
   };
 
-  const handleExportCSV = () => {
+  const handleExportExcel = () => {
     toast.info("Đang xuất dữ liệu báo cáo...");
-    let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+    const wb = XLSX.utils.book_new();
     
     if (activeReportTab === "pl" && plData) {
-      csvContent += `BÁO CÁO KẾT QUẢ KINH DOANH (P&L)\r\nTừ ngày: ${startDate} - Đến ngày: ${endDate}\r\n\r\n`;
-      csvContent += "Chỉ tiêu,Số tiền\r\n";
-      csvContent += `1. Doanh thu bán bán lẻ đơn hàng,${Math.round(plData.salesRevenue)}\r\n`;
-      csvContent += `2. Doanh thu dịch vụ kỹ thuật & bảo hành,${Math.round(plData.warrantyIncome)}\r\n`;
-      csvContent += `3. Các khoản giảm trừ doanh thu (Đổi trả),${Math.round(plData.salesRefunds)}\r\n`;
-      csvContent += `Doanh thu thuần,${Math.round(plData.netRevenue)}\r\n`;
-      csvContent += `Giá vốn hàng bán (COGS),${Math.round(plData.costOfGoodsSold)}\r\n`;
-      csvContent += `Lợi nhuận gộp,${Math.round(plData.salesGrossMargin)}\r\n`;
-      csvContent += `Tổng chi phí vận hành,${Math.round(plData.totalOperatingExpenses)}\r\n`;
-      plData.expenseBreakdown.forEach((exp) => {
-        csvContent += ` - Chi phí ${exp.categoryName},${Math.round(exp.amount)}\r\n`;
+      const sheetData = [
+        ["BÁO CÁO KẾT QUẢ HOẠT ĐỘNG KINH DOANH (P&L)"],
+        [`Từ ngày: ${startDate} - Đến ngày: ${endDate}`],
+        [],
+        ["Chỉ tiêu", "Mã số", "Số tiền (VNĐ)"],
+        ["I. DOANH THU & KHOẢN GIẢM TRỪ", "", ""],
+        ["1. Doanh thu bán lẻ sản phẩm", "01", Math.round(plData.salesRevenue)],
+        ["2. Doanh thu dịch vụ sửa chữa & bảo hành", "02", Math.round(plData.warrantyIncome)],
+        ["3. Các khoản giảm trừ doanh thu (Đổi trả hoàn tiền)", "03", -Math.round(plData.salesRefunds)],
+        ["Doanh thu thuần trong kỳ (01 + 02 - 03)", "10", Math.round(plData.netRevenue)],
+        ["II. GIÁ VỐN HÀNG BÁN & LỢI NHUẬN GỘP", "", ""],
+        ["1. Trị giá gốc xuất kho (COGS)", "11", -Math.round(plData.costOfGoodsSold)],
+        ["Lợi nhuận gộp từ bán hàng & dịch vụ (10 - 11)", "20", Math.round(plData.salesGrossMargin)],
+        ["III. CHI PHÍ VẬN HÀNH DOANH NGHIỆP", "", ""],
+        ...plData.expenseBreakdown.map((exp, idx) => [
+          `Chi phí ${exp.categoryName}`,
+          `21.${idx + 1}`,
+          -Math.round(exp.amount)
+        ]),
+        ["Tổng chi phí hoạt động kinh doanh", "25", -Math.round(plData.totalOperatingExpenses)],
+        ["IV. LỢI NHUẬN RÒNG TRƯỚC THUẾ (20 - 25)", "30", Math.round(plData.netProfit)]
+      ];
+      
+      const ws = XLSX.utils.aoa_to_sheet(sheetData);
+      
+      // Auto-fit columns
+      const maxColWidth: number[] = [];
+      sheetData.forEach((row) => {
+        row.forEach((cell, i) => {
+          const cellLen = cell ? cell.toString().length : 10;
+          maxColWidth[i] = Math.max(maxColWidth[i] || 10, cellLen + 3);
+        });
       });
-      csvContent += `LỢI NHUẬN RÒNG TRƯỚC THUẾ,${Math.round(plData.netProfit)}\r\n`;
+      ws["!cols"] = maxColWidth.map(w => ({ wch: w }));
+      
+      XLSX.utils.book_append_sheet(wb, ws, "Báo cáo P&L");
     } else if (activeReportTab === "cashflow" && cashFlowData) {
-      csvContent += `BÁO CÁO LƯU CHUYỂN TIỀN TỆ (CASH FLOW)\r\nTừ ngày: ${startDate} - Đến ngày: ${endDate}\r\n\r\n`;
-      csvContent += "Chỉ tiêu,Số tiền\r\n";
-      csvContent += `Dòng tiền vào từ hoạt động kinh doanh,${Math.round(cashFlowData.operatingInflow)}\r\n`;
-      csvContent += `Dòng tiền ra từ hoạt động kinh doanh,${Math.round(cashFlowData.operatingOutflow)}\r\n`;
-      csvContent += `Dòng tiền thuần hoạt động kinh doanh,${Math.round(cashFlowData.netOperatingCashFlow)}\r\n`;
-      csvContent += `Dòng tiền ra hoạt động đầu tư (Mua sắm thiết bị),${Math.round(cashFlowData.investingOutflow)}\r\n`;
-      csvContent += `Dòng tiền thuần hoạt động đầu tư,${Math.round(cashFlowData.netInvestingCashFlow)}\r\n`;
-      csvContent += `LƯU CHUYỂN TIỀN THUẦN TRONG KỲ,${Math.round(cashFlowData.netCashFlow)}\r\n`;
+      const sheetData = [
+        ["BÁO CÁO LƯU CHUYỂN TIỀN TỆ TRỰC TIẾP (CASH FLOW)"],
+        [`Từ ngày: ${startDate} - Đến ngày: ${endDate}`],
+        [],
+        ["Chỉ tiêu", "Số tiền (VNĐ)"],
+        ["Dòng tiền vào từ hoạt động kinh doanh", Math.round(cashFlowData.operatingInflow)],
+        ["Dòng tiền ra từ hoạt động kinh doanh", -Math.round(cashFlowData.operatingOutflow)],
+        ["Dòng tiền thuần hoạt động kinh doanh", Math.round(cashFlowData.netOperatingCashFlow)],
+        ["Dòng tiền ra hoạt động đầu tư (Mua sắm thiết bị)", -Math.round(cashFlowData.investingOutflow)],
+        ["Dòng tiền thuần hoạt động đầu tư", Math.round(cashFlowData.netInvestingCashFlow)],
+        ["LƯU CHUYỂN TIỀN THUẦN TRONG KỲ", Math.round(cashFlowData.netCashFlow)]
+      ];
+      
+      const ws = XLSX.utils.aoa_to_sheet(sheetData);
+      
+      // Auto-fit columns
+      const maxColWidth: number[] = [];
+      sheetData.forEach((row) => {
+        row.forEach((cell, i) => {
+          const cellLen = cell ? cell.toString().length : 10;
+          maxColWidth[i] = Math.max(maxColWidth[i] || 10, cellLen + 3);
+        });
+      });
+      ws["!cols"] = maxColWidth.map(w => ({ wch: w }));
+      
+      XLSX.utils.book_append_sheet(wb, ws, "Lưu chuyển tiền tệ");
     }
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `BaoCaoTaiChinh_${activeReportTab}_${startDate}_${endDate}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success("Đã xuất báo cáo CSV thành công");
+    
+    XLSX.writeFile(wb, `BaoCaoTaiChinh_${activeReportTab}_${startDate}_${endDate}.xlsx`);
+    toast.success("Đã xuất báo cáo Excel (.xlsx) thành công");
   };
 
   const isDataLoading = activeReportTab === "pl" ? isLoadingPL : isLoadingCashFlow;
@@ -196,28 +232,33 @@ export default function ReportsPage() {
         }
       `}</style>
 
-      {/* Controller & Filter Bar - Apple Executive Style - Ultra Compact & Flat */}
-      <div className="bg-white rounded-3xl border border-slate-100 p-3 shadow-[0_8px_30px_rgba(0,0,0,0.04)] print:hidden overflow-visible">
-        <div className="flex flex-row flex-nowrap items-center justify-between gap-3 w-full min-w-[960px]">
+      {/* Controller & Filter Bar - Apple Executive Style - Unified & Flat */}
+      <div className="pb-6 border-b border-[#e0e0e0] print:hidden">
+        <div className="flex flex-wrap items-center gap-3 justify-start">
           
           {/* 1. Toggle Report Type Tabs (P&L vs Cash Flow) - Apple Segmented Control Style */}
-          <div className="flex bg-[#f5f5f7] p-[3px] rounded-full border border-[#e0e0e0] gap-1 select-none shrink-0 h-9 items-center">
+          <div className="relative flex bg-[#f5f5f7] p-[3px] rounded-full border border-[#e0e0e0] h-9 w-[290px] shrink-0 select-none overflow-hidden">
+            {/* Sliding active indicator */}
+            <div 
+              className="absolute top-[3px] bottom-[3px] rounded-full bg-[#0066cc] shadow-[0_2px_4px_rgba(0,102,204,0.25)]"
+              style={{
+                width: "calc(50% - 6px)",
+                left: `calc(${(activeReportTab === "pl" ? 0 : 1) * 50}% + 3px)`,
+                transition: "left 280ms cubic-bezier(0.16, 1, 0.3, 1)"
+              }}
+            />
             <button
               onClick={() => setActiveReportTab("pl")}
-              className={`flex items-center px-3.5 h-full rounded-full text-[12px] transition-all duration-200 select-none cursor-pointer active:scale-[0.98] justify-center ${
-                activeReportTab === "pl"
-                  ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white font-bold shadow-md shadow-[0_3px_8px_rgba(0,102,204,0.2)] border border-white/10 scale-[1.01]"
-                  : "text-slate-600 hover:text-slate-900 font-semibold"
+              className={`w-1/2 h-full relative z-10 flex items-center justify-center text-[12.5px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                activeReportTab === "pl" ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
               }`}
             >
               Báo cáo lãi lỗ
             </button>
             <button
               onClick={() => setActiveReportTab("cashflow")}
-              className={`flex items-center px-3.5 h-full rounded-full text-[12px] transition-all duration-200 select-none cursor-pointer active:scale-[0.98] justify-center ${
-                activeReportTab === "cashflow"
-                  ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white font-bold shadow-md shadow-[0_3px_8px_rgba(0,102,204,0.2)] border border-white/10 scale-[1.01]"
-                  : "text-slate-600 hover:text-slate-900 font-semibold"
+              className={`w-1/2 h-full relative z-10 flex items-center justify-center text-[12.5px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                activeReportTab === "cashflow" ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
               }`}
             >
               Báo cáo dòng tiền
@@ -225,7 +266,18 @@ export default function ReportsPage() {
           </div>
 
           {/* 2. Segmented Control style for Quick Period Filters */}
-          <div className="flex bg-[#f5f5f7] p-[3px] rounded-full border border-[#e0e0e0] gap-1 select-none shrink-0 h-9 items-center">
+          <div className="relative flex bg-[#f5f5f7] p-[3px] rounded-full border border-[#e0e0e0] h-9 w-full sm:w-[420px] shrink-0 select-none overflow-hidden">
+            {/* Sliding active indicator */}
+            {selectedPeriod !== null && (
+              <div 
+                className="absolute top-[3px] bottom-[3px] rounded-full bg-[#0066cc] shadow-[0_2px_4px_rgba(0,102,204,0.25)]"
+                style={{
+                  width: "calc(25% - 6px)",
+                  left: `calc(${((selectedPeriod === "this_month" ? 0 : selectedPeriod === "this_quarter" ? 1 : selectedPeriod === "this_year" ? 2 : 3)) * 25}% + 3px)`,
+                  transition: "left 280ms cubic-bezier(0.16, 1, 0.3, 1)"
+                }}
+              />
+            )}
             {(["this_month", "this_quarter", "this_year", "last_30"] as const).map((type) => {
               const labelMap: Record<string, string> = {
                 this_month: "Tháng này",
@@ -238,10 +290,8 @@ export default function ReportsPage() {
                 <button
                   key={type}
                   onClick={() => handleQuickFilter(type)}
-                  className={`flex items-center px-3 h-full rounded-full text-[12px] transition-all duration-200 select-none cursor-pointer active:scale-[0.98] justify-center ${
-                    active
-                      ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white font-bold shadow-md shadow-[0_3px_8px_rgba(0,102,204,0.2)] border border-white/10 scale-[1.01]"
-                      : "text-slate-600 hover:text-slate-900 font-semibold"
+                  className={`w-1/4 h-full relative z-10 flex items-center justify-center text-[12.5px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                    active ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
                   }`}
                 >
                   {labelMap[type]}
@@ -250,63 +300,58 @@ export default function ReportsPage() {
             })}
           </div>
 
-          {/* 3. Custom Date Pickers Range with Inline Labels */}
-          <div
-            className={cn(
-              "h-9 rounded-full px-2 text-[12px] font-semibold transition-all duration-200 flex items-center gap-1 cursor-pointer select-none border shrink-0 bg-white/60 border-slate-200/80 text-slate-700 hover:bg-white/80"
-            )}
-          >
-            <InlineDatePicker
-              label="Từ:"
-              value={startDate}
-              active={true}
-              onChange={(val) => {
-                setStartDate(val);
-                setSelectedPeriod(null);
-                if (endDate && val > endDate) {
-                  setEndDate(val);
-                }
-              }}
-            />
-            <InlineDatePicker
-              label="đến:"
-              value={endDate}
-              active={true}
-              onChange={(val) => {
+          {/* 3. Custom Date Pickers Range */}
+          <InlineDatePicker
+            label="Từ:"
+            value={startDate}
+            active={selectedPeriod === null}
+            onChange={(val) => {
+              setStartDate(val);
+              setSelectedPeriod(null);
+              if (endDate && val > endDate) {
                 setEndDate(val);
-                setSelectedPeriod(null);
-                if (startDate && val < startDate) {
-                  setStartDate(val);
-                }
-              }}
-              align="right"
-            />
-          </div>
+              }
+            }}
+          />
+          <span className="text-slate-300 font-semibold select-none">/</span>
+          <InlineDatePicker
+            label="Đến:"
+            value={endDate}
+            active={selectedPeriod === null}
+            onChange={(val) => {
+              setEndDate(val);
+              setSelectedPeriod(null);
+              if (startDate && val < startDate) {
+                setStartDate(val);
+              }
+            }}
+            align="right"
+          />
 
           {/* 4. Action Buttons */}
-          <div className="flex gap-1.5 h-9 items-center shrink-0">
+          <div className="flex gap-2 h-9 items-center shrink-0 sm:ml-auto">
             <button
               onClick={() => activeReportTab === "pl" ? refetchPL() : refetchCashFlow()}
-              className="flex items-center justify-center w-9 h-9 bg-[#f5f5f7] border border-[#e0e0e0] hover:bg-[#e8e8ed] text-slate-600 hover:text-slate-900 rounded-full transition-all cursor-pointer shadow-sm active:scale-[0.95]"
+              className="flex items-center justify-center h-9 w-9 bg-[#f5f5f7] border border-[#e0e0e0] hover:bg-[#e8e8ed] text-[#7a7a7a] hover:text-[#1d1d1f] rounded-full transition-all cursor-pointer shadow-sm active:scale-[0.95]"
               title="Cập nhật dữ liệu"
             >
-              <RefreshCcw size={13.5} className={isRefreshing ? "animate-spin text-[#0066cc]" : ""} />
+              <RefreshCcw size={14} className={isRefreshing ? "animate-spin text-[#0066cc]" : ""} />
             </button>
             <button
               onClick={handlePrint}
               disabled={isDataLoading}
-              className="flex items-center justify-center w-9 h-9 bg-[#f5f5f7] border border-[#e0e0e0] hover:bg-[#e8e8ed] text-slate-600 hover:text-slate-900 rounded-full transition-all cursor-pointer shadow-sm active:scale-[0.95] disabled:opacity-50"
+              className="flex items-center justify-center h-9 w-9 bg-[#f5f5f7] border border-[#e0e0e0] hover:bg-[#e8e8ed] text-[#7a7a7a] hover:text-[#1d1d1f] rounded-full transition-all cursor-pointer shadow-sm active:scale-[0.95] disabled:opacity-50"
               title="In báo cáo tài chính"
             >
-              <Printer size={13.5} />
+              <Printer size={14} />
             </button>
             <button
-              onClick={handleExportCSV}
+              onClick={handleExportExcel}
               disabled={isDataLoading}
-              className="flex items-center justify-center w-9 h-9 bg-[#f5f5f7] border border-[#e0e0e0] hover:bg-[#e8e8ed] text-slate-600 hover:text-slate-900 rounded-full transition-all cursor-pointer shadow-sm active:scale-[0.95] disabled:opacity-50"
-              title="Xuất Excel/CSV"
+              className="flex items-center justify-center h-9 w-9 bg-[#f5f5f7] border border-[#e0e0e0] hover:bg-[#e8e8ed] text-[#7a7a7a] hover:text-[#1d1d1f] rounded-full transition-all cursor-pointer shadow-sm active:scale-[0.95] disabled:opacity-50"
+              title="Xuất báo cáo Excel"
             >
-              <Download size={13.5} />
+              <Download size={14} />
             </button>
           </div>
 
@@ -719,8 +764,7 @@ function InlineDatePicker({
   ];
 
   return (
-    <div ref={containerRef} className="relative flex items-center gap-1.5 select-none text-slate-700">
-      <span className="opacity-80">{label}</span>
+    <div ref={containerRef} className="relative select-none shrink-0">
       <button
         type="button"
         onClick={(e) => {
@@ -728,13 +772,14 @@ function InlineDatePicker({
           setIsOpen(!isOpen);
         }}
         className={cn(
-          "h-6 rounded-[8px] border px-1.5 text-[11.5px] font-bold focus:outline-none transition-all min-w-[70px] text-center cursor-pointer",
+          "h-9 rounded-full border px-4 text-[12.5px] font-bold focus:outline-none transition-all flex items-center gap-2 cursor-pointer bg-[#f5f5f7] border-[#e0e0e0] text-[#1d1d1f] hover:bg-[#e8e8ed] active:scale-98 duration-200 shadow-[0_1px_2px_rgba(0,0,0,0.02)]",
           active
             ? "bg-blue-500/10 border-blue-500/30 text-[#0066cc] hover:bg-blue-500/15"
-            : "bg-white/60 border-slate-200/80 text-slate-700 hover:bg-white/80"
+            : ""
         )}
       >
-        {displayValue}
+        <span className="text-slate-400 font-medium">{label}</span>
+        <span className="tabular-nums">{displayValue}</span>
       </button>
 
       {isOpen && (

@@ -495,12 +495,102 @@ export default function ExpensesPage() {
       {/* Header - Flat Clean Apple Style */}
     
  
-      {/* 2. Structured Filters & Date Range Controls */}
-      <KinhPanel className="p-4 shadow-sm relative z-20" overflowVisible={true}>
-        <div className="flex flex-wrap xl:flex-nowrap items-center gap-2 w-full">
+      {/* Header - Apple Premium Single-Row Layout */}
+      <div className="pb-6 border-b border-[#e0e0e0] print:hidden">
+        <div className="flex flex-wrap items-center gap-3 justify-start">
           
-          {/* Category select dropdown */}
-          <div className="w-[220px] shrink-0">
+          {/* Timeframe Selector (Tuần / Tháng / Năm / Tùy chọn / Chọn tháng) - Apple Segmented Control Style */}
+          <div className="relative flex bg-[#f5f5f7] p-[3px] rounded-full border border-[#e0e0e0] h-[40px] w-full sm:w-[460px] shrink-0 select-none overflow-hidden">
+            {/* Sliding Active Capsule Overlay */}
+            <div
+              className="absolute top-[3px] bottom-[3px] rounded-full bg-[#0066cc] shadow-[0_2px_4px_rgba(0,102,204,0.25)]"
+              style={{
+                width: "calc(20% - 6px)",
+                left: `calc(${
+                  (activeTimeframe === "weekly"
+                    ? 0
+                    : activeTimeframe === "monthly"
+                    ? 1
+                    : activeTimeframe === "yearly"
+                    ? 2
+                    : activeTimeframe === "custom"
+                    ? 3
+                    : 4) * 20
+                }% + 3px)`,
+                transition: "left 280ms cubic-bezier(0.16, 1, 0.3, 1)"
+              }}
+            />
+
+            {(["weekly", "monthly", "yearly", "custom", "month-select"] as const).map((type) => {
+              const labelMap: Record<string, string> = {
+                weekly: "Tuần",
+                monthly: "Tháng",
+                yearly: "Năm",
+                custom: "Tùy chọn",
+                "month-select": "Chọn tháng",
+              };
+              const active = activeTimeframe === type;
+              return (
+                <button
+                  key={type}
+                  onClick={() => setActiveTimeframe(type)}
+                  className={`w-1/5 h-full relative z-10 flex items-center justify-center text-[12.5px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                    active ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
+                  }`}
+                >
+                  {labelMap[type]}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Custom Date Pickers Range */}
+          {activeTimeframe === "custom" && (
+            <>
+              <InlineDatePicker
+                label="Từ:"
+                value={customStartDate}
+                active={true}
+                onChange={(val) => {
+                  setCustomStartDate(val);
+                  setActiveTimeframe("custom");
+                  if (customEndDate && val > customEndDate) {
+                    setCustomEndDate(val);
+                  }
+                }}
+              />
+              <span className="text-slate-300 font-semibold select-none">/</span>
+              <InlineDatePicker
+                label="Đến:"
+                value={customEndDate}
+                active={true}
+                onChange={(val) => {
+                  setCustomEndDate(val);
+                  setActiveTimeframe("custom");
+                  if (customStartDate && val < customStartDate) {
+                    setCustomStartDate(val);
+                  }
+                }}
+                align="right"
+              />
+            </>
+          )}
+
+          {/* Specific Month Selector */}
+          {activeTimeframe === "month-select" && (
+            <InlineMonthPicker
+              label="Chọn tháng:"
+              value={selectedSpecificMonth}
+              active={true}
+              onChange={(val) => {
+                setSelectedSpecificMonth(val);
+                setActiveTimeframe("month-select");
+              }}
+            />
+          )}
+
+          {/* Category select dropdown - Pushed to right */}
+          <div className="w-[220px] shrink-0 sm:ml-auto">
             <CustomSelect
               options={categoryFilterOptions}
               value={selectedCategory}
@@ -512,135 +602,19 @@ export default function ExpensesPage() {
             />
           </div>
 
-          {/* Timeframe Selector (Tuần / Tháng / Năm) */}
-          <div className="relative flex bg-white/40 border border-white/60 backdrop-blur-md p-[3px] rounded-full w-[135px] h-9 select-none z-10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)] shrink-0">
-            {/* Sliding Active Capsule Overlay */}
-            <div
-              className={cn(
-                "absolute top-[3px] bottom-[3px] left-[3px] w-[calc((100%-6px)/3)] rounded-full bg-gradient-to-br from-[#2ea1ff] to-[#0066cc] shadow-md shadow-[0_3px_8px_rgba(0,102,204,0.15)] border border-white/10 transition-all duration-250 ease-[cubic-bezier(0.16,1,0.3,1)]",
-                activeTimeframe === "weekly" && "translate-x-0 opacity-100",
-                activeTimeframe === "monthly" && "translate-x-full opacity-100",
-                activeTimeframe === "yearly" && "translate-x-[200%] opacity-100",
-                (activeTimeframe === "custom" || activeTimeframe === "month-select") && "opacity-0 scale-95 pointer-events-none"
-              )}
-            />
-
-            <button
-              onClick={() => setActiveTimeframe("weekly")}
-              className="relative z-10 flex-1 h-full text-[12px] transition-colors duration-200 cursor-pointer flex items-center justify-center rounded-full focus:outline-none active:scale-[0.98] group"
-            >
-              <span className={cn(
-                "transition-all duration-200",
-                activeTimeframe === "weekly" ? "text-white font-bold" : "text-slate-600 font-semibold hover:text-slate-900"
-              )}>
-                Tuần
-              </span>
-            </button>
-            <button
-              onClick={() => setActiveTimeframe("monthly")}
-              className="relative z-10 flex-1 h-full text-[12px] transition-colors duration-200 cursor-pointer flex items-center justify-center rounded-full focus:outline-none active:scale-[0.98] group"
-            >
-              <span className={cn(
-                "transition-all duration-200",
-                activeTimeframe === "monthly" ? "text-white font-bold" : "text-slate-600 font-semibold hover:text-slate-900"
-              )}>
-                Tháng
-              </span>
-            </button>
-            <button
-              onClick={() => setActiveTimeframe("yearly")}
-              className="relative z-10 flex-1 h-full text-[12px] transition-colors duration-200 cursor-pointer flex items-center justify-center rounded-full focus:outline-none active:scale-[0.98] group"
-            >
-              <span className={cn(
-                "transition-all duration-200",
-                activeTimeframe === "yearly" ? "text-white font-bold" : "text-slate-600 font-semibold hover:text-slate-900"
-              )}>
-                Năm
-              </span>
-            </button>
-          </div>
-
-          {/* From Date to Date Picker Inline */}
-          <div
-            onClick={() => setActiveTimeframe("custom")}
-            className={cn(
-              "h-9 rounded-full px-2 text-[12px] font-semibold transition-all duration-200 flex items-center gap-1 cursor-pointer select-none border shrink-0",
-              activeTimeframe === "custom"
-                ? "bg-white border-slate-200 shadow-[0_1px_2px_rgba(0,0,0,0.02)] text-slate-800"
-                : "bg-white/60 border-white/80 text-slate-700 hover:bg-white/85"
-            )}
-          >
-            <InlineDatePicker
-              label="Từ:"
-              value={customStartDate}
-              active={activeTimeframe === "custom"}
-              onChange={(val) => {
-                setCustomStartDate(val);
-                setActiveTimeframe("custom");
-                if (customEndDate && val > customEndDate) {
-                  setCustomEndDate(val);
-                }
-              }}
-            />
-            <InlineDatePicker
-              label="đến:"
-              value={customEndDate}
-              active={activeTimeframe === "custom"}
-              onChange={(val) => {
-                setCustomEndDate(val);
-                setActiveTimeframe("custom");
-                if (customStartDate && val < customStartDate) {
-                  setCustomStartDate(val);
-                }
-              }}
-            />
-          </div>
-
-          {/* Specific Month Selector Inline */}
-          <div
-            onClick={() => setActiveTimeframe("month-select")}
-            className={cn(
-              "h-9 rounded-full px-2 text-[12px] font-semibold transition-all duration-200 flex items-center gap-1 cursor-pointer select-none border shrink-0",
-              activeTimeframe === "month-select"
-                ? "bg-white border-slate-200 shadow-[0_1px_2px_rgba(0,0,0,0.02)] text-slate-800"
-                : "bg-white/60 border-white/80 text-slate-700 hover:bg-white/85"
-            )}
-          >
-            <InlineMonthPicker
-              label="Chọn tháng:"
-              value={selectedSpecificMonth}
-              active={activeTimeframe === "month-select"}
-              onChange={(val) => {
-                setSelectedSpecificMonth(val);
-                setActiveTimeframe("month-select");
-              }}
-            />
-          </div>
-
           {/* Action & Refresh Group */}
-          <div className="flex items-center gap-2 sm:ml-auto shrink-0">
-            <button
-              onClick={() => {
-                setExpenseDate(new Date().toISOString().split("T")[0]);
-                setIsDialogOpen(true);
-              }}
-              className="px-3 h-9 bg-[#0066cc] hover:bg-[#0055b3] active:scale-[0.97] text-white text-[11.5px] font-bold rounded-full transition-all cursor-pointer flex items-center justify-center gap-1 select-none shadow-[0_2px_6px_rgba(0,102,204,0.15)] hover:shadow-[0_4px_12px_rgba(0,102,204,0.25)] border border-[#0066cc]/10"
-            >
-              <Plus size={13} className="stroke-[2.5]" />
-              Ghi nhận khoản chi
-            </button>
-
+          <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => refetch()}
-              className="w-9 h-9 bg-[#f5f5f7] hover:bg-[#e8e8ed] text-slate-600 hover:text-slate-900 rounded-full transition-all border border-[#e0e0e0] cursor-pointer flex items-center justify-center shadow-sm active:scale-[0.95]"
+              className="w-10 h-10 bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#7a7a7a] hover:text-[#1d1d1f] rounded-full transition-all border border-[#e0e0e0] cursor-pointer flex items-center justify-center shadow-sm active:scale-[0.95]"
               title="Làm mới chi phí"
             >
-              <RefreshCw size={13} className={isFetching ? "animate-spin text-[#0066cc]" : ""} />
+              <RefreshCw size={14} className={isFetching ? "animate-spin text-[#0066cc]" : ""} />
             </button>
           </div>
 
         </div>
-      </KinhPanel>
+      </div>
  
       {/* Dual-Pane Workspace Layout */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
@@ -1578,7 +1552,6 @@ function InlineDatePicker({
     onChange(`${y}-${m}-${d}`);
     setIsOpen(false);
   };
-
   const MONTHS_VN = [
     "Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", 
     "Tháng 5", "Tháng 6", "Tháng 7", "Tháng 8", 
@@ -1586,8 +1559,7 @@ function InlineDatePicker({
   ];
 
   return (
-    <div ref={containerRef} className="relative flex items-center gap-1.5 select-none text-slate-700">
-      <span className="opacity-80">{label}</span>
+    <div ref={containerRef} className="relative select-none shrink-0">
       <button
         type="button"
         onClick={(e) => {
@@ -1595,15 +1567,15 @@ function InlineDatePicker({
           setIsOpen(!isOpen);
         }}
         className={cn(
-          "h-6 rounded-[8px] border px-1.5 text-[11.5px] font-bold focus:outline-none transition-all min-w-[70px] text-center cursor-pointer",
+          "h-[40px] rounded-full border px-4 text-[12.5px] font-bold focus:outline-none transition-all flex items-center gap-2 cursor-pointer bg-[#f5f5f7] border-[#e0e0e0] text-[#1d1d1f] hover:bg-[#e8e8ed] active:scale-98 duration-200 shadow-[0_1px_2px_rgba(0,0,0,0.02)]",
           active
             ? "bg-blue-500/10 border-blue-500/30 text-[#0066cc] hover:bg-blue-500/15"
-            : "bg-white/60 border-slate-200/80 text-slate-700 hover:bg-white/80"
+            : ""
         )}
       >
-        {displayValue}
+        <span className="text-slate-400 font-medium">{label}</span>
+        <span className="tabular-nums">{displayValue}</span>
       </button>
-
       {isOpen && (
         <div 
           onClick={(e) => e.stopPropagation()}
@@ -1751,8 +1723,7 @@ function InlineMonthPicker({
   const MONTHS_VN = ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10", "T11", "T12"];
 
   return (
-    <div ref={containerRef} className="relative flex items-center gap-1.5 select-none text-slate-700">
-      <span className="opacity-80">{label}</span>
+    <div ref={containerRef} className="relative select-none shrink-0">
       <button
         type="button"
         onClick={(e) => {
@@ -1760,13 +1731,14 @@ function InlineMonthPicker({
           setIsOpen(!isOpen);
         }}
         className={cn(
-          "h-6 rounded-[8px] border px-1.5 text-[11.5px] font-bold focus:outline-none transition-all min-w-[76px] text-center cursor-pointer",
+          "h-[40px] rounded-full border px-4 text-[12.5px] font-bold focus:outline-none transition-all flex items-center gap-2 cursor-pointer bg-[#f5f5f7] border-[#e0e0e0] text-[#1d1d1f] hover:bg-[#e8e8ed] active:scale-98 duration-200 shadow-[0_1px_2px_rgba(0,0,0,0.02)]",
           active
             ? "bg-blue-500/10 border-blue-500/30 text-[#0066cc] hover:bg-blue-500/15"
-            : "bg-white/60 border-slate-200/80 text-slate-700 hover:bg-white/80"
+            : ""
         )}
       >
-        {displayValue || "Chọn..."}
+        <span className="text-slate-400 font-medium">{label}</span>
+        <span className="tabular-nums">{displayValue || "Chọn..."}</span>
       </button>
 
       {isOpen && (

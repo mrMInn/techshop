@@ -18,7 +18,8 @@ import {
   products,
   accountingPeriods,
   quotations,
-  purchaseOrders
+  purchaseOrders,
+  accessoryItems
 } from "@/lib/db/schema";
 import { eq, desc, and, sql, or, like, gte } from "drizzle-orm";
 import { sendTelegramNotification } from "@/lib/telegram/notifier";
@@ -361,6 +362,58 @@ export async function syncHistoricalData() {
       });
 
       needRecalc = true;
+    }
+
+    // E. Quét các lô nhập phụ kiện trực tiếp (không qua PO/nhà cung cấp) chưa có sổ quỹ
+    const accessoryBatches = await db
+      .select({
+        batchCode: accessoryItems.batchCode,
+        createdAt: sql<string>`min(cast(${accessoryItems.createdAt} as text))`,
+        totalCost: sql<string>`sum(${accessoryItems.unitCost})`,
+        notes: sql<string>`min(${accessoryItems.notes})`,
+      })
+      .from(accessoryItems)
+      .where(sql`${accessoryItems.purchaseOrderId} IS NULL`)
+      .groupBy(accessoryItems.batchCode);
+
+    for (const batch of accessoryBatches) {
+      if (!batch.batchCode) continue;
+      const totalCostNum = Number(batch.totalCost || 0);
+      if (totalCostNum <= 0) continue;
+
+      // Kiểm tra xem đã có dòng chi tương ứng cho lô này chưa
+      const existingEntry = await db
+        .select()
+        .from(cashBookEntries)
+        .where(
+          and(
+            eq(cashBookEntries.type, "expense"),
+            sql`${cashBookEntries.description} LIKE ${`%${batch.batchCode}%`}`
+          )
+        )
+        .limit(1);
+
+      if (existingEntry.length === 0) {
+        const dateStr = new Date(batch.createdAt).toISOString().slice(0, 10).replace(/-/g, "");
+        const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+        const entryNumber = `CB${dateStr}-${randomSuffix}`;
+
+        await db.insert(cashBookEntries).values({
+          entryNumber,
+          type: "expense",
+          category: "purchase",
+          amount: totalCostNum.toFixed(2),
+          runningBalance: "0",
+          paymentMethod: "bank_transfer",
+          referenceType: null,
+          referenceId: null,
+          description: `[Đồng bộ] Chi tiền nhập kho phụ kiện trực tiếp (Lô ${batch.batchCode})`,
+          entryDate: new Date(batch.createdAt).toISOString().split("T")[0],
+          createdBy: null,
+        });
+
+        needRecalc = true;
+      }
     }
 
     // Nếu có dữ liệu mới phát sinh, thực hiện tính toán lại số dư lũy kế

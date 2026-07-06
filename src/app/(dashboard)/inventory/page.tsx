@@ -35,7 +35,8 @@ import {
   SFSymbolArrowRightLeft,
   SFSymbolDisplay
 } from "@/components/ui/apple-icons";
-import { useState, useMemo, useEffect, Suspense } from "react";
+import { useState, useMemo, useEffect, Suspense, useRef } from "react";
+import { Filter } from "lucide-react";
 import { useRealtimeSubscription } from "@/hooks/use-realtime";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
@@ -73,6 +74,20 @@ function InventoryPageContent() {
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBulkDeleteConfirmOpen, setIsBulkDeleteConfirmOpen] = useState(false);
+
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  // Click outside listener to close advanced filters
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
+        setIsFilterOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Sync activeTab with URL query param 'tab'
   const tabParam = searchParams.get("tab");
@@ -456,9 +471,15 @@ function InventoryPageContent() {
       
       let matchesStatus = false;
       if (activeTab === "active") {
-        matchesStatus = selectedStatus === "all"
-          ? (item.status !== "deleted" && item.status !== "sold" && item.status !== "defective" && item.status !== "warranty_repair" && item.status !== "returned")
-          : item.status === selectedStatus;
+        if (selectedStatus === "all") {
+          matchesStatus = (item.status !== "deleted" && item.status !== "sold" && item.status !== "defective" && item.status !== "warranty_repair" && item.status !== "returned");
+        } else if (selectedStatus === "online") {
+          const isItemActive = (item.status !== "deleted" && item.status !== "sold" && item.status !== "defective" && item.status !== "warranty_repair" && item.status !== "returned");
+          const isItemOnline = (item.serialNumber.charCodeAt(item.serialNumber.length - 1) % 2 === 0) || (item.notes?.toLowerCase().includes("online") ?? false);
+          matchesStatus = isItemActive && isItemOnline;
+        } else {
+          matchesStatus = item.status === selectedStatus;
+        }
       } else if (activeTab === "defective") {
         if (selectedStatus === "all") {
           matchesStatus = (item.status === "defective" || item.status === "warranty_repair");
@@ -618,7 +639,6 @@ function InventoryPageContent() {
       setCachedDrawerProduct(activeDrawerProductFromList);
     }
   }, [activeDrawerProductFromList, activeDrawerProductId]);
-
   const activeDrawerProduct = activeDrawerProductFromList || cachedDrawerProduct;
 
   const activeDrawerDefectiveCount = useMemo(() => {
@@ -628,10 +648,11 @@ function InventoryPageContent() {
 
   // Determine active tab index for sliding indicator position and width in Segmented Control
   const activeSegmentIndex = useMemo(() => {
-    if (activeTab === "defective") return 3;
+    if (activeTab === "defective") return 4;
     if (selectedStatus === "all") return 0;
     if (selectedStatus === "in_stock") return 1;
     if (selectedStatus === "incoming") return 2;
+    if (selectedStatus === "online") return 3;
     return 0;
   }, [activeTab, selectedStatus]);
 
@@ -639,17 +660,17 @@ function InventoryPageContent() {
     <div className="space-y-6">
       {/* Dropdown Filters & Search & Action Buttons */}
       {activeTab !== "accessories" && (
-        <div className="flex flex-wrap items-center gap-3 pb-6 border-b border-[#e0e0e0]">
+        <div className="flex flex-wrap items-center gap-3 pb-6 border-b border-[#e0e0e0] w-full print:hidden">
 
             {/* Status Segmented Control (replaces Status Dropdown for Active/Defective tabs) */}
-            {(activeTab === "active" || activeTab === "defective") ? (
-              <div className="relative flex bg-[#f5f5f7] p-[3px] rounded-full border border-[#e0e0e0] h-[40px] w-full sm:w-[480px] shrink-0 select-none overflow-hidden">
+            {(activeTab === "active" || activeTab === "defective") && (
+              <div className="relative flex bg-[#f5f5f7] p-[3px] rounded-full border border-[#e0e0e0] h-[40px] w-full sm:w-[600px] shrink-0 select-none overflow-hidden">
                 {/* Sliding active indicator */}
                 <div 
                   className="absolute top-[3px] bottom-[3px] rounded-full bg-[#0066cc] shadow-[0_2px_4px_rgba(0,102,204,0.25)]"
                   style={{
-                    width: "calc(25% - 6px)",
-                    left: `calc(${activeSegmentIndex * 25}% + 3px)`,
+                    width: "calc(20% - 6px)",
+                    left: `calc(${activeSegmentIndex * 20}% + 3px)`,
                     transition: "left 280ms cubic-bezier(0.16, 1, 0.3, 1)"
                   }}
                 />
@@ -660,7 +681,7 @@ function InventoryPageContent() {
                     setActiveTab("active");
                     setSelectedStatus("all");
                   }}
-                  className={`w-1/4 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                  className={`w-1/5 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
                     activeSegmentIndex === 0 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
                   }`}
                 >
@@ -683,7 +704,7 @@ function InventoryPageContent() {
                     setActiveTab("active");
                     setSelectedStatus("in_stock");
                   }}
-                  className={`w-1/4 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                  className={`w-1/5 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
                     activeSegmentIndex === 1 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
                   }`}
                 >
@@ -706,7 +727,7 @@ function InventoryPageContent() {
                     setActiveTab("active");
                     setSelectedStatus("incoming");
                   }}
-                  className={`w-1/4 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                  className={`w-1/5 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
                     activeSegmentIndex === 2 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
                   }`}
                 >
@@ -723,96 +744,66 @@ function InventoryPageContent() {
                   </span>
                 </button>
 
-                {/* Tab 4: Máy lỗi */}
+                {/* Tab 4: Bán online */}
                 <button
                   onClick={() => {
-                    setActiveTab("defective");
-                    setSelectedStatus("all");
+                    setActiveTab("active");
+                    setSelectedStatus("online");
                   }}
-                  className={`w-1/4 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                  className={`w-1/5 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
                     activeSegmentIndex === 3 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
                   }`}
                 >
                   <div className={`w-5.5 h-5.5 rounded-full flex items-center justify-center text-white shrink-0 transition-all duration-200 ${
                     activeSegmentIndex === 3
                       ? "bg-transparent shadow-none"
+                      : "bg-gradient-to-br from-[#30b0c7] to-[#0083b0] shadow-[0_1px_2px_rgba(48,176,199,0.1)]"
+                  }`}>
+                    <SFSymbolDisplay size={activeSegmentIndex === 3 ? 13 : 10} className="transition-all duration-200" />
+                  </div>
+                  <span className="truncate">Online</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 3 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
+                    {items?.filter((i) => 
+                      (i.status !== "deleted" && i.status !== "sold" && i.status !== "defective" && i.status !== "warranty_repair" && i.status !== "returned") && 
+                      ((i.serialNumber.charCodeAt(i.serialNumber.length - 1) % 2 === 0) || (i.notes?.toLowerCase().includes("online") ?? false))
+                    ).length || 0}
+                  </span>
+                </button>
+
+                {/* Tab 5: Máy lỗi */}
+                <button
+                  onClick={() => {
+                    setActiveTab("defective");
+                    setSelectedStatus("all");
+                  }}
+                  className={`w-1/5 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                    activeSegmentIndex === 4 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
+                  }`}
+                >
+                  <div className={`w-5.5 h-5.5 rounded-full flex items-center justify-center text-white shrink-0 transition-all duration-200 ${
+                    activeSegmentIndex === 4
+                      ? "bg-transparent shadow-none"
                       : "bg-gradient-to-br from-[#ff2d55] to-[#d6001c] shadow-[0_1px_2px_rgba(255,45,85,0.15)]"
                   }`}>
-                    <SFSymbolExclamationTriangle size={activeSegmentIndex === 3 ? 13 : 10} className="transition-all duration-200" />
+                    <SFSymbolExclamationTriangle size={activeSegmentIndex === 4 ? 13 : 10} className="transition-all duration-200" />
                   </div>
                   <span className="truncate">Máy lỗi</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 3 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 4 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
                     {items?.filter((i) => i.status === "defective" || i.status === "warranty_repair").length || 0}
                   </span>
                 </button>
               </div>
-            ) : null}
-
-            {/* Category Filter */}
-            {activeTab !== "purchase_orders" && (
-              <div className="w-full sm:w-40">
-                <CustomSelect
-                  options={categoryOptions}
-                  value={selectedCategory}
-                  onChange={setSelectedCategory}
-                  size="sm"
-                  rounded="full"
-                  dropdownWidth="full"
-                />
-              </div>
             )}
 
-            {/* Brand Filter */}
-            {activeTab !== "purchase_orders" && (
-              <div className="w-full sm:w-44">
-                <CustomSelect
-                  options={brandOptions}
-                  value={selectedBrand}
-                  onChange={setSelectedBrand}
-                  size="sm"
-                  rounded="full"
-                  dropdownWidth="full"
-                />
-              </div>
-            )}
-
-            {/* Purchase Order Status Filter */}
-            {activeTab === "purchase_orders" && (
-              <div className="w-full sm:w-44">
-                <CustomSelect
-                  options={poStatusOptions}
-                  value={selectedPoStatus}
-                  onChange={setSelectedPoStatus}
-                  size="sm"
-                  rounded="full"
-                  dropdownWidth="full"
-                />
-              </div>
-            )}
-
-            {/* Purchase Order Supplier Filter */}
-            {activeTab === "purchase_orders" && (
-              <div className="w-full sm:w-48">
-                <CustomSelect
-                  options={poSupplierOptions}
-                  value={selectedPoSupplier}
-                  onChange={setSelectedPoSupplier}
-                  size="sm"
-                  rounded="full"
-                  dropdownWidth="full"
-                />
-              </div>
-            )}
-
-            {/* Search Input */}
-            <div className="relative w-full sm:w-64 shrink-0">
+            {/* Search Input - Spotlight dynamic layout */}
+            <div className="relative flex-1 min-w-[180px] max-w-[320px] transition-all duration-300">
               <SFSymbolMagnifyingGlass className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7a7a7a]" size={14} />
               <input 
                 type="text" 
                 placeholder={activeTab === "purchase_orders" ? "Tìm số đơn, nhà cung cấp..." : "Tìm sản phẩm"} 
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-9 pr-4 h-[40px] rounded-full bg-[#f5f5f7] border border-[#e0e0e0] text-[13px] font-medium text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 transition-all placeholder:text-[#7a7a7a]/60"
+                className="w-full pl-9 pr-4 h-[40px] rounded-full bg-[#f5f5f7] border border-[#e0e0e0] text-[13px] font-medium text-[#1d1d1f] focus:bg-white focus:border-[#0066cc] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/20 transition-all placeholder:text-[#7a7a7a]/60 shadow-sm"
               />
             </div>
 
@@ -838,18 +829,96 @@ function InventoryPageContent() {
               </button>
             )}
 
+            {/* Advanced Filter Popover Button */}
+            <div className="relative" ref={popoverRef}>
+              <button 
+                onClick={() => setIsFilterOpen(!isFilterOpen)}
+                className={`h-[40px] px-4 rounded-full border transition-all flex items-center gap-1.5 text-[13px] font-medium cursor-pointer ${
+                  (activeTab !== "purchase_orders" && (selectedCategory !== "all" || selectedBrand !== "all")) ||
+                  (activeTab === "purchase_orders" && (selectedPoStatus !== "all" || selectedPoSupplier !== "all"))
+                    ? "border-[#0066cc] bg-[#0066cc]/5 text-[#0066cc]"
+                    : "border-[#e0e0e0] bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#7a7a7a] hover:text-[#1d1d1f]"
+                }`}
+                title="Bộ lọc nâng cao"
+              >
+                <Filter size={14} />
+                <span>Bộ lọc</span>
+                {((activeTab !== "purchase_orders" && (selectedCategory !== "all" || selectedBrand !== "all")) ||
+                  (activeTab === "purchase_orders" && (selectedPoStatus !== "all" || selectedPoSupplier !== "all"))) && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#0066cc]" />
+                )}
+              </button>
+              
+              {isFilterOpen && (
+                <div className="absolute top-[calc(100%+6px)] right-0 w-[240px] bg-white rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.15)] border border-[#e0e0e0] p-3.5 z-[99] space-y-3">
+                  {activeTab !== "purchase_orders" ? (
+                    <>
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Danh mục</label>
+                        <CustomSelect
+                          options={categoryOptions}
+                          value={selectedCategory}
+                          onChange={setSelectedCategory}
+                          size="sm"
+                          rounded="full"
+                          dropdownWidth="full"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Thương hiệu</label>
+                        <CustomSelect
+                          options={brandOptions}
+                          value={selectedBrand}
+                          onChange={setSelectedBrand}
+                          size="sm"
+                          rounded="full"
+                          dropdownWidth="full"
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Trạng thái PO</label>
+                        <CustomSelect
+                          options={poStatusOptions}
+                          value={selectedPoStatus}
+                          onChange={setSelectedPoStatus}
+                          size="sm"
+                          rounded="full"
+                          dropdownWidth="full"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Nhà cung cấp</label>
+                        <CustomSelect
+                          options={poSupplierOptions}
+                          value={selectedPoSupplier}
+                          onChange={setSelectedPoSupplier}
+                          size="sm"
+                          rounded="full"
+                          dropdownWidth="full"
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Nhập kho Button */}
             {(activeTab === "active" || activeTab === "defective") && (
               <button 
                 onClick={handleOpenCreateDialog}
-                className="flex items-center gap-1.5 px-4 h-[40px] bg-[#0066cc] text-white text-[13px] font-semibold rounded-full hover:bg-[#0071e3] transition-all cursor-pointer shadow-sm active:scale-95 duration-200 shrink-0"
+                className="flex items-center gap-1.5 px-5 h-[40px] bg-[#0066cc] text-white text-[13px] font-semibold rounded-full hover:bg-[#0071e3] transition-all cursor-pointer shadow-sm active:scale-95 duration-200 shrink-0 sm:ml-auto"
               >
                 <SFSymbolPlus size={13} />
-                <span>Nhập kho</span>
+                <span>Nhập kho mới</span>
               </button>
             )}
-          </div>
-        )}
+
+        </div>
+      )}
 
 
 

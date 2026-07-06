@@ -10,9 +10,10 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { 
   Search, Plus, RefreshCw, ShoppingCart, DollarSign, 
   TrendingUp, AlertCircle, Eye, Trash2, 
-  Banknote
+  Banknote, FileSpreadsheet
 } from "lucide-react";
-import { useState, useEffect, Suspense, useMemo } from "react";
+import * as XLSX from "xlsx";
+import { useState, useEffect, Suspense, useMemo, useRef } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useRealtimeSubscription } from "@/hooks/use-realtime";
 import { toast } from "sonner";
@@ -218,6 +219,91 @@ function OrdersPageContent() {
   // Gán filteredOrders bằng danh sách đơn hàng đã được lọc/phân trang từ backend
   const filteredOrders = ordersList;
 
+  // Hàm xuất file Excel danh sách đơn hàng đã lọc
+  const handleExportExcel = () => {
+    if (!filteredOrders || filteredOrders.length === 0) {
+      toast.error("Không có dữ liệu đơn hàng để xuất");
+      return;
+    }
+
+    const wb = XLSX.utils.book_new();
+    
+    // Tiêu đề và thông tin tổng quan
+    const sheetData = [
+      ["DANH SÁCH ĐƠN HÀNG TECHSHOP"],
+      [`Ngày xuất: ${new Date().toLocaleDateString("vi-VN")} - Tổng số đơn: ${filteredOrders.length}`],
+      [],
+      [
+        "STT",
+        "Mã đơn hàng",
+        "Ngày tạo",
+        "Tên khách hàng",
+        "Số điện thoại",
+        "Kênh bán",
+        "Nguồn dẫn",
+        "Trạng thái đơn",
+        "Trạng thái thanh toán",
+        "Mã vận đơn",
+        "Đơn vị vận chuyển",
+        "Doanh số (VNĐ)",
+        "Lợi nhuận (VNĐ)",
+        "Tỷ suất lợi nhuận (%)"
+      ],
+      ...filteredOrders.map((order, idx) => {
+        let statusVN: string = order.status;
+        if (order.status === "completed") statusVN = "Hoàn tất";
+        else if (order.status === "processing") statusVN = "Đang giao";
+        else if (order.status === "cancelled") statusVN = "Đã hủy";
+        else if (order.status === "confirmed") statusVN = "Đang xử lý";
+        else if (order.status === "draft") statusVN = "Nháp";
+        else if (order.status === "refunded") statusVN = "Hoàn tiền";
+
+        let paymentStatusVN: string = order.paymentStatus;
+        if (order.paymentStatus === "paid") paymentStatusVN = "Đã thanh toán";
+        else if (order.paymentStatus === "unpaid") paymentStatusVN = "Chờ thanh toán";
+        else if (order.paymentStatus === "partial") paymentStatusVN = "Trả một phần";
+        else if (order.paymentStatus === "refunded") paymentStatusVN = "Đã hoàn tiền";
+
+        const profitMarginVal = order.status === "cancelled" ? 0 : Number(order.profitMargin) || 0;
+
+        return [
+          idx + 1,
+          order.orderNumber,
+          formatToDDMMYYYY(order.createdAt),
+          order.customerName,
+          order.customerPhone,
+          order.saleChannel === "offline" ? "Cửa hàng" : order.saleChannel === "online" ? "Online" : order.saleChannel,
+          order.leadSourceName || "",
+          statusVN,
+          paymentStatusVN,
+          order.trackingNumber || "",
+          order.shippingCarrier || "",
+          order.status === "cancelled" ? 0 : Math.round(Number(order.totalAmount) || 0),
+          order.status === "cancelled" ? 0 : Math.round(Number(order.profit) || 0),
+          order.status === "cancelled" ? "—" : `${profitMarginVal.toFixed(1)}%`
+        ];
+      })
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(sheetData);
+
+    // Tự động căn chỉnh độ rộng cột
+    const maxColWidth: number[] = [];
+    sheetData.forEach((row) => {
+      row.forEach((cell, i) => {
+        const cellLen = cell ? cell.toString().length : 10;
+        maxColWidth[i] = Math.max(maxColWidth[i] || 10, cellLen + 3);
+      });
+    });
+    ws["!cols"] = maxColWidth.map((w) => ({ wch: w }));
+
+    XLSX.utils.book_append_sheet(wb, ws, "Danh sách đơn hàng");
+    
+    // Tải xuống file Excel
+    XLSX.writeFile(wb, `DanhSachDonHang_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast.success("Đã xuất danh sách đơn hàng ra file Excel (.xlsx) thành công");
+  };
+
   // Số liệu thống kê ở đầu trang lấy từ backend
   const completedOrdersCount = stats.completedCount;
   const processingOrdersCount = stats.processingCount;
@@ -238,7 +324,7 @@ function OrdersPageContent() {
     <div className="space-y-6">
       {/* 1. Header Section - Apple premium single-row layout */}
       <div className="pb-6 border-b border-[#e0e0e0]">
-        <div className="flex flex-wrap items-center gap-3 justify-start">
+        <div className="flex flex-wrap items-center gap-3 justify-start w-full">
             
             {/* Status Segmented Control (replaces Status Dropdown & Stats Cards) */}
             <div className="relative flex bg-[#f5f5f7] p-[3px] rounded-full border border-[#e0e0e0] h-[40px] w-full sm:w-[620px] shrink-0 select-none overflow-hidden">
@@ -373,32 +459,20 @@ function OrdersPageContent() {
               </button>
             </div>
 
-            {/* Trạng thái thanh toán Filter */}
-            <div className="w-full sm:w-48">
-              <CustomSelect
-                options={paymentFilterOptions}
-                value={selectedPaymentStatus}
-                onChange={setSelectedPaymentStatus}
-                size="sm"
-                rounded="full"
-                dropdownWidth="full"
-              />
-            </div>
-
-            {/* Search Input - Leftmost */}
-            <div className="relative w-full sm:w-64">
+            {/* Search Input - Spotlight dynamic layout */}
+            <div className="relative flex-1 min-w-[200px] max-w-[480px] transition-all duration-300">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7a7a7a]" size={14} />
               <input 
                 type="text" 
-                placeholder="Tìm mã đơn, SĐT..." 
+                placeholder="Tìm mã đơn, tên khách, số điện thoại..." 
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-9 pr-4 h-[40px] rounded-full bg-[#f5f5f7] border border-[#e0e0e0] text-[13px] font-medium text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 transition-all placeholder:text-[#7a7a7a]/60"
+                className="w-full pl-9 pr-4 h-[40px] rounded-full bg-[#f5f5f7] border border-[#e0e0e0] text-[13px] font-medium text-[#1d1d1f] focus:bg-white focus:border-[#0066cc] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/20 transition-all placeholder:text-[#7a7a7a]/60 shadow-sm"
               />
             </div>
 
             {/* Reset Button */}
-            {(selectedStatus !== "all" || selectedPaymentStatus !== "all" || selectedChannel !== "all" || search !== "") && (
+            {(selectedStatus !== "all" || selectedChannel !== "all" || search !== "") && (
               <button
                 onClick={() => {
                   setSelectedStatus("all");
@@ -412,6 +486,15 @@ function OrdersPageContent() {
                 <RefreshCw size={14} />
               </button>
             )}
+
+            {/* Excel Export Button */}
+            <button
+              onClick={handleExportExcel}
+              className="h-[40px] w-[40px] bg-[#f5f5f7] hover:bg-[#e8e8ed] border border-[#e0e0e0] text-[#7a7a7a] hover:text-[#1d1d1f] rounded-full transition-all cursor-pointer flex items-center justify-center shrink-0 active:scale-95 duration-200 sm:ml-auto"
+              title="Xuất file Excel (.xlsx)"
+            >
+              <FileSpreadsheet size={15} />
+            </button>
 
             {/* Create Button - Rightmost */}
             <button 

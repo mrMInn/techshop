@@ -1812,7 +1812,7 @@ export async function importAccessoryItems(data: {
   catalogId: string;
   quantity: number;
   unitCost: string;
-  supplierId: string;
+  supplierId?: string | null;
   serialNumbers?: string[];
   notes?: string;
 }) {
@@ -1821,27 +1821,62 @@ export async function importAccessoryItems(data: {
       const ownerProfiles = await tx.select().from(profiles).limit(1);
       const performedById = ownerProfiles[0]?.id;
 
-      // Sinh PO mới cho phụ kiện
+      // Sinh mã lô nhập và các thông tin định danh
       const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
       const dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, "");
-      const poNumber = `PO-ACC-${dateStr}-${rand}`;
-
-      const totalCost = (Number(data.unitCost) * data.quantity).toFixed(2);
-
-      const [newPo] = await tx.insert(purchaseOrders).values({
-        poNumber,
-        supplierId: data.supplierId,
-        status: "received", // Always received immediately since accessories are imported in-place
-        originCountry: "VN",
-        shippingCost: "0",
-        totalCost: String(totalCost),
-        notes: data.notes || "Nhập kho phụ kiện",
-        actualArrival: new Date().toISOString().split('T')[0],
-        createdBy: performedById || null,
-      }).returning();
-
-      // Sinh mã lô nhập
       const batchCode = `BAT-ACC-${dateStr}-${rand}`;
+
+      let purchaseOrderId: string | null = null;
+      const finalSupplierId = data.supplierId || null;
+
+      // Chỉ sinh PO mới cho phụ kiện nếu có chọn nhà cung cấp
+      if (finalSupplierId) {
+        const poNumber = `PO-ACC-${dateStr}-${rand}`;
+        const totalCost = (Number(data.unitCost) * data.quantity).toFixed(2);
+
+        const [newPo] = await tx.insert(purchaseOrders).values({
+          poNumber,
+          supplierId: finalSupplierId,
+          status: "received", // Always received immediately since accessories are imported in-place
+          originCountry: "VN",
+          shippingCost: "0",
+          totalCost: String(totalCost),
+          notes: data.notes || "Nhập kho phụ kiện",
+          actualArrival: new Date().toISOString().split('T')[0],
+          createdBy: performedById || null,
+        }).returning();
+
+        purchaseOrderId = newPo.id;
+      }
+
+      // Đồng bộ Sổ quỹ Kế toán (Chỉ tạo giao dịch nếu có tổng chi phí vốn > 0)
+      const costVal = Number(data.unitCost || 0);
+      const qtyVal = Number(data.quantity || 0);
+      const totalCostVal = costVal * qtyVal;
+
+      if (totalCostVal > 0) {
+        const dateStrCB = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+        const randomSuffixCB = Math.random().toString(36).substring(2, 6).toUpperCase();
+        const entryNumber = `CB${dateStrCB}-${randomSuffixCB}`;
+
+        await tx.insert(cashBookEntries).values({
+          entryNumber,
+          type: "expense",
+          category: "purchase",
+          amount: totalCostVal.toFixed(2),
+          runningBalance: "0",
+          paymentMethod: "bank_transfer",
+          referenceType: purchaseOrderId ? "purchase_order" as const : null,
+          referenceId: purchaseOrderId,
+          description: purchaseOrderId 
+            ? `Chi tiền thanh toán đơn nhập phụ kiện PO-ACC-${dateStr}-${rand}`
+            : `Chi tiền nhập kho phụ kiện trực tiếp (Lô BAT-ACC-${dateStr}-${rand})`,
+          entryDate: new Date().toISOString().split("T")[0],
+          createdBy: performedById || null,
+        });
+
+        await recalculateRunningBalances(tx);
+      }
 
       const itemsToInsert: any[] = [];
       const serials = data.serialNumbers || [];
@@ -1860,8 +1895,8 @@ export async function importAccessoryItems(data: {
           unitCost: data.unitCost,
           status: "in_stock" as const,
           sellingPrice: "0", // Default to 0, will be set when sold or attached
-          supplierId: data.supplierId,
-          purchaseOrderId: newPo.id,
+          supplierId: finalSupplierId,
+          purchaseOrderId: purchaseOrderId,
           batchCode,
           notes: data.notes || null,
         });
@@ -1876,8 +1911,8 @@ export async function importAccessoryItems(data: {
           unitCost: data.unitCost,
           status: "in_stock" as const,
           sellingPrice: "0",
-          supplierId: data.supplierId,
-          purchaseOrderId: newPo.id,
+          supplierId: finalSupplierId,
+          purchaseOrderId: purchaseOrderId,
           batchCode,
           notes: data.notes || null,
         });
