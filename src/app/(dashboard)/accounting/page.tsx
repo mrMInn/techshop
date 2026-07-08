@@ -1071,7 +1071,7 @@ export default function CashBookPage() {
                           {/* STT */}
                           <td className={`py-3 px-3 text-center font-bold text-[12px] transition-all ${
                             isSelected 
-                              ? "text-amber-900 bg-amber-500/20 group-hover:bg-amber-500/25 border-y border-l border-amber-500/35 rounded-l-xl" 
+                              ? "text-[#0066cc] bg-[#0066cc]/8 group-hover:bg-[#0066cc]/12 border-y border-l border-[#0066cc]/25 rounded-l-xl" 
                               : "text-slate-400 border-b border-slate-100 group-hover:bg-[#0071e3]/4"
                           }`}>
                             {stt}
@@ -1080,10 +1080,10 @@ export default function CashBookPage() {
                           {/* Số chứng từ */}
                           <td className={`py-3 px-3 truncate whitespace-nowrap transition-all ${
                             isSelected 
-                              ? "bg-amber-500/20 group-hover:bg-amber-500/25 border-y border-amber-500/35 text-amber-900" 
+                              ? "bg-[#0066cc]/8 group-hover:bg-[#0066cc]/12 border-y border-[#0066cc]/25 text-[#0066cc]" 
                               : "border-b border-slate-100 group-hover:bg-[#0071e3]/4"
                           }`} title={entry.entryNumber}>
-                            <span className={`text-[12px] tracking-tight truncate block max-w-[100px] ${isSelected ? "text-amber-900 font-bold" : "font-semibold text-slate-700"}`}>
+                            <span className={`text-[12px] tracking-tight truncate block max-w-[100px] ${isSelected ? "text-[#0066cc] font-bold" : "font-semibold text-slate-700"}`}>
                               {entry.entryNumber}
                             </span>
                           </td>
@@ -1091,7 +1091,7 @@ export default function CashBookPage() {
                           {/* Ngày hạch toán */}
                           <td className={`py-3 px-3 font-medium whitespace-nowrap text-[12px] transition-all ${
                             isSelected 
-                              ? "bg-amber-500/20 group-hover:bg-amber-500/25 border-y border-amber-500/35 text-slate-700" 
+                              ? "bg-[#0066cc]/8 group-hover:bg-[#0066cc]/12 border-y border-[#0066cc]/25 text-slate-700" 
                               : "text-slate-500 border-b border-slate-100 group-hover:bg-[#0071e3]/4"
                           }`}>
                             {formatToDDMMYYYY(entry.entryDate)}
@@ -1100,7 +1100,7 @@ export default function CashBookPage() {
                           {/* Phân loại */}
                           <td className={`py-3 px-3 text-center transition-all ${
                             isSelected 
-                              ? "bg-amber-500/20 group-hover:bg-amber-500/25 border-y border-amber-500/35" 
+                              ? "bg-[#0066cc]/8 group-hover:bg-[#0066cc]/12 border-y border-[#0066cc]/25" 
                               : "border-b border-slate-100 group-hover:bg-[#0071e3]/4"
                           }`}>
                             <span className={`text-[12px] font-bold ${
@@ -1115,7 +1115,7 @@ export default function CashBookPage() {
                           {/* Diễn giải nội dung */}
                           <td className={`py-3 px-3 font-medium truncate transition-all ${
                             isSelected 
-                              ? "bg-amber-500/20 group-hover:bg-amber-500/25 border-y border-amber-500/35 text-slate-700" 
+                              ? "bg-[#0066cc]/8 group-hover:bg-[#0066cc]/12 border-y border-[#0066cc]/25 text-slate-700" 
                               : "text-slate-700 border-b border-slate-100 group-hover:bg-[#0071e3]/4"
                           }`} title={entry.description}>
                             {entry.description}
@@ -1124,7 +1124,7 @@ export default function CashBookPage() {
                           {/* Số tiền */}
                           <td className={`py-3 px-3 text-right whitespace-nowrap transition-all ${
                             isSelected 
-                              ? "bg-amber-500/20 group-hover:bg-amber-500/25 border-y border-amber-500/35" 
+                              ? "bg-[#0066cc]/8 group-hover:bg-[#0066cc]/12 border-y border-[#0066cc]/25" 
                               : "border-b border-slate-100 group-hover:bg-[#0071e3]/4"
                           }`}>
                             <span className={`text-[13px] font-bold tracking-tight ${
@@ -1138,7 +1138,7 @@ export default function CashBookPage() {
                           {/* Số dư lũy kế */}
                           <td className={`py-3 px-3 text-right pr-4 whitespace-nowrap transition-all ${
                             isSelected 
-                              ? "bg-amber-500/20 group-hover:bg-amber-500/25 border-y border-r border-amber-500/35 rounded-r-xl text-slate-700" 
+                              ? "bg-[#0066cc]/8 group-hover:bg-[#0066cc]/12 border-y border-r border-[#0066cc]/25 rounded-r-xl text-slate-700" 
                               : "text-slate-500 border-b border-slate-100 group-hover:bg-[#0071e3]/4"
                           }`}>
                             <span className={`text-[12px] font-semibold ${isSelected ? "text-slate-700" : "text-slate-500"}`}>

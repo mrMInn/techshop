@@ -1136,97 +1136,94 @@ export async function getInventoryItemLifecycle(serialNumber: string) {
 
     const item = itemQuery[0];
 
-    // B. Lấy lịch sử thẻ kho thô (Movements)
-    const movements = await db
-      .select({
-        id: inventoryMovements.id,
-        movementType: inventoryMovements.movementType,
-        fromStatus: inventoryMovements.fromStatus,
-        toStatus: inventoryMovements.toStatus,
-        referenceType: inventoryMovements.referenceType,
-        quantityChange: inventoryMovements.quantityChange,
-        notes: inventoryMovements.notes,
-        performedAt: inventoryMovements.performedAt,
-        performedByName: profiles.fullName,
-      })
-      .from(inventoryMovements)
-      .leftJoin(profiles, eq(inventoryMovements.performedBy, profiles.id))
-      .where(eq(inventoryMovements.inventoryItemId, item.id))
-      .orderBy(desc(inventoryMovements.performedAt));
+    const [movements, sales, warranties, returnsList, replacementForList] = await Promise.all([
+      db
+        .select({
+          id: inventoryMovements.id,
+          movementType: inventoryMovements.movementType,
+          fromStatus: inventoryMovements.fromStatus,
+          toStatus: inventoryMovements.toStatus,
+          referenceType: inventoryMovements.referenceType,
+          quantityChange: inventoryMovements.quantityChange,
+          notes: inventoryMovements.notes,
+          performedAt: inventoryMovements.performedAt,
+          performedByName: profiles.fullName,
+        })
+        .from(inventoryMovements)
+        .leftJoin(profiles, eq(inventoryMovements.performedBy, profiles.id))
+        .where(eq(inventoryMovements.inventoryItemId, item.id))
+        .orderBy(desc(inventoryMovements.performedAt)),
 
-    // C. Truy vấn lịch sử đơn hàng bán lẻ (Orders)
-    const sales = await db
-      .select({
-        orderItemId: orderItems.id,
-        orderId: orders.id,
-        orderNumber: orders.orderNumber,
-        sellingPrice: orderItems.sellingPrice,
-        createdAt: orders.createdAt,
-        customerName: customers.fullName,
-        customerPhone: customers.phone,
-        status: orders.status,
-      })
-      .from(orderItems)
-      .innerJoin(orders, eq(orderItems.orderId, orders.id))
-      .innerJoin(customers, eq(orders.customerId, customers.id))
-      .where(eq(orderItems.inventoryItemId, item.id));
+      db
+        .select({
+          orderItemId: orderItems.id,
+          orderId: orders.id,
+          orderNumber: orders.orderNumber,
+          sellingPrice: orderItems.sellingPrice,
+          createdAt: orders.createdAt,
+          customerName: customers.fullName,
+          customerPhone: customers.phone,
+          status: orders.status,
+        })
+        .from(orderItems)
+        .innerJoin(orders, eq(orderItems.orderId, orders.id))
+        .innerJoin(customers, eq(orders.customerId, customers.id))
+        .where(eq(orderItems.inventoryItemId, item.id)),
 
-    // D. Truy vấn lịch sử bảo hành/sửa chữa (Warranty Claims)
-    const warranties = await db
-      .select({
-        id: warrantyClaims.id,
-        claimNumber: warrantyClaims.claimNumber,
-        issueDescription: warrantyClaims.issueDescription,
-        repairCost: warrantyClaims.repairCost,
-        status: warrantyClaims.status,
-        receivedDate: warrantyClaims.receivedDate,
-        actualReturnDate: warrantyClaims.actualReturnDate,
-        technicianNotes: warrantyClaims.diagnosis,
-        customerName: customers.fullName,
-      })
-      .from(warrantyClaims)
-      .innerJoin(customers, eq(warrantyClaims.customerId, customers.id))
-      .where(eq(warrantyClaims.inventoryItemId, item.id))
-      .orderBy(desc(warrantyClaims.receivedDate));
+      db
+        .select({
+          id: warrantyClaims.id,
+          claimNumber: warrantyClaims.claimNumber,
+          issueDescription: warrantyClaims.issueDescription,
+          repairCost: warrantyClaims.repairCost,
+          status: warrantyClaims.status,
+          receivedDate: warrantyClaims.receivedDate,
+          actualReturnDate: warrantyClaims.actualReturnDate,
+          technicianNotes: warrantyClaims.diagnosis,
+          customerName: customers.fullName,
+        })
+        .from(warrantyClaims)
+        .innerJoin(customers, eq(warrantyClaims.customerId, customers.id))
+        .where(eq(warrantyClaims.inventoryItemId, item.id))
+        .orderBy(desc(warrantyClaims.receivedDate)),
 
-    // E. Truy vấn lịch sử đổi trả (Returns)
-    const returnsList = await db
-      .select({
-        returnItemId: returnItems.id,
-        returnId: returns.id,
-        returnNumber: returns.returnNumber,
-        type: returns.type,
-        reason: returnItems.returnReason,
-        conditionOnReturn: returnItems.conditionOnReturn,
-        isDefective: returnItems.isDefective,
-        defectDescription: returnItems.defectDescription,
-        refundPrice: returnItems.refundPrice,
-        createdAt: returns.createdAt,
-        customerName: customers.fullName,
-      })
-      .from(returnItems)
-      .innerJoin(returns, eq(returnItems.returnId, returns.id))
-      .innerJoin(customers, eq(returns.customerId, customers.id))
-      .where(eq(returnItems.inventoryItemId, item.id))
-      .orderBy(desc(returns.createdAt));
+      db
+        .select({
+          returnItemId: returnItems.id,
+          returnId: returns.id,
+          returnNumber: returns.returnNumber,
+          type: returns.type,
+          reason: returnItems.returnReason,
+          conditionOnReturn: returnItems.conditionOnReturn,
+          isDefective: returnItems.isDefective,
+          defectDescription: returnItems.defectDescription,
+          refundPrice: returnItems.refundPrice,
+          createdAt: returns.createdAt,
+          customerName: customers.fullName,
+        })
+        .from(returnItems)
+        .innerJoin(returns, eq(returnItems.returnId, returns.id))
+        .innerJoin(customers, eq(returns.customerId, customers.id))
+        .where(eq(returnItems.inventoryItemId, item.id))
+        .orderBy(desc(returns.createdAt)),
 
-    // E2. Truy vấn lịch sử máy này được xuất để đổi thế vào (Replacement For)
-    const replacementForList = await db
-      .select({
-        returnItemId: returnItems.id,
-        returnId: returns.id,
-        returnNumber: returns.returnNumber,
-        type: returns.type,
-        reason: returnItems.returnReason,
-        createdAt: returns.createdAt,
-        customerName: customers.fullName,
-        oldItemSerial: sql<string>`(SELECT serial_number FROM inventory_items WHERE id = ${returnItems.inventoryItemId})`,
-      })
-      .from(returnItems)
-      .innerJoin(returns, eq(returnItems.returnId, returns.id))
-      .innerJoin(customers, eq(returns.customerId, customers.id))
-      .where(eq(returnItems.newInventoryItemId, item.id))
-      .orderBy(desc(returns.createdAt));
+      db
+        .select({
+          returnItemId: returnItems.id,
+          returnId: returns.id,
+          returnNumber: returns.returnNumber,
+          type: returns.type,
+          reason: returnItems.returnReason,
+          createdAt: returns.createdAt,
+          customerName: customers.fullName,
+          oldItemSerial: sql<string>`(SELECT serial_number FROM inventory_items WHERE id = ${returnItems.inventoryItemId})`,
+        })
+        .from(returnItems)
+        .innerJoin(returns, eq(returnItems.returnId, returns.id))
+        .innerJoin(customers, eq(returns.customerId, customers.id))
+        .where(eq(returnItems.newInventoryItemId, item.id))
+        .orderBy(desc(returns.createdAt))
+    ]);
 
     // F. Tổng hợp Milestone Timeline
     const milestones: {
@@ -1617,6 +1614,18 @@ export async function supplierRefundAction(
         })
         .where(eq(inventoryItems.id, itemId));
 
+      // Cập nhật trạng thái đơn nhập PO liên đới (nếu có)
+      if (item.purchaseOrderItemId) {
+        const poItem = await tx
+          .select({ purchaseOrderId: purchaseOrderItems.purchaseOrderId })
+          .from(purchaseOrderItems)
+          .where(eq(purchaseOrderItems.id, item.purchaseOrderItemId))
+          .limit(1);
+        if (poItem.length > 0 && poItem[0].purchaseOrderId) {
+          await syncPurchaseOrderStatus(tx, poItem[0].purchaseOrderId);
+        }
+      }
+
       await tx.insert(inventoryMovements).values({
         inventoryItemId: itemId,
         movementType: 'returned',
@@ -1691,6 +1700,18 @@ export async function supplierReturnWriteOffAction(itemId: string) {
           updatedAt: new Date(),
         })
         .where(eq(inventoryItems.id, itemId));
+
+      // Cập nhật trạng thái đơn nhập PO liên đới (nếu có)
+      if (item.purchaseOrderItemId) {
+        const poItem = await tx
+          .select({ purchaseOrderId: purchaseOrderItems.purchaseOrderId })
+          .from(purchaseOrderItems)
+          .where(eq(purchaseOrderItems.id, item.purchaseOrderItemId))
+          .limit(1);
+        if (poItem.length > 0 && poItem[0].purchaseOrderId) {
+          await syncPurchaseOrderStatus(tx, poItem[0].purchaseOrderId);
+        }
+      }
 
       await tx.insert(inventoryMovements).values({
         inventoryItemId: itemId,

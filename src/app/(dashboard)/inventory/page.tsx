@@ -204,6 +204,12 @@ function InventoryPageContent() {
     staleTime: 10000, // Cache for 10 seconds to make Drawer toggle instant
   });
 
+  const isPoDetailLoadingState = !!selectedPoId && (
+    isPoDetailLoading || 
+    (!poDetailData && !isPoDetailError) || 
+    (poDetailData && poDetailData.po?.id !== selectedPoId && !isPoDetailError && poDetailData.success !== false)
+  );
+
   useEffect(() => {
     if (poDetailData?.po) {
       setPoStatusInput(poDetailData.po.status);
@@ -473,10 +479,6 @@ function InventoryPageContent() {
       if (activeTab === "active") {
         if (selectedStatus === "all") {
           matchesStatus = (item.status !== "deleted" && item.status !== "sold" && item.status !== "defective" && item.status !== "warranty_repair" && item.status !== "returned");
-        } else if (selectedStatus === "online") {
-          const isItemActive = (item.status !== "deleted" && item.status !== "sold" && item.status !== "defective" && item.status !== "warranty_repair" && item.status !== "returned");
-          const isItemOnline = (item.serialNumber.charCodeAt(item.serialNumber.length - 1) % 2 === 0) || (item.notes?.toLowerCase().includes("online") ?? false);
-          matchesStatus = isItemActive && isItemOnline;
         } else {
           matchesStatus = item.status === selectedStatus;
         }
@@ -648,11 +650,10 @@ function InventoryPageContent() {
 
   // Determine active tab index for sliding indicator position and width in Segmented Control
   const activeSegmentIndex = useMemo(() => {
-    if (activeTab === "defective") return 4;
+    if (activeTab === "defective") return 3;
     if (selectedStatus === "all") return 0;
     if (selectedStatus === "in_stock") return 1;
     if (selectedStatus === "incoming") return 2;
-    if (selectedStatus === "online") return 3;
     return 0;
   }, [activeTab, selectedStatus]);
 
@@ -664,13 +665,13 @@ function InventoryPageContent() {
 
             {/* Status Segmented Control (replaces Status Dropdown for Active/Defective tabs) */}
             {(activeTab === "active" || activeTab === "defective") && (
-              <div className="relative flex bg-[#f5f5f7] p-[3px] rounded-full border border-[#e0e0e0] h-[40px] w-full sm:w-[600px] shrink-0 select-none overflow-hidden">
+              <div className="relative flex bg-[#f5f5f7] p-[3px] rounded-full border border-[#e0e0e0] h-[40px] w-full sm:w-[500px] shrink-0 select-none overflow-hidden">
                 {/* Sliding active indicator */}
                 <div 
                   className="absolute top-[3px] bottom-[3px] rounded-full bg-[#0066cc] shadow-[0_2px_4px_rgba(0,102,204,0.25)]"
                   style={{
-                    width: "calc(20% - 6px)",
-                    left: `calc(${activeSegmentIndex * 20}% + 3px)`,
+                    width: "calc(25% - 6px)",
+                    left: `calc(${activeSegmentIndex * 25}% + 3px)`,
                     transition: "left 280ms cubic-bezier(0.16, 1, 0.3, 1)"
                   }}
                 />
@@ -681,7 +682,7 @@ function InventoryPageContent() {
                     setActiveTab("active");
                     setSelectedStatus("all");
                   }}
-                  className={`w-1/5 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                  className={`w-1/4 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
                     activeSegmentIndex === 0 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
                   }`}
                 >
@@ -704,7 +705,7 @@ function InventoryPageContent() {
                     setActiveTab("active");
                     setSelectedStatus("in_stock");
                   }}
-                  className={`w-1/5 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                  className={`w-1/4 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
                     activeSegmentIndex === 1 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
                   }`}
                 >
@@ -727,7 +728,7 @@ function InventoryPageContent() {
                     setActiveTab("active");
                     setSelectedStatus("incoming");
                   }}
-                  className={`w-1/5 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                  className={`w-1/4 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
                     activeSegmentIndex === 2 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
                   }`}
                 >
@@ -744,51 +745,25 @@ function InventoryPageContent() {
                   </span>
                 </button>
 
-                {/* Tab 4: Bán online */}
+                {/* Tab 4: Máy lỗi */}
                 <button
                   onClick={() => {
-                    setActiveTab("active");
-                    setSelectedStatus("online");
+                    setActiveTab("defective");
+                    setSelectedStatus("all");
                   }}
-                  className={`w-1/5 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                  className={`w-1/4 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
                     activeSegmentIndex === 3 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
                   }`}
                 >
                   <div className={`w-5.5 h-5.5 rounded-full flex items-center justify-center text-white shrink-0 transition-all duration-200 ${
                     activeSegmentIndex === 3
                       ? "bg-transparent shadow-none"
-                      : "bg-gradient-to-br from-[#30b0c7] to-[#0083b0] shadow-[0_1px_2px_rgba(48,176,199,0.1)]"
-                  }`}>
-                    <SFSymbolDisplay size={activeSegmentIndex === 3 ? 13 : 10} className="transition-all duration-200" />
-                  </div>
-                  <span className="truncate">Online</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 3 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
-                    {items?.filter((i) => 
-                      (i.status !== "deleted" && i.status !== "sold" && i.status !== "defective" && i.status !== "warranty_repair" && i.status !== "returned") && 
-                      ((i.serialNumber.charCodeAt(i.serialNumber.length - 1) % 2 === 0) || (i.notes?.toLowerCase().includes("online") ?? false))
-                    ).length || 0}
-                  </span>
-                </button>
-
-                {/* Tab 5: Máy lỗi */}
-                <button
-                  onClick={() => {
-                    setActiveTab("defective");
-                    setSelectedStatus("all");
-                  }}
-                  className={`w-1/5 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
-                    activeSegmentIndex === 4 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
-                  }`}
-                >
-                  <div className={`w-5.5 h-5.5 rounded-full flex items-center justify-center text-white shrink-0 transition-all duration-200 ${
-                    activeSegmentIndex === 4
-                      ? "bg-transparent shadow-none"
                       : "bg-gradient-to-br from-[#ff2d55] to-[#d6001c] shadow-[0_1px_2px_rgba(255,45,85,0.15)]"
                   }`}>
-                    <SFSymbolExclamationTriangle size={activeSegmentIndex === 4 ? 13 : 10} className="transition-all duration-200" />
+                    <SFSymbolExclamationTriangle size={activeSegmentIndex === 3 ? 13 : 10} className="transition-all duration-200" />
                   </div>
                   <span className="truncate">Máy lỗi</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 4 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 3 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
                     {items?.filter((i) => i.status === "defective" || i.status === "warranty_repair").length || 0}
                   </span>
                 </button>
@@ -829,82 +804,79 @@ function InventoryPageContent() {
               </button>
             )}
 
-            {/* Advanced Filter Popover Button */}
-            <div className="relative" ref={popoverRef}>
-              <button 
-                onClick={() => setIsFilterOpen(!isFilterOpen)}
-                className={`h-[40px] px-4 rounded-full border transition-all flex items-center gap-1.5 text-[13px] font-medium cursor-pointer ${
-                  (activeTab !== "purchase_orders" && (selectedCategory !== "all" || selectedBrand !== "all")) ||
-                  (activeTab === "purchase_orders" && (selectedPoStatus !== "all" || selectedPoSupplier !== "all"))
-                    ? "border-[#0066cc] bg-[#0066cc]/5 text-[#0066cc]"
-                    : "border-[#e0e0e0] bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#7a7a7a] hover:text-[#1d1d1f]"
-                }`}
-                title="Bộ lọc nâng cao"
-              >
-                <Filter size={14} />
-                <span>Bộ lọc</span>
-                {((activeTab !== "purchase_orders" && (selectedCategory !== "all" || selectedBrand !== "all")) ||
-                  (activeTab === "purchase_orders" && (selectedPoStatus !== "all" || selectedPoSupplier !== "all"))) && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#0066cc]" />
-                )}
-              </button>
-              
-              {isFilterOpen && (
-                <div className="absolute top-[calc(100%+6px)] right-0 w-[240px] bg-white rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.15)] border border-[#e0e0e0] p-3.5 z-[99] space-y-3">
-                  {activeTab !== "purchase_orders" ? (
-                    <>
-                      <div className="space-y-1">
-                        <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Danh mục</label>
-                        <CustomSelect
-                          options={categoryOptions}
-                          value={selectedCategory}
-                          onChange={setSelectedCategory}
-                          size="sm"
-                          rounded="full"
-                          dropdownWidth="full"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Thương hiệu</label>
-                        <CustomSelect
-                          options={brandOptions}
-                          value={selectedBrand}
-                          onChange={setSelectedBrand}
-                          size="sm"
-                          rounded="full"
-                          dropdownWidth="full"
-                        />
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="space-y-1">
-                        <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Trạng thái PO</label>
-                        <CustomSelect
-                          options={poStatusOptions}
-                          value={selectedPoStatus}
-                          onChange={setSelectedPoStatus}
-                          size="sm"
-                          rounded="full"
-                          dropdownWidth="full"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Nhà cung cấp</label>
-                        <CustomSelect
-                          options={poSupplierOptions}
-                          value={selectedPoSupplier}
-                          onChange={setSelectedPoSupplier}
-                          size="sm"
-                          rounded="full"
-                          dropdownWidth="full"
-                        />
-                      </div>
-                    </>
-                  )}
+            {/* Direct Filters for PO Tab */}
+            {activeTab === "purchase_orders" && (
+              <>
+                <div className="w-[180px] shrink-0">
+                  <CustomSelect
+                    options={poStatusOptions}
+                    value={selectedPoStatus}
+                    onChange={setSelectedPoStatus}
+                    size="sm"
+                    rounded="full"
+                    dropdownWidth="full"
+                  />
                 </div>
-              )}
-            </div>
+                <div className="w-[220px] shrink-0">
+                  <CustomSelect
+                    options={poSupplierOptions}
+                    value={selectedPoSupplier}
+                    onChange={setSelectedPoSupplier}
+                    size="sm"
+                    rounded="full"
+                    dropdownWidth="full"
+                  />
+                </div>
+              </>
+            )}
+
+            {/* Advanced Filter Popover Button (for other tabs) */}
+            {activeTab !== "purchase_orders" && (
+              <div className="relative" ref={popoverRef}>
+                <button 
+                  onClick={() => setIsFilterOpen(!isFilterOpen)}
+                  className={`h-[40px] px-4 rounded-full border transition-all flex items-center gap-1.5 text-[13px] font-medium cursor-pointer ${
+                    selectedCategory !== "all" || selectedBrand !== "all"
+                      ? "border-[#0066cc] bg-[#0066cc]/5 text-[#0066cc]"
+                      : "border-[#e0e0e0] bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#7a7a7a] hover:text-[#1d1d1f]"
+                  }`}
+                  title="Bộ lọc nâng cao"
+                >
+                  <Filter size={14} />
+                  <span>Bộ lọc</span>
+                  {(selectedCategory !== "all" || selectedBrand !== "all") && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#0066cc]" />
+                  )}
+                </button>
+                
+                {isFilterOpen && (
+                  <div className="absolute top-[calc(100%+6px)] right-0 w-[240px] bg-white rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.15)] border border-[#e0e0e0] p-3.5 z-[99] space-y-3">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Danh mục</label>
+                      <CustomSelect
+                        options={categoryOptions}
+                        value={selectedCategory}
+                        onChange={setSelectedCategory}
+                        size="sm"
+                        rounded="full"
+                        dropdownWidth="full"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Thương hiệu</label>
+                      <CustomSelect
+                        options={brandOptions}
+                        value={selectedBrand}
+                        onChange={setSelectedBrand}
+                        size="sm"
+                        rounded="full"
+                        dropdownWidth="full"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Nhập kho Button */}
             {(activeTab === "active" || activeTab === "defective") && (
@@ -960,7 +932,7 @@ function InventoryPageContent() {
                     <th className="px-6 py-3 border-b border-[#e0e0e0] whitespace-nowrap">Nhà cung cấp</th>
                     <th className="px-6 py-3 text-center border-b border-[#e0e0e0] whitespace-nowrap">Số lượng máy</th>
                     <th className="px-6 py-3 text-right border-b border-[#e0e0e0] whitespace-nowrap">Tổng tiền hàng</th>
-                    <th className="px-6 py-3 text-right border-b border-[#e0e0e0] whitespace-nowrap">Phí</th>
+                    <th className="px-6 py-3 text-right border-b border-[#e0e0e0] whitespace-nowrap">Vận chuyển</th>
                     <th className="px-6 py-3 text-center border-b border-[#e0e0e0] whitespace-nowrap">Trạng thái</th>
                     <th className="px-6 py-3 text-center border-b border-[#e0e0e0] whitespace-nowrap">Ngày tạo</th>
                   </tr>
@@ -980,8 +952,7 @@ function InventoryPageContent() {
                     };
                     const statusInfo = poStatusConfig[po.status] || { color: "text-slate-800", label: po.status };
                     const shippingVal = Number(po.shippingCost || 0);
-                    const taxVal = Number(po.taxImport || 0);
-                    const addCost = shippingVal + taxVal;
+                    const addCost = shippingVal;
 
                     return (
                       <tr 
@@ -1314,8 +1285,9 @@ function InventoryPageContent() {
                         bulkConfirmMutation.mutate(ids);
                       }}
                       disabled={bulkConfirmMutation.isPending}
-                      className="flex items-center gap-1.5 px-4 h-[34px] bg-[#0066cc]/10 hover:bg-[#0066cc]/20 disabled:opacity-50 text-[#0066cc] text-[13.5px] font-semibold rounded-full border border-[#0066cc]/15 transition-all cursor-pointer active:scale-95 duration-200"
+                      className="flex items-center gap-1.5 px-4 h-9 bg-[#0066cc] hover:bg-[#0071e3] disabled:opacity-50 text-white text-[13px] font-semibold rounded-full transition-all cursor-pointer active:scale-95 duration-200 shadow-sm"
                     >
+                      <SFSymbolCheckmarkCircle size={14} />
                       <span>Nhận về kho tất cả ({activeDrawerProduct.items.filter((item: any) => item.status === 'incoming').length} máy)</span>
                     </button>
                   ) : (
@@ -1785,82 +1757,187 @@ function InventoryPageContent() {
             onClick={() => setSelectedPoId(null)}
           />
           
-          {/* Drawer Wrapper */}
-          <div className="fixed inset-4 sm:inset-6 lg:inset-8 bg-[#f5f5f7] rounded-[24px] sm:rounded-[28px] shadow-[0_24px_80px_rgba(0,0,0,0.25)] border border-[#e0e0e0]/50 overflow-hidden transform transition-all flex flex-col z-50 pointer-events-auto animate-in fade-in zoom-in-95 duration-300 ease-out" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif', fontFeatureSettings: '"zero" off' }}>
+          {/* Centered Modal Wrapper */}
+          <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none p-4 sm:p-6 lg:p-10">
+            <div 
+              className={`w-full bg-[#f5f5f7] rounded-[24px] sm:rounded-[28px] shadow-[0_24px_80px_rgba(0,0,0,0.25)] border border-[#e0e0e0]/50 overflow-hidden transform transition-all duration-300 ease-out flex flex-col pointer-events-auto animate-in fade-in zoom-in-95 ${
+                isPoDetailLoadingState 
+                  ? "max-w-md h-[180px]" 
+                  : isPoDetailError || !poDetailData?.success || !poDetailData.po
+                  ? "max-w-xl h-[340px]" 
+                  : "max-w-7xl max-h-[85vh]"
+              }`}
+              style={{ 
+                fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif', 
+                fontFeatureSettings: '"zero" off' 
+              }}
+            >
             
-            {isPoDetailLoading || (!poDetailData && !isPoDetailError) || (poDetailData && poDetailData.po?.id !== selectedPoId && !isPoDetailError && poDetailData.success !== false) ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-[#7a7a7a]">
-                <SFSymbolArrowClockwise className="animate-spin mb-4 text-[#0066cc]" size={24} />
-                <p className="text-[17px]">Đang tải chi tiết đơn nhập...</p>
+            {isPoDetailLoadingState ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-[#7a7a7a] relative">
+                <button 
+                  onClick={() => setSelectedPoId(null)}
+                  className="absolute right-4 top-4 w-7 h-7 rounded-full flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-[#7a7a7a] hover:text-[#1d1d1f] cursor-pointer transition-all duration-200"
+                >
+                  ✕
+                </button>
+                <SFSymbolArrowClockwise className="animate-spin mb-3 text-[#0066cc]" size={22} />
+                <p className="text-[15px] font-medium text-[#1d1d1f]">Đang tải chi tiết đơn nhập...</p>
               </div>
             ) : isPoDetailError || !poDetailData?.success || !poDetailData.po ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-                <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4 text-red-500 font-bold text-xl">
+                <div className="w-14 h-14 bg-red-50 rounded-full flex items-center justify-center mb-3.5 text-red-500 font-bold text-xl">
                   ✕
                 </div>
-                <h3 className="text-[21px] font-semibold text-[#1d1d1f] mb-2">Lỗi tải dữ liệu</h3>
-                <p className="text-[17px] text-[#7a7a7a] mb-6 max-w-md leading-relaxed">
+                <h3 className="text-[19px] font-bold text-[#1d1d1f] mb-1.5">Lỗi tải dữ liệu</h3>
+                <p className="text-[15px] text-[#7a7a7a] mb-5 max-w-sm leading-relaxed">
                   {poDetailData?.message || (poDetailError as any)?.message || "Không thể tải chi tiết đơn nhập hàng. Vui lòng thử lại."}
                 </p>
                 <button 
                   onClick={() => setSelectedPoId(null)}
-                  className="px-6 h-[40px] bg-slate-100 hover:bg-slate-200 text-[#1d1d1f] font-semibold rounded-full transition-all active:scale-95 duration-200 cursor-pointer"
+                  className="px-5 h-[36px] bg-slate-100 hover:bg-slate-200 text-[#1d1d1f] text-[13px] font-semibold rounded-full transition-all active:scale-95 duration-200 cursor-pointer"
                 >
                   Đóng
                 </button>
               </div>
             ) : (
               <>
-                {/* 1. Header Card - Edit Mode / Display Mode */}
-                <div className="mx-6 mt-5 mb-3 p-4 bg-white rounded-2xl border border-slate-200/50 shadow-sm shrink-0">
-                  {isEditingPo ? (
-                    <div className="space-y-3.5">
-                      <div className="flex items-center justify-between border-b border-[#f5f5f7] pb-2.5">
-                        <h2 className="text-[17px] font-bold text-[#1d1d1f] tracking-[-0.02em]">
-                          Chỉnh sửa Phiếu nhập: {poDetailData.po.poNumber}
-                        </h2>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              // Save changes
-                              const shippingDigits = poShippingCostInput.replace(/\D/g, "");
-                              const taxDigits = poTaxImportInput.replace(/\D/g, "");
-                              updatePoMutation.mutate({
-                                id: selectedPoId!,
-                                payload: {
-                                  status: poStatusInput as any,
-                                  shippingCost: shippingDigits || "0",
-                                  taxImport: taxDigits || "0",
-                                }
-                              });
-                            }}
-                            disabled={updatePoMutation.isPending}
-                            className="px-4 h-[30px] bg-[#0066cc] hover:bg-[#0071e3] text-white text-[12px] font-bold rounded-full cursor-pointer transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center shadow-sm"
-                          >
-                            {updatePoMutation.isPending ? "Đang lưu..." : "Lưu"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              // Reset states and exit edit mode
-                              setPoStatusInput(poDetailData.po.status);
-                              setPoShippingCostInput(poDetailData.po.shippingCost ? Math.round(Number(poDetailData.po.shippingCost)).toString() : "0");
-                              setPoTaxImportInput(poDetailData.po.taxImport ? Math.round(Number(poDetailData.po.taxImport)).toString() : "0");
-                              setIsEditingPo(false);
-                            }}
-                            className="px-4 h-[30px] bg-slate-100 hover:bg-slate-200 text-[#1d1d1f] text-[12px] font-bold rounded-full cursor-pointer transition-all active:scale-95"
-                          >
-                            Hủy
-                          </button>
-                        </div>
-                      </div>
+                {/* 1. Modal Header */}
+                <div className="px-6 py-4.5 border-b border-slate-200/60 bg-white flex items-center justify-between shrink-0 select-none">
+                  <div className="flex items-center gap-2.5">
+                    <h2 className="text-[17px] font-bold text-[#1d1d1f] tracking-[-0.02em]">
+                      Chi tiết Đơn nhập: {poDetailData.po.poNumber}
+                    </h2>
+                    <div 
+                      className={`text-[11.5px] font-bold px-2 py-0.5 rounded-full select-none ${
+                        poDetailData.po.status === "received" 
+                          ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                          : poDetailData.po.status === "in_transit"
+                          ? "bg-blue-50 text-blue-600 border border-blue-100"
+                          : poDetailData.po.status === "cancelled"
+                          ? "bg-red-50 text-red-600 border border-red-100"
+                          : "bg-slate-50 text-slate-500 border border-slate-200"
+                      }`}
+                    >
+                      {poDetailData.po.status === "received" 
+                        ? "Đã sẵn hàng"
+                        : poDetailData.po.status === "in_transit"
+                        ? "Đang vận chuyển"
+                        : poDetailData.po.status === "cancelled"
+                        ? "Đã hủy"
+                        : poDetailData.po.status === "draft"
+                        ? "Bản nháp"
+                        : poDetailData.po.status === "ordered"
+                        ? "Đã đặt hàng"
+                        : poDetailData.po.status === "partially_received"
+                        ? "Nhận một phần"
+                        : poDetailData.po.status === "warranty_supplier"
+                        ? "Bảo hành NCC"
+                        : poDetailData.po.status === "returned_supplier"
+                        ? "Đã trả NCC"
+                        : poDetailData.po.status}
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setSelectedPoId(null)}
+                    className="w-9 h-9 rounded-full flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-[#7a7a7a] hover:text-[#1d1d1f] cursor-pointer transition-all duration-200"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* 2. Split Body Layout */}
+                <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
+                  
+                  {/* Left Side: Table of items */}
+                  <div className="flex-1 flex flex-col min-w-0 min-h-0 p-5">
+                    <div className="bg-white rounded-2xl border border-slate-200/50 p-4 shadow-sm flex flex-col flex-1 overflow-hidden">
+                      <h3 className="text-[12.5px] font-bold text-[#86868b] uppercase tracking-wider mb-3.5 px-1 select-none">
+                        Danh sách máy đã nhập theo đơn ({Number(poDetailData.items?.length || 0)})
+                      </h3>
                       
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-3.5">
-                        {/* Status Select */}
-                        <div className="flex items-center gap-3">
-                          <label className="shrink-0 text-[13px] font-semibold text-[#86868b] min-w-[75px]">Trạng thái:</label>
-                          <div className="flex-1">
+                      <div className="overflow-auto flex-1 rounded-xl border border-slate-100">
+                        <table className="w-full text-left border-collapse min-w-[500px]">
+                          <thead className="sticky top-0 z-10">
+                            <tr className="bg-[#f5f5f7] text-[#8e8e93] font-semibold uppercase text-[11px] tracking-wide whitespace-nowrap border-b border-slate-200/60 select-none">
+                              <th className="px-4 py-2.5 w-14 text-center whitespace-nowrap">STT</th>
+                              <th className="px-4 py-2.5 whitespace-nowrap">Tên sản phẩm / Model</th>
+                              <th className="px-4 py-2.5 whitespace-nowrap">Số Serial</th>
+                              <th className="px-4 py-2.5 text-center whitespace-nowrap">Trạng thái máy</th>
+                              <th className="px-4 py-2.5 text-right whitespace-nowrap">Giá vốn nhập kho</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100/80 text-[14px] text-[#1d1d1f]">
+                            {poDetailData.items?.map((item: any, idx: number) => {
+                              const costPriceVal = Number(item.costPrice || 0);
+                              return (
+                                <tr key={item.id} className="hover:bg-[#f5f5f7]/40 transition-colors">
+                                  <td className="px-4 py-2.5 text-center text-[#8e8e93] font-medium text-[13px] whitespace-nowrap">
+                                    {idx + 1}
+                                  </td>
+                                  <td className="px-4 py-2.5 font-medium text-[#1d1d1f]">
+                                    <div className="flex flex-col">
+                                      <span className="text-[13.5px]">{item.productName}</span>
+                                      
+                                      {/* Specs/Configuration */}
+                                      {item.productSpecs && (
+                                        <div className="flex flex-wrap gap-x-1.5 gap-y-0.5 text-[10px] text-[#86868b] font-semibold mt-1 select-none">
+                                          {item.productSpecs.cpu && (
+                                            <span className="bg-[#f5f5f7] px-1.5 py-0.5 rounded">{item.productSpecs.cpu}</span>
+                                          )}
+                                          {item.productSpecs.ram && (
+                                            <span className="bg-[#f5f5f7] px-1.5 py-0.5 rounded">RAM {item.productSpecs.ram}</span>
+                                          )}
+                                          {item.productSpecs.ssd && (
+                                            <span className="bg-[#f5f5f7] px-1.5 py-0.5 rounded">SSD {item.productSpecs.ssd}</span>
+                                          )}
+                                          {item.productSpecs.screen && (
+                                            <span className="bg-[#f5f5f7] px-1.5 py-0.5 rounded">{item.productSpecs.screen}</span>
+                                          )}
+                                        </div>
+                                      )}
+
+                                      {item.condition && (
+                                        <span className="text-[11px] text-[#8e8e93] font-normal mt-0.5">
+                                          {item.condition === 'new' ? 'Mới 100%' : 'Like New 99%'}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-2.5 whitespace-nowrap">
+                                    <span className="font-medium text-[13px] text-[#48484a] tracking-[0.01em]">
+                                      {item.serialNumber}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-2.5 text-center whitespace-nowrap">
+                                    <StatusBadge status={item.status} className="text-[12.5px]" />
+                                  </td>
+                                  <td className="px-4 py-2.5 text-right font-bold text-[#1d1d1f] whitespace-nowrap text-[13.5px]">
+                                    {formatPrice(costPriceVal.toString())}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Side: Invoice Summary Sidebar */}
+                  <div className="w-full lg:w-[320px] shrink-0 bg-white border-t lg:border-t-0 lg:border-l border-slate-200 p-5 flex flex-col justify-between overflow-y-auto">
+                    <div className="space-y-6">
+                      
+                      {/* Section 1: General Metadata */}
+                      {isEditingPo ? (
+                        <div className="space-y-4">
+                          <h3 className="text-[11.5px] font-bold text-[#86868b] uppercase tracking-wider select-none">
+                            Cập nhật chi phí
+                          </h3>
+                          
+                          {/* Status Input */}
+                          <div className="space-y-1.5">
+                            <label className="text-[12px] font-semibold text-[#86868b]">Trạng thái đơn nhập:</label>
                             <CustomSelect
                               options={[
                                 { value: "in_transit", label: "Đang vận chuyển" },
@@ -1874,239 +1951,208 @@ function InventoryPageContent() {
                               dropdownWidth="full"
                             />
                           </div>
-                        </div>
 
-                        {/* Shipping Cost Input */}
-                        <div className="flex items-center gap-3">
-                          <label className="shrink-0 text-[13px] font-semibold text-[#86868b] min-w-[75px]">Vận chuyển:</label>
-                          <div className="relative flex-1">
-                            <input
-                              type="text"
-                              value={formatVNDInput(poShippingCostInput)}
-                              onChange={(e) => setPoShippingCostInput(e.target.value.replace(/\D/g, ""))}
-                              className="w-full pl-4 pr-8 h-[40px] rounded-full bg-[#f5f5f7] border border-[#e0e0e0] text-[13px] font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 transition-all text-right"
-                              placeholder="0"
-                            />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-[#7a7a7a] font-medium pointer-events-none">₫</span>
+                          {/* Shipping Input */}
+                          <div className="space-y-1.5">
+                            <label className="text-[12px] font-semibold text-[#86868b]">Phí vận chuyển:</label>
+                            <div className="relative">
+                              <input
+                                type="text"
+                                value={formatVNDInput(poShippingCostInput)}
+                                onChange={(e) => {
+                                  const val = e.target.value.replace(/\D/g, "");
+                                  setPoShippingCostInput(val ? parseInt(val, 10).toString() : "");
+                                }}
+                                className="w-full pl-4 pr-8 h-[36px] rounded-xl bg-[#f5f5f7] border border-[#e0e0e0] text-[13px] font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 transition-all text-right"
+                                placeholder="0"
+                              />
+                              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-[#7a7a7a] font-medium pointer-events-none">₫</span>
+                            </div>
+                          </div>
+
+                          {/* Action Save/Cancel inside sidebar */}
+                          <div className="flex gap-2 pt-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const shippingDigits = poShippingCostInput.replace(/\D/g, "");
+                                updatePoMutation.mutate({
+                                  id: selectedPoId!,
+                                  payload: {
+                                    status: poStatusInput as any,
+                                    shippingCost: shippingDigits || "0",
+                                  }
+                                });
+                              }}
+                              disabled={updatePoMutation.isPending}
+                              className="flex-1 h-9 bg-[#0066cc] hover:bg-[#0071e3] text-white text-[13px] font-semibold rounded-full cursor-pointer transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center shadow-sm"
+                            >
+                              {updatePoMutation.isPending ? "Đang lưu..." : "Lưu"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPoStatusInput(poDetailData.po.status);
+                                setPoShippingCostInput(poDetailData.po.shippingCost ? Math.round(Number(poDetailData.po.shippingCost)).toString() : "0");
+                                setIsEditingPo(false);
+                              }}
+                              className="px-4 h-9 bg-slate-100 hover:bg-slate-200 text-[#1d1d1f] text-[13px] font-semibold rounded-full cursor-pointer transition-all active:scale-95"
+                            >
+                              Hủy
+                            </button>
                           </div>
                         </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <h3 className="text-[11.5px] font-bold text-[#86868b] uppercase tracking-wider select-none">
+                              Thông tin chung
+                            </h3>
+                            <button
+                              type="button"
+                              onClick={() => setIsEditingPo(true)}
+                              className="text-[12px] text-[#0066cc] hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+                            >
+                              <SFSymbolSquareAndPencil size={11} />
+                              <span>Sửa</span>
+                            </button>
+                          </div>
+                          
+                          <div className="space-y-2 text-[13px] text-slate-600">
+                            <div className="flex justify-between">
+                              <span className="text-[#86868b]">Nhà cung cấp:</span>
+                              <span className="font-semibold text-[#1d1d1f]">{poDetailData.po.supplierName || "N/A"}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-[#86868b]">Quốc gia gửi:</span>
+                              <span className="font-semibold text-[#1d1d1f]">{poDetailData.po.originCountry || "VN"}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-[#86868b]">Hình thức:</span>
+                              <span className="font-semibold text-[#1d1d1f]">{poDetailData.po.shippingMethod || "N/A"}</span>
+                            </div>
+                            {poDetailData.po.trackingNumber && (
+                              <div className="flex justify-between">
+                                <span className="text-[#86868b]">Mã vận đơn:</span>
+                                <span className="font-semibold text-[#1d1d1f] tracking-tight">{poDetailData.po.trackingNumber}</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between">
+                              <span className="text-[#86868b]">Ngày tạo:</span>
+                              <span className="font-semibold text-[#1d1d1f]">{formatToDDMMYYYY(poDetailData.po.createdAt)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
-                        {/* Tax Import Input */}
-                        <div className="flex items-center gap-3">
-                          <label className="shrink-0 text-[13px] font-semibold text-[#86868b] min-w-[75px]">Thuế & Khác:</label>
-                          <div className="relative flex-1">
-                            <input
-                              type="text"
-                              value={formatVNDInput(poTaxImportInput)}
-                              onChange={(e) => setPoTaxImportInput(e.target.value.replace(/\D/g, ""))}
-                              className="w-full pl-4 pr-8 h-[40px] rounded-full bg-[#f5f5f7] border border-[#e0e0e0] text-[13px] font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 transition-all text-right"
-                              placeholder="0"
-                            />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-[#7a7a7a] font-medium pointer-events-none">₫</span>
+                      <hr className="border-slate-100" />
+
+                      {/* Section 2: Quantities Stats */}
+                      <div className="space-y-3">
+                        <h3 className="text-[11.5px] font-bold text-[#86868b] uppercase tracking-wider select-none">
+                          Phân bổ số lượng
+                        </h3>
+                        <div className="space-y-2.5 text-[13px]">
+                          <div className="flex justify-between items-center bg-slate-50 px-2.5 py-1.5 rounded-lg font-bold text-slate-700">
+                            <span>Tổng số máy:</span>
+                            <span>{Number(poDetailData.stats?.totalItemsCount || 0)} máy</span>
+                          </div>
+                          <div className="flex justify-between items-center px-2.5">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                              <span className="text-slate-600">Sẵn bán:</span>
+                            </div>
+                            <span className="font-bold text-emerald-600">{Number(poDetailData.stats?.inStockCount || 0)} máy</span>
+                          </div>
+                          <div className="flex justify-between items-center px-2.5">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-blue-500" />
+                              <span className="text-slate-600">Đang về:</span>
+                            </div>
+                            <span className="font-bold text-blue-600">{Number(poDetailData.stats?.incomingCount || 0)} máy</span>
+                          </div>
+                          <div className="flex justify-between items-center px-2.5">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-amber-500" />
+                              <span className="text-slate-600">Đang lỗi:</span>
+                            </div>
+                            <span className="font-bold text-amber-600">{Number(poDetailData.stats?.defectiveCount || 0)} máy</span>
+                          </div>
+                          <div className="flex justify-between items-center px-2.5">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-slate-400" />
+                              <span className="text-slate-600">Đã trả NCC:</span>
+                            </div>
+                            <span className="font-bold text-slate-600">{Number(poDetailData.stats?.returnedCount || 0)} máy</span>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-start justify-between">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-3">
-                          <h2 className="text-[20px] font-bold text-[#1d1d1f] leading-none tracking-[-0.02em]" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif' }}>
-                            Chi tiết Đơn nhập: {poDetailData.po.poNumber}
-                          </h2>
-                          <div 
-                            className={`text-[13px] font-bold select-none ${
-                              poDetailData.po.status === "received" 
-                                ? "text-emerald-600"
-                                : poDetailData.po.status === "in_transit"
-                                ? "text-blue-600"
-                                : poDetailData.po.status === "cancelled"
-                                ? "text-red-600"
-                                : "text-slate-500"
-                            }`}
-                          >
-                            {poDetailData.po.status === "received" 
-                              ? "Đã sẵn hàng"
-                              : poDetailData.po.status === "in_transit"
-                              ? "Đang vận chuyển"
-                              : poDetailData.po.status === "cancelled"
-                              ? "Đã hủy"
-                              : poDetailData.po.status === "draft"
-                              ? "Bản nháp"
-                              : poDetailData.po.status === "ordered"
-                              ? "Đã đặt hàng"
-                              : poDetailData.po.status === "partially_received"
-                              ? "Nhận một phần"
-                              : poDetailData.po.status === "warranty_supplier"
-                              ? "Bảo hành NCC"
-                              : poDetailData.po.status === "returned_supplier"
-                              ? "Đã trả NCC"
-                              : poDetailData.po.status}
+
+                      <hr className="border-slate-100" />
+
+                      {/* Section 3: Cost Invoice Summary */}
+                      <div className="space-y-3 bg-[#f5f5f7]/55 p-3 rounded-xl border border-slate-100">
+                        <h3 className="text-[11.5px] font-bold text-[#86868b] uppercase tracking-wider select-none">
+                          Hóa đơn chi phí
+                        </h3>
+                        <div className="space-y-2 text-[13px]">
+                          <div className="flex justify-between text-slate-600">
+                            <span>Tiền hàng:</span>
+                            <span className="font-semibold text-[#1d1d1f]">{formatPrice(poDetailData.po.totalCost)}</span>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => setIsEditingPo(true)}
-                            className="flex items-center gap-1.5 px-3.5 h-[30px] bg-[#0066cc] hover:bg-[#0071e3] text-white text-[12px] font-bold rounded-full transition-all cursor-pointer shadow-sm active:scale-95 duration-200"
-                          >
-                            <SFSymbolSquareAndPencil size={12} />
-                            <span>Cập nhật chi phí</span>
-                          </button>
-                        </div>
-                        
-                        <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-[13px] text-[#86868b] font-medium">
-                          <div>
-                            Nhà cung cấp: <span className="font-bold text-[#1d1d1f]">{poDetailData.po.supplierName || "N/A"}</span>
-                          </div>
-                          <span className="text-slate-200">|</span>
-                          <div>
-                            Quốc gia gửi: <span className="font-bold text-[#1d1d1f]">{poDetailData.po.originCountry || "VN"}</span>
-                          </div>
-                          <span className="text-slate-200">|</span>
-                          <div>
-                            Vận chuyển: <span className="font-bold text-[#1d1d1f]">
-                              {poDetailData.po.shippingMethod || "N/A"} 
-                              {poDetailData.po.trackingNumber && ` (Mã: ${poDetailData.po.trackingNumber})`}
+                          
+                          <div className="flex justify-between text-slate-600">
+                            <div className="flex flex-col">
+                              <span>Vận chuyển:</span>
+                              <span className="text-[10px] text-[#86868b] leading-tight font-medium">
+                                Mỗi máy: +{formatPrice((Number(poDetailData.po.shippingCost || 0) / (Number(poDetailData.stats?.totalItemsCount || 0) || 1)).toFixed(2))}
+                              </span>
+                            </div>
+                            <span className="font-semibold text-[#1d1d1f]">
+                              +{formatPrice(Number(poDetailData.po.shippingCost || 0).toFixed(2))}
                             </span>
                           </div>
-                          <span className="text-slate-200">|</span>
-                          <div>
-                            Ngày nhập: <span className="font-bold text-[#1d1d1f]">{formatToDDMMYYYY(poDetailData.po.createdAt)}</span>
+
+                          {Number(poDetailData.stats?.totalAccessoryCost || 0) > 0 && (
+                            <div className="flex justify-between text-slate-600">
+                              <span>Phụ kiện lẻ:</span>
+                              <span className="font-semibold text-[#1d1d1f]">
+                                +{formatPrice(Number(poDetailData.stats?.totalAccessoryCost || 0).toFixed(2))}
+                              </span>
+                            </div>
+                          )}
+
+                          <hr className="border-slate-200/80 my-1" />
+
+                          {/* Grand Total Cost */}
+                          <div className="flex justify-between items-baseline pt-1">
+                            <span className="font-bold text-[#1d1d1f] text-[13.5px]">Tổng đơn nhập:</span>
+                            <span className="font-black text-[#0066cc] text-[17px] tracking-tight">
+                              {formatPrice(
+                                (
+                                  Number(poDetailData.po.totalCost || 0) + 
+                                  Number(poDetailData.po.shippingCost || 0) + 
+                                  Number(poDetailData.stats?.totalAccessoryCost || 0)
+                                ).toFixed(2)
+                              )}
+                            </span>
                           </div>
                         </div>
                       </div>
 
-                      <button 
-                        onClick={() => setSelectedPoId(null)}
-                        className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-[#7a7a7a] hover:text-[#1d1d1f] cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95 shrink-0"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  )}
-                  {/* Quick Stats Grid - Compact Segmented UI */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 mt-4 pt-4 border-t border-[#f5f5f7]">
-                    <div className="bg-[#f5f5f7]/55 rounded-xl p-2.5 border border-slate-100 flex flex-col justify-center select-none">
-                      <span className="text-[10.5px] font-bold text-[#86868b] uppercase tracking-wider">Tổng số máy</span>
-                      <span className="text-[14.5px] font-extrabold text-[#1d1d1f] mt-1">{Number(poDetailData.stats?.totalItemsCount || 0)} máy</span>
                     </div>
                     
-                    <div className="bg-emerald-50/45 rounded-xl p-2.5 border border-emerald-100/50 flex flex-col justify-center select-none">
-                      <span className="text-[10.5px] font-bold text-emerald-700/80 uppercase tracking-wider">Sẵn bán</span>
-                      <span className="text-[14.5px] font-extrabold text-emerald-600 mt-1">
-                        {Number(poDetailData.stats?.inStockCount || 0)} máy
-                      </span>
-                    </div>
-
-                    <div className="bg-blue-50/45 rounded-xl p-2.5 border border-blue-100/50 flex flex-col justify-center select-none">
-                      <span className="text-[10.5px] font-bold text-blue-700/80 uppercase tracking-wider">Đang về</span>
-                      <span className="text-[14.5px] font-extrabold text-blue-600 mt-1">
-                        {Number(poDetailData.stats?.incomingCount || 0)} máy
-                      </span>
-                    </div>
-                    
-                    <div className="bg-amber-50/45 rounded-xl p-2.5 border border-amber-100/50 flex flex-col justify-center select-none">
-                      <span className="text-[10.5px] font-bold text-amber-700/80 uppercase tracking-wider">Đang lỗi</span>
-                      <span className="text-[14.5px] font-extrabold text-amber-600 mt-1">
-                        {Number(poDetailData.stats?.defectiveCount || 0)} máy
-                      </span>
-                    </div>
-
-                    <div className="bg-slate-50/60 rounded-xl p-2.5 border border-slate-200/50 flex flex-col justify-center select-none">
-                      <span className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Đã trả NCC</span>
-                      <span className="text-[14.5px] font-extrabold text-slate-600 mt-1">
-                        {Number(poDetailData.stats?.returnedCount || 0)} máy
-                      </span>
-                    </div>
-                    
-                    <div className="bg-[#f5f5f7]/55 rounded-xl p-2.5 border border-slate-100 flex flex-col justify-center select-none">
-                      <span className="text-[10.5px] font-bold text-[#86868b] uppercase tracking-wider">Tiền hàng</span>
-                      <span className="text-[14.5px] font-extrabold text-[#1d1d1f] mt-1">{formatPrice(poDetailData.po.totalCost)}</span>
-                    </div>
-                    
-                    <div className="bg-[#f5f5f7]/55 rounded-xl p-2.5 border border-slate-100 flex flex-col justify-center select-none">
-                      <span className="text-[10.5px] font-bold text-[#86868b] uppercase tracking-wider">VC & Thuế</span>
-                      <div className="flex flex-col mt-0.5">
-                        <span className="text-[14.5px] font-extrabold text-[#1d1d1f] leading-tight">
-                          {formatPrice((Number(poDetailData.po.shippingCost || 0) + Number(poDetailData.po.taxImport || 0)).toFixed(2))}
-                        </span>
-                        <span className="text-[9px] text-[#86868b] font-semibold mt-0.5 leading-none">
-                          Mỗi máy: +{formatPrice(((Number(poDetailData.po.shippingCost || 0) + Number(poDetailData.po.taxImport || 0)) / (Number(poDetailData.stats?.totalItemsCount || 0) || 1)).toFixed(2))}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <div className="bg-[#f5f5f7]/55 rounded-xl p-2.5 border border-slate-100 flex flex-col justify-center select-none">
-                      <span className="text-[10.5px] font-bold text-[#86868b] uppercase tracking-wider">Phụ kiện lẻ</span>
-                      <span className="text-[14.5px] font-extrabold text-[#1d1d1f] mt-1">
-                        {formatPrice(Number(poDetailData.stats?.totalAccessoryCost || 0).toFixed(2))}
-                      </span>
+                    {/* Sidebar Footer Hint */}
+                    <div className="pt-4 text-center text-[10.5px] text-[#86868b] font-medium leading-relaxed border-t border-slate-100 select-none">
+                      Phí vận chuyển được phân bổ đều cho tổng số máy thực tế của đơn nhập này.
                     </div>
                   </div>
-                </div>
 
-                {/* 3. Table Card */}
-                <div className="mx-6 mb-3 flex-1 flex flex-col min-h-0">
-                  <div className="bg-white rounded-2xl border border-slate-200/50 p-4 shadow-sm flex flex-col flex-1 overflow-hidden">
-                    <h3 className="text-[13.5px] font-bold text-[#86868b] uppercase tracking-wider mb-4 px-1">
-                      Danh sách máy đã nhập theo đơn ({Number(poDetailData.items?.length || 0)})
-                    </h3>
-                    
-                    <div className="overflow-auto flex-1 rounded-xl border border-slate-100">
-                      <table className="w-full text-left border-collapse min-w-[700px]">
-                        <thead className="sticky top-0 z-10">
-                          <tr className="bg-[#f5f5f7] text-[#8e8e93] font-semibold uppercase text-[11px] tracking-wide whitespace-nowrap border-b border-slate-200/60">
-                            <th className="px-5 py-3 w-14 text-center whitespace-nowrap">STT</th>
-                            <th className="px-5 py-3 whitespace-nowrap">Tên sản phẩm / Model</th>
-                            <th className="px-5 py-3 whitespace-nowrap">Số Serial</th>
-                            <th className="px-5 py-3 text-center whitespace-nowrap">Trạng thái máy</th>
-                            <th className="px-5 py-3 text-right whitespace-nowrap">Giá vốn nhập kho</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100/80 text-[14px] text-[#1d1d1f]">
-                          {poDetailData.items?.map((item: any, idx: number) => {
-                            const costPriceVal = Number(item.costPrice || 0);
-                            return (
-                              <tr key={item.id} className="hover:bg-[#f5f5f7]/40 transition-colors">
-                                <td className="px-5 py-3 text-center text-[#8e8e93] font-medium text-[13px] whitespace-nowrap">
-                                  {idx + 1}
-                                </td>
-                                <td className="px-5 py-3 font-medium text-[#1d1d1f]">
-                                  <div className="flex flex-col">
-                                    <span className="text-[13.5px]">{item.productName}</span>
-                                    {item.condition && (
-                                      <span className="text-[11px] text-[#8e8e93] font-normal mt-0.5">
-                                        {item.condition === 'new' ? 'Mới 100%' : 'Like New 99%'}
-                                      </span>
-                                    )}
-                                  </div>
-                                </td>
-                                <td className="px-5 py-3 whitespace-nowrap">
-                                  <span className="font-medium text-[13px] text-[#48484a] tracking-[0.01em]">
-                                    {item.serialNumber}
-                                  </span>
-                                </td>
-                                <td className="px-5 py-3 text-center whitespace-nowrap">
-                                  <StatusBadge status={item.status} className="text-[12.5px]" />
-                                </td>
-                                <td className="px-5 py-3 text-right font-bold text-[#1d1d1f] whitespace-nowrap text-[13.5px]">
-                                  {formatPrice(costPriceVal.toString())}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Footer */}
-                <div className="px-6 py-2.5 bg-transparent text-center text-[12px] text-[#86868b] font-semibold shrink-0">
-                  Phí vận chuyển và Thuế nhập khẩu được phân bổ đều cho tổng số máy thực tế của đơn nhập này.
                 </div>
               </>
             )}
             
+            </div>
           </div>
         </>,
         document.body

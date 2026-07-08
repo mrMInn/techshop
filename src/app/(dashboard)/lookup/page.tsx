@@ -15,8 +15,8 @@ import {
   SFSymbolQRCode,
   SFSymbolFileSpreadsheet
 } from "@/components/ui/apple-icons";
-import { searchCustomersByPhone, getCustomerDetail, getCustomersList } from "@/app/actions/customers";
-import { getInventoryItemLifecycle, getInventoryItems } from "@/app/actions/inventory";
+import { searchCustomersByPhone, getCustomerDetail, getLookupSuggestions } from "@/app/actions/customers";
+import { getInventoryItemLifecycle } from "@/app/actions/inventory";
 import Link from "next/link";
 import { toast } from "sonner";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -171,21 +171,14 @@ function LookupPageContent() {
     async function loadSuggestions() {
       try {
         setSuggestionsLoading(true);
-        const [custRes, invRes] = await Promise.all([
-          getCustomersList(),
-          getInventoryItems()
-        ]);
-        if (Array.isArray(custRes)) {
-          const filtered = custRes
-            .filter((c: any) => c.phone && c.fullName !== "Khách vãng lai")
-            .slice(0, 4);
-          setRecentCustomers(filtered);
-        }
-        if (Array.isArray(invRes)) {
-          const filtered = invRes
-            .filter((i: any) => i.serialNumber)
-            .slice(0, 4);
-          setRecentSerials(filtered);
+        const res = await getLookupSuggestions();
+        if (res.success) {
+          if (res.recentCustomers) {
+            setRecentCustomers(res.recentCustomers);
+          }
+          if (res.recentSerials) {
+            setRecentSerials(res.recentSerials);
+          }
         }
       } catch (error) {
         console.error("Lỗi tải gợi ý tra cứu:", error);
@@ -354,16 +347,59 @@ function LookupPageContent() {
     const isPhonePattern = /^\+?[0-9]{8,15}$/.test(cleanNum);
 
     if (isPhonePattern) {
-      setSearchType("customer");
-      const foundCustomer = await handleSearchPhone(target);
-      
-      // Fallback to Serial Search if no customer is found
-      if (!foundCustomer) {
-        setSearchType("serial");
-        const foundSerial = await handleSearchSerial(target);
-        if (!foundSerial) {
+      setPhoneLoading(true);
+      setSerialLoading(true);
+      setSearchResults([]);
+      setSelectedCustomerId(null);
+      setCustomerDetail(null);
+      setLifecycleData(null);
+
+      try {
+        const [phoneRes, serialRes] = await Promise.all([
+          searchCustomersByPhone(target),
+          getInventoryItemLifecycle(target)
+        ]);
+
+        const hasCustomer = phoneRes.success && phoneRes.customers && phoneRes.customers.length > 0;
+        const hasSerial = serialRes.success;
+
+        if (hasCustomer) {
+          setSearchResults(phoneRes.customers);
+          saveToHistory(target, "customer", phoneRes.customers[0].fullName);
+          setSearchType("customer");
+          
+          const urlParams = new URLSearchParams(window.location.search);
+          const customerIdParam = urlParams.get("customerId");
+          const hasMatchingCustomer = customerIdParam && phoneRes.customers.some((c: any) => c.id === customerIdParam);
+          
+          if (hasMatchingCustomer) {
+            setSelectedCustomerId(customerIdParam);
+            fetchCustomerDetail(customerIdParam);
+          } else if (phoneRes.customers.length === 1) {
+            const customerId = phoneRes.customers[0].id;
+            setSelectedCustomerId(customerId);
+            fetchCustomerDetail(customerId);
+          } else if (phoneRes.customers.length > 1) {
+            toast.info(`Tìm thấy ${phoneRes.customers.length} khách hàng trùng khớp`);
+          }
+
+          if (hasSerial) {
+            setLifecycleData(serialRes);
+          }
+        } else if (hasSerial) {
+          setLifecycleData(serialRes);
+          setSearchType("serial");
+          const itemLabel = serialRes.item ? `${serialRes.item.brandName || ""} ${serialRes.item.productName || ""}`.trim() : target;
+          saveToHistory(target, "serial", itemLabel);
+          toast.success("Đã tìm thấy lịch sử vòng đời thiết bị");
+        } else {
           toast.error("Không tìm thấy khách hàng hoặc thiết bị nào khớp");
         }
+      } catch (err: any) {
+        toast.error(err.message || "Lỗi kết nối máy chủ");
+      } finally {
+        setPhoneLoading(false);
+        setSerialLoading(false);
       }
     } else {
       setSearchType("serial");

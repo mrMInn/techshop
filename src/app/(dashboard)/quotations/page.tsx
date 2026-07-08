@@ -120,7 +120,6 @@ export default function QuotationsPage() {
 
   // Segmented Control counts
   const totalCount = quotationsData?.length || 0;
-  const draftCount = quotationsData?.filter(q => q.status === "draft" || q.status === "sent").length || 0;
   const viewedCount = quotationsData?.filter(q => q.status === "viewed").length || 0;
   const acceptedCount = quotationsData?.filter(q => q.status === "accepted").length || 0;
   const rejectedCount = quotationsData?.filter(q => q.status === "rejected").length || 0;
@@ -128,11 +127,10 @@ export default function QuotationsPage() {
 
   const activeSegmentIndex = useMemo(() => {
     if (statusFilter === "all") return 0;
-    if (statusFilter === "draft") return 1;
-    if (statusFilter === "viewed") return 2;
-    if (statusFilter === "accepted") return 3;
-    if (statusFilter === "rejected") return 4;
-    if (statusFilter === "converted") return 5;
+    if (statusFilter === "viewed") return 1;
+    if (statusFilter === "accepted") return 2;
+    if (statusFilter === "rejected") return 3;
+    if (statusFilter === "converted") return 4;
     return 0;
   }, [statusFilter]);
 
@@ -144,13 +142,13 @@ export default function QuotationsPage() {
         <div className="flex flex-wrap items-center gap-3 justify-start">
             
             {/* Status Segmented Control */}
-            <div className="relative flex bg-[#f5f5f7] p-[3px] rounded-full border border-[#e0e0e0] h-[40px] w-full sm:w-[720px] shrink-0 select-none overflow-hidden">
+            <div className="relative flex bg-[#f5f5f7] p-[3px] rounded-full border border-[#e0e0e0] h-[40px] w-full sm:w-[700px] shrink-0 select-none overflow-hidden">
               {/* Sliding active indicator */}
               <div 
                 className="absolute top-[3px] bottom-[3px] rounded-full bg-[#0066cc] shadow-[0_2px_4px_rgba(0,102,204,0.25)]"
                 style={{
-                  width: "calc(16.66667% - 6px)",
-                  left: `calc(${activeSegmentIndex * 16.66667}% + 3px)`,
+                  width: "calc(20% - 6px)",
+                  left: `calc(${activeSegmentIndex * 20}% + 3px)`,
                   transition: "left 280ms cubic-bezier(0.16, 1, 0.3, 1)"
                 }}
               />
@@ -159,7 +157,7 @@ export default function QuotationsPage() {
               <button
                 type="button"
                 onClick={() => setStatusFilter("all")}
-                className={`w-1/6 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[12.5px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                className={`w-1/5 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[12.5px] transition-colors duration-200 cursor-pointer active:scale-98 ${
                   activeSegmentIndex === 0 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
                 }`}
               >
@@ -176,107 +174,86 @@ export default function QuotationsPage() {
                 </span>
               </button>
 
-              {/* Tab 2: Nháp */}
+              {/* Tab 2: Đã xem */}
               <button
                 type="button"
-                onClick={() => setStatusFilter("draft")}
-                className={`w-1/6 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[12.5px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                onClick={() => setStatusFilter("viewed")}
+                className={`w-1/5 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[12.5px] transition-colors duration-200 cursor-pointer active:scale-98 ${
                   activeSegmentIndex === 1 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
                 }`}
               >
                 <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white shrink-0 transition-all duration-200 ${
                   activeSegmentIndex === 1
                     ? "bg-transparent shadow-none"
-                    : "bg-gradient-to-br from-slate-400 to-slate-600 shadow-[0_1px_2px_rgba(100,116,139,0.15)]"
+                    : "bg-gradient-to-br from-[#af52de] to-[#892ec0] shadow-[0_1px_2px_rgba(175,82,222,0.1)]"
                 }`}>
-                  <FileText size={activeSegmentIndex === 1 ? 12 : 9} className="transition-all duration-200" />
+                  <Eye size={activeSegmentIndex === 1 ? 12 : 9} className="transition-all duration-200" />
                 </div>
-                <span className="truncate">Nháp</span>
+                <span className="truncate">Đã xem</span>
                 <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 1 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
-                  {draftCount}
+                  {viewedCount}
                 </span>
               </button>
 
-              {/* Tab 3: Đã xem */}
+              {/* Tab 3: Đồng ý */}
               <button
                 type="button"
-                onClick={() => setStatusFilter("viewed")}
-                className={`w-1/6 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[12.5px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                onClick={() => setStatusFilter("accepted")}
+                className={`w-1/5 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[12.5px] transition-colors duration-200 cursor-pointer active:scale-98 ${
                   activeSegmentIndex === 2 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
                 }`}
               >
                 <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white shrink-0 transition-all duration-200 ${
                   activeSegmentIndex === 2
                     ? "bg-transparent shadow-none"
-                    : "bg-gradient-to-br from-[#af52de] to-[#892ec0] shadow-[0_1px_2px_rgba(175,82,222,0.1)]"
+                    : "bg-gradient-to-br from-[#34c759] to-[#28a745] shadow-[0_1px_2px_rgba(52,199,89,0.1)]"
                 }`}>
-                  <Eye size={activeSegmentIndex === 2 ? 12 : 9} className="transition-all duration-200" />
+                  <CheckCircle size={activeSegmentIndex === 2 ? 12 : 9} className="transition-all duration-200" />
                 </div>
-                <span className="truncate">Đã xem</span>
+                <span className="truncate">Đồng ý</span>
                 <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 2 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
-                  {viewedCount}
+                  {acceptedCount}
                 </span>
               </button>
 
-              {/* Tab 4: Đồng ý */}
+              {/* Tab 4: Từ chối */}
               <button
                 type="button"
-                onClick={() => setStatusFilter("accepted")}
-                className={`w-1/6 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[12.5px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                onClick={() => setStatusFilter("rejected")}
+                className={`w-1/5 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[12.5px] transition-colors duration-200 cursor-pointer active:scale-98 ${
                   activeSegmentIndex === 3 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
                 }`}
               >
                 <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white shrink-0 transition-all duration-200 ${
                   activeSegmentIndex === 3
                     ? "bg-transparent shadow-none"
-                    : "bg-gradient-to-br from-[#34c759] to-[#28a745] shadow-[0_1px_2px_rgba(52,199,89,0.1)]"
+                    : "bg-gradient-to-br from-[#ff2d55] to-[#d6001c] shadow-[0_1px_2px_rgba(255,45,85,0.15)]"
                 }`}>
-                  <CheckCircle size={activeSegmentIndex === 3 ? 12 : 9} className="transition-all duration-200" />
+                  <XCircle size={activeSegmentIndex === 3 ? 12 : 9} className="transition-all duration-200" />
                 </div>
-                <span className="truncate">Đồng ý</span>
+                <span className="truncate">Từ chối</span>
                 <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 3 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
-                  {acceptedCount}
+                  {rejectedCount}
                 </span>
               </button>
 
-              {/* Tab 5: Từ chối */}
+              {/* Tab 5: Đã chuyển */}
               <button
                 type="button"
-                onClick={() => setStatusFilter("rejected")}
-                className={`w-1/6 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[12.5px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                onClick={() => setStatusFilter("converted")}
+                className={`w-1/5 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[12.5px] transition-colors duration-200 cursor-pointer active:scale-98 ${
                   activeSegmentIndex === 4 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
                 }`}
               >
                 <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white shrink-0 transition-all duration-200 ${
                   activeSegmentIndex === 4
                     ? "bg-transparent shadow-none"
-                    : "bg-gradient-to-br from-[#ff2d55] to-[#d6001c] shadow-[0_1px_2px_rgba(255,45,85,0.15)]"
-                }`}>
-                  <XCircle size={activeSegmentIndex === 4 ? 12 : 9} className="transition-all duration-200" />
-                </div>
-                <span className="truncate">Từ chối</span>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 4 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
-                  {rejectedCount}
-                </span>
-              </button>
-
-              {/* Tab 6: Đã chuyển */}
-              <button
-                type="button"
-                onClick={() => setStatusFilter("converted")}
-                className={`w-1/6 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[12.5px] transition-colors duration-200 cursor-pointer active:scale-98 ${
-                  activeSegmentIndex === 5 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
-                }`}
-              >
-                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white shrink-0 transition-all duration-200 ${
-                  activeSegmentIndex === 5
-                    ? "bg-transparent shadow-none"
                     : "bg-gradient-to-br from-amber-500 to-orange-600 shadow-[0_1px_2px_rgba(245,158,11,0.15)]"
                 }`}>
-                  <RefreshCw size={activeSegmentIndex === 5 ? 12 : 9} className="transition-all duration-200" />
+                  <RefreshCw size={activeSegmentIndex === 4 ? 12 : 9} className="transition-all duration-200" />
                 </div>
                 <span className="truncate">Đã chuyển</span>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 5 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 4 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
                   {convertedCount}
                 </span>
               </button>

@@ -389,3 +389,46 @@ export async function getLeadSourcesList() {
     return [];
   }
 }
+
+// ============================================================
+// 6. Lấy gợi ý tra cứu nhanh cho trang Tra cứu (chỉ lấy 4 bản ghi mỗi bảng)
+// ============================================================
+export async function getLookupSuggestions() {
+  try {
+    const [recentCustomers, recentSerials] = await Promise.all([
+      db
+        .select({
+          id: customers.id,
+          fullName: customers.fullName,
+          phone: customers.phone,
+          email: customers.email,
+          address: customers.address,
+        })
+        .from(customers)
+        .where(sql`${customers.phone} IS NOT NULL AND ${customers.fullName} != 'Khách vãng lai'`)
+        .orderBy(desc(customers.createdAt))
+        .limit(4),
+
+      db
+        .select({
+          id: inventoryItems.id,
+          serialNumber: inventoryItems.serialNumber,
+          status: inventoryItems.status,
+          productName: products.name,
+          brandName: brands.name,
+        })
+        .from(inventoryItems)
+        .innerJoin(products, eq(inventoryItems.productId, products.id))
+        .innerJoin(brands, eq(products.brandId, brands.id))
+        .where(sql`${inventoryItems.serialNumber} IS NOT NULL`)
+        .orderBy(desc(inventoryItems.createdAt))
+        .limit(4),
+    ]);
+
+    return { success: true, recentCustomers, recentSerials };
+  } catch (error: any) {
+    console.error("Lỗi lấy gợi ý tra cứu:", error);
+    return { success: false, message: error.message || "Lỗi lấy gợi ý" };
+  }
+}
+

@@ -17,6 +17,7 @@ export async function getPurchaseOrdersList() {
         totalCost: purchaseOrders.totalCost,
         shippingCost: purchaseOrders.shippingCost,
         totalItemsCount: sql<number>`cast(count(${inventoryItems.id}) as integer)`,
+        returnedItemsCount: sql<number>`cast(sum(case when ${inventoryItems.status} = 'returned' then 1 else 0 end) as integer)`,
       })
       .from(purchaseOrders)
       .leftJoin(suppliers, eq(purchaseOrders.supplierId, suppliers.id))
@@ -33,7 +34,26 @@ export async function getPurchaseOrdersList() {
       )
       .orderBy(desc(purchaseOrders.createdAt));
 
-    return { success: true, purchaseOrders: list };
+    const mappedList = list.map((po) => {
+      let status = po.status;
+      const totalItemsCount = po.totalItemsCount || 0;
+      const returnedItemsCount = po.returnedItemsCount || 0;
+      if (totalItemsCount > 0 && returnedItemsCount === totalItemsCount) {
+        status = "returned_supplier";
+      }
+      return {
+        id: po.id,
+        poNumber: po.poNumber,
+        supplierName: po.supplierName,
+        status,
+        createdAt: po.createdAt,
+        totalCost: po.totalCost,
+        shippingCost: po.shippingCost,
+        totalItemsCount,
+      };
+    });
+
+    return { success: true, purchaseOrders: mappedList };
   } catch (error: any) {
     console.error("Lỗi lấy danh sách đơn nhập hàng:", error);
     return { success: false, message: error.message || "Lỗi truy vấn danh sách đơn nhập" };
@@ -72,6 +92,7 @@ export async function getPurchaseOrderDetail(poId: string) {
           serialNumber: inventoryItems.serialNumber,
           productId: inventoryItems.productId,
           productName: products.name,
+          productSpecs: products.specs,
           condition: inventoryItems.condition,
           status: inventoryItems.status,
           costPrice: inventoryItems.costPrice,
@@ -105,6 +126,10 @@ export async function getPurchaseOrderDetail(poId: string) {
     const po = poResult[0];
 
     const totalItemsCount = items.length;
+    const returnedItemsCount = items.filter((i: any) => i.status === 'returned').length;
+    if (totalItemsCount > 0 && returnedItemsCount === totalItemsCount) {
+      po.status = "returned_supplier";
+    }
 
     // C. Tính toán phân bổ chi phí vận chuyển
     const allocatedShipping = totalItemsCount > 0 
