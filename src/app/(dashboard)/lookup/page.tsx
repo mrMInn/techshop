@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { Loader2, Phone, User, Mail, MapPin, ShoppingBag, CreditCard, RefreshCw, FileText, ExternalLink, Cpu, History } from "lucide-react";
+import { Loader2, Phone, User, Mail, MapPin, ShoppingBag, CreditCard, RefreshCw, FileText, ExternalLink, Cpu } from "lucide-react";
 import { 
   SFSymbolMagnifyingGlass,
   SFSymbolCalendar,
@@ -15,7 +15,7 @@ import {
   SFSymbolQRCode,
   SFSymbolFileSpreadsheet
 } from "@/components/ui/apple-icons";
-import { searchCustomersByPhone, getCustomerDetail, getLookupSuggestions } from "@/app/actions/customers";
+import { searchCustomersByPhone, getCustomerDetail } from "@/app/actions/customers";
 import { getInventoryItemLifecycle } from "@/app/actions/inventory";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -129,66 +129,6 @@ function LookupPageContent() {
   const [serialLoading, setSerialLoading] = useState(false);
   const [lifecycleData, setLifecycleData] = useState<any>(null);
 
-  // Search suggestions & history states
-  const [recentCustomers, setRecentCustomers] = useState<any[]>([]);
-  const [recentSerials, setRecentSerials] = useState<any[]>([]);
-  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
-  const [recentSearches, setRecentSearches] = useState<{ query: string; type: "customer" | "serial"; label: string }[]>([]);
-
-  // Load search history from localStorage on mount
-  useEffect(() => {
-    const history = localStorage.getItem("techshop_lookup_history");
-    if (history) {
-      try {
-        setRecentSearches(JSON.parse(history));
-      } catch (e) {
-        console.error("Error parsing search history:", e);
-      }
-    }
-  }, []);
-
-  // Save query to search history
-  const saveToHistory = (query: string, type: "customer" | "serial", label: string) => {
-    const current = localStorage.getItem("techshop_lookup_history");
-    let list = [];
-    if (current) {
-      try {
-        list = JSON.parse(current);
-      } catch (e) {}
-    }
-    // Remove if exists
-    list = list.filter((item: any) => item.query !== query);
-    // Add to front
-    list.unshift({ query, type, label });
-    // Limit to 5
-    list = list.slice(0, 5);
-    localStorage.setItem("techshop_lookup_history", JSON.stringify(list));
-    setRecentSearches(list);
-  };
-
-  // Load suggestions on mount
-  useEffect(() => {
-    async function loadSuggestions() {
-      try {
-        setSuggestionsLoading(true);
-        const res = await getLookupSuggestions();
-        if (res.success) {
-          if (res.recentCustomers) {
-            setRecentCustomers(res.recentCustomers);
-          }
-          if (res.recentSerials) {
-            setRecentSerials(res.recentSerials);
-          }
-        }
-      } catch (error) {
-        console.error("Lỗi tải gợi ý tra cứu:", error);
-      } finally {
-        setSuggestionsLoading(false);
-      }
-    }
-    loadSuggestions();
-  }, []);
-
   // Update URL parameters
   const updateURL = (value: string, forceType?: "customer" | "serial") => {
     const params = new URLSearchParams(searchParams.toString());
@@ -223,7 +163,7 @@ function LookupPageContent() {
 
   // Search by Phone Number
   const handleSearchPhone = async (phoneToSearch: string): Promise<boolean> => {
-    const target = phoneToSearch.trim();
+    const target = phoneToSearch.trim().replace(/[\s\-\.\(\)]/g, "");
     if (!target) {
       toast.error("Vui lòng nhập số điện thoại");
       return false;
@@ -238,7 +178,6 @@ function LookupPageContent() {
       const res = await searchCustomersByPhone(target);
       if (res.success && res.customers && res.customers.length > 0) {
         setSearchResults(res.customers);
-        saveToHistory(target, "customer", res.customers[0].fullName);
         
         const urlParams = new URLSearchParams(window.location.search);
         const customerIdParam = urlParams.get("customerId");
@@ -299,8 +238,6 @@ function LookupPageContent() {
       if (res.success) {
         setLifecycleData(res);
         toast.success("Đã tìm thấy lịch sử vòng đời thiết bị");
-        const itemLabel = res.item ? `${res.item.brandName || ""} ${res.item.productName || ""}`.trim() : target;
-        saveToHistory(target, "serial", itemLabel);
         return true;
       }
       return false;
@@ -347,6 +284,7 @@ function LookupPageContent() {
     const isPhonePattern = /^\+?[0-9]{8,15}$/.test(cleanNum);
 
     if (isPhonePattern) {
+      console.log("IS_PHONE_PATTERN matched");
       setPhoneLoading(true);
       setSerialLoading(true);
       setSearchResults([]);
@@ -355,17 +293,18 @@ function LookupPageContent() {
       setLifecycleData(null);
 
       try {
-        const [phoneRes, serialRes] = await Promise.all([
-          searchCustomersByPhone(target),
-          getInventoryItemLifecycle(target)
-        ]);
+        console.log("Calling phoneRes...");
+        const phoneRes = await searchCustomersByPhone(cleanNum);
+        console.log("phoneRes received:", phoneRes);
+        console.log("Calling serialRes...");
+        const serialRes = await getInventoryItemLifecycle(target);
+        console.log("serialRes received:", serialRes);
 
         const hasCustomer = phoneRes.success && phoneRes.customers && phoneRes.customers.length > 0;
         const hasSerial = serialRes.success;
 
         if (hasCustomer) {
           setSearchResults(phoneRes.customers);
-          saveToHistory(target, "customer", phoneRes.customers[0].fullName);
           setSearchType("customer");
           
           const urlParams = new URLSearchParams(window.location.search);
@@ -389,8 +328,6 @@ function LookupPageContent() {
         } else if (hasSerial) {
           setLifecycleData(serialRes);
           setSearchType("serial");
-          const itemLabel = serialRes.item ? `${serialRes.item.brandName || ""} ${serialRes.item.productName || ""}`.trim() : target;
-          saveToHistory(target, "serial", itemLabel);
           toast.success("Đã tìm thấy lịch sử vòng đời thiết bị");
         } else {
           toast.error("Không tìm thấy khách hàng hoặc thiết bị nào khớp");
@@ -417,16 +354,29 @@ function LookupPageContent() {
       const qParam = params.get("q");
       const phoneParam = params.get("phone");
       const serialParam = params.get("serial");
+      const customerIdParam = params.get("customerId");
 
       if (serialParam) {
         setSearchQuery(serialParam);
         handleSearch(serialParam, "serial");
       } else if (phoneParam) {
         setSearchQuery(phoneParam);
-        handleSearch(phoneParam, "customer");
+        if (customerIdParam) {
+          setSelectedCustomerIdState(customerIdParam);
+          setSearchType("customer");
+          fetchCustomerDetail(customerIdParam);
+        } else {
+          handleSearch(phoneParam, "customer");
+        }
       } else if (qParam) {
         setSearchQuery(qParam);
-        handleSearch(qParam);
+        if (customerIdParam) {
+          setSelectedCustomerIdState(customerIdParam);
+          setSearchType("customer");
+          fetchCustomerDetail(customerIdParam);
+        } else {
+          handleSearch(qParam);
+        }
       }
     }
   }, []);
@@ -1155,156 +1105,6 @@ function LookupPageContent() {
             Nhập số điện thoại khách hàng hoặc mã Serial sản phẩm để truy xuất hồ sơ giao dịch, lịch sử sửa chữa hoặc sơ đồ vòng đời thiết bị.
           </p>
         </GlassCard>
-
-        {/* 2-Column Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          
-          {/* Column Left: Search History & Customers */}
-          <div className="space-y-6">
-            
-            {/* Search History */}
-            <div className="bg-white rounded-2xl border border-[#e5e5e7] p-5 shadow-sm space-y-4">
-              <div className="flex items-center gap-2 text-[#1d1d1f] pb-2 border-b border-[#f5f5f7]">
-                <History size={16} className="text-[#86868b]" />
-                <h5 className="text-[13.5px] font-bold">Lịch sử tra cứu gần đây</h5>
-              </div>
-              
-              {recentSearches.length > 0 ? (
-                <div className="space-y-2 max-h-[220px] overflow-y-auto scrollbar-none">
-                  {recentSearches.map((item, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => {
-                        setSearchQuery(item.query);
-                        handleSearch(item.query, item.type);
-                      }}
-                      className="w-full flex items-center justify-between p-3 rounded-xl bg-[#f5f5f7] hover:bg-[#e8e8ed] text-left transition-all active:scale-[0.98] group cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className={cn(
-                          "w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-white text-[11px]",
-                          item.type === "customer" ? "bg-[#0066cc]" : "bg-emerald-600"
-                        )}>
-                          {item.type === "customer" ? <User size={12} /> : <Cpu size={12} />}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-[13px] font-semibold text-[#1d1d1f] truncate">{item.label}</p>
-                          <p className="text-[11px] text-[#86868b] font-medium font-mono">{item.query}</p>
-                        </div>
-                      </div>
-                      <ExternalLink size={12} className="text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity pr-1" />
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="py-8 text-center text-slate-400 text-[12px] font-medium">
-                  Chưa có lịch sử tìm kiếm nào gần đây
-                </div>
-              )}
-            </div>
-
-            {/* Recent Active Customers */}
-            <div className="bg-white rounded-2xl border border-[#e5e5e7] p-5 shadow-sm space-y-4">
-              <div className="flex items-center gap-2 text-[#1d1d1f] pb-2 border-b border-[#f5f5f7]">
-                <User size={16} className="text-[#86868b]" />
-                <h5 className="text-[13.5px] font-bold">Khách hàng giao dịch gần đây</h5>
-              </div>
-              
-              {suggestionsLoading ? (
-                <div className="py-8 flex justify-center items-center text-slate-400 text-[12px]">
-                  <Loader2 size={16} className="animate-spin mr-2 text-[#0066cc]" />
-                  Đang tải danh sách...
-                </div>
-              ) : recentCustomers.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {recentCustomers.map((cust) => (
-                    <button
-                      key={cust.id}
-                      onClick={() => {
-                        setSearchQuery(cust.phone);
-                        handleSearch(cust.phone, "customer");
-                      }}
-                      className="flex items-center gap-2.5 p-3 rounded-xl bg-[#f5f5f7] hover:bg-[#e8e8ed] text-left transition-all active:scale-[0.98] cursor-pointer"
-                    >
-                      <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 shrink-0">
-                        <User size={13} />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-[12.5px] font-bold text-[#1d1d1f] truncate leading-snug">{cust.fullName}</p>
-                        <p className="text-[11px] text-[#86868b] font-medium font-mono leading-none mt-1">{cust.phone}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="py-8 text-center text-slate-400 text-[12px] font-medium">
-                  Không tìm thấy khách hàng gợi ý
-                </div>
-              )}
-            </div>
-
-          </div>
-
-          {/* Column Right: Recent Machines (Serial Numbers) */}
-          <div className="space-y-6">
-            
-            <div className="bg-white rounded-2xl border border-[#e5e5e7] p-5 shadow-sm space-y-4 h-full flex flex-col justify-start">
-              <div className="flex items-center gap-2 text-[#1d1d1f] pb-2 border-b border-[#f5f5f7] shrink-0">
-                <Cpu size={16} className="text-[#86868b]" />
-                <h5 className="text-[13.5px] font-bold">Thiết bị mới nhập kho</h5>
-              </div>
-              
-              {suggestionsLoading ? (
-                <div className="py-12 flex justify-center items-center text-slate-400 text-[12px] flex-1">
-                  <Loader2 size={16} className="animate-spin mr-2 text-[#0066cc]" />
-                  Đang tải danh sách...
-                </div>
-              ) : recentSerials.length > 0 ? (
-                <div className="space-y-2 flex-1 overflow-y-auto">
-                  {recentSerials.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => {
-                        setSearchQuery(item.serialNumber);
-                        handleSearch(item.serialNumber, "serial");
-                      }}
-                      className="w-full flex items-center justify-between p-3 rounded-xl bg-[#f5f5f7] hover:bg-[#e8e8ed] text-left transition-all active:scale-[0.98] group cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 shrink-0">
-                          <Cpu size={13} />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-[12.5px] font-bold text-[#1d1d1f] truncate leading-snug">
-                            {item.brandName} {item.productName}
-                          </p>
-                          <div className="flex items-center gap-1.5 mt-1">
-                            <span className="text-[10px] text-[#86868b] font-medium font-mono bg-white border border-[#e5e5e7] px-1.5 py-0.5 rounded">
-                              {item.serialNumber}
-                            </span>
-                            <span className={cn(
-                              "text-[10px] font-bold uppercase",
-                              statusMapping[item.status]?.color || "text-slate-500"
-                            )}>
-                              {statusMapping[item.status]?.label || item.status}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <ExternalLink size={12} className="text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity pr-1 shrink-0" />
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="py-12 text-center text-slate-400 text-[12px] font-medium flex-1 flex items-center justify-center">
-                  Không tìm thấy thiết bị gợi ý nào gần đây
-                </div>
-              )}
-            </div>
-
-          </div>
-
-        </div>
       </div>
     );
   };

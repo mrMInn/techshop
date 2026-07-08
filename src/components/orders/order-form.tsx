@@ -141,37 +141,11 @@ export function OrderForm({ onSubmit, onCancel, isLoading }: OrderFormProps) {
     })) || [];
   }, [leadSourceList]);
 
-  const [selectedProductId, setSelectedProductId] = useState("");
+  const [selectedInventoryItemId, setSelectedInventoryItemId] = useState("");
 
   const availableStockItems = useMemo(() => {
     return stockItems?.filter(item => !selectedItems.some(si => si.inventoryItemId === item.id)) || [];
   }, [stockItems, selectedItems]);
-
-  const groupedStockItems = useMemo(() => {
-    const groups: Record<string, {
-      productId: string;
-      productName: string;
-      brandName: string;
-      specs: any;
-      items: any[];
-    }> = {};
-
-    for (const item of availableStockItems) {
-      const key = item.productId;
-      if (!groups[key]) {
-        groups[key] = {
-          productId: item.productId,
-          productName: item.productName,
-          brandName: item.brandName,
-          specs: item.specs,
-          items: [],
-        };
-      }
-      groups[key].items.push(item);
-    }
-
-    return Object.values(groups);
-  }, [availableStockItems]);
 
   const stockItemOptions = useMemo(() => {
     const formatSpecs = (specsObj: any) => {
@@ -187,24 +161,17 @@ export function OrderForm({ onSubmit, onCancel, isLoading }: OrderFormProps) {
       return parts.join(" / ");
     };
 
-    return groupedStockItems.map((group, index) => {
-      const specsStr = formatSpecs(group.specs);
-      // Collect all serial numbers for searchable keywords
-      const serialKeywords = group.items.map(item => item.serialNumber).join(" ");
+    return availableStockItems.map((item) => {
+      const specsStr = formatSpecs(item.specs);
       return {
-        value: group.productId,
-        label: `[${index + 1}] ${group.productName}`,
-        subLabel: `${specsStr || "Không có cấu hình"} • (Còn ${group.items.length} máy)`,
-        searchKeywords: serialKeywords,
+        value: item.id,
+        label: `${item.productName} (${item.condition === "new" ? "Mới" : "Cũ"})`,
+        subLabel: `${specsStr ? specsStr + " - " : ""}${item.serialNumber}`,
+        searchKeywords: `${item.serialNumber} ${item.productName} ${specsStr}`,
+        price: formatPrice(Number(item.costPrice || 0)),
       };
     });
-  }, [groupedStockItems]);
-
-  const availableSerialsForSelectedProduct = useMemo(() => {
-    if (!selectedProductId) return [];
-    const group = groupedStockItems.find(g => g.productId === selectedProductId);
-    return group ? group.items : [];
-  }, [selectedProductId, groupedStockItems]);
+  }, [availableStockItems]);
 
   const handleAddItemDirectly = (item: any) => {
     const exists = selectedItems.some(i => i.inventoryItemId === item.id);
@@ -213,8 +180,6 @@ export function OrderForm({ onSubmit, onCancel, isLoading }: OrderFormProps) {
       return;
     }
 
-    // Look up specs from the grouped stock items
-    const group = groupedStockItems.find(g => g.productId === item.productId);
     const actualCost = getActualCost(item);
     setSelectedItems([
       ...selectedItems,
@@ -225,24 +190,24 @@ export function OrderForm({ onSubmit, onCancel, isLoading }: OrderFormProps) {
         serialNumber: item.serialNumber,
         costPrice: Number(item.costPrice),
         actualCost: actualCost,
-        specs: group?.specs || item.specs || null,
-        sellingPrice: "",
+        specs: item.specs || null,
+        sellingPrice: item.sellingPrice && Number(item.sellingPrice) > 0 ? Math.round(Number(item.sellingPrice)).toString() : "",
         discount: "",
-        warrantyMonths: "",
+        warrantyMonths: "12",
         accessories: item.accessories || [],
       }
     ]);
   };
 
   useEffect(() => {
-    if (selectedProductId) {
-      const serials = availableSerialsForSelectedProduct;
-      if (serials.length === 1) {
-        handleAddItemDirectly(serials[0]);
-        setSelectedProductId("");
+    if (selectedInventoryItemId) {
+      const item = availableStockItems.find(i => i.id === selectedInventoryItemId);
+      if (item) {
+        handleAddItemDirectly(item);
+        setSelectedInventoryItemId("");
       }
     }
-  }, [selectedProductId, availableSerialsForSelectedProduct]);
+  }, [selectedInventoryItemId, availableStockItems]);
 
   const accessoryOptions = useMemo(() => {
     const availableAccessories = stockAccessories?.filter(
@@ -491,8 +456,8 @@ export function OrderForm({ onSubmit, onCancel, isLoading }: OrderFormProps) {
                   <div className="relative w-full sm:w-72">
                     <CustomSelect
                       options={stockItemOptions}
-                      value={selectedProductId}
-                      onChange={setSelectedProductId}
+                      value={selectedInventoryItemId}
+                      onChange={setSelectedInventoryItemId}
                       placeholder="Tìm máy theo Model/Serial..."
                       searchable={true}
                       align="right"
@@ -514,69 +479,6 @@ export function OrderForm({ onSubmit, onCancel, isLoading }: OrderFormProps) {
                   </div>
                 </div>
               </div>
-
-              {/* Secondary Serial Selector Picker (only when there are multiple units of the selected model) */}
-              {selectedProductId && availableSerialsForSelectedProduct.length > 1 && (
-                <div className="p-4 bg-[#f5f5f7] rounded-xl border border-[#e0e0e0] space-y-3 shadow-inner animate-fade-in">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[13px] font-bold text-[#1d1d1f]">
-                      Mã này có <span className="text-[#0066cc] font-extrabold">{availableSerialsForSelectedProduct.length} máy</span>. Chọn Serial bên dưới để bán:
-                    </span>
-                    <button 
-                      type="button" 
-                      onClick={() => setSelectedProductId("")}
-                      className="text-[12px] font-semibold text-red-600 hover:text-red-700 cursor-pointer"
-                    >
-                      Hủy chọn
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
-                    {availableSerialsForSelectedProduct.map((item) => {
-                      const actualCost = getActualCost(item);
-                      const originalCost = Number(item.costPrice || 0);
-                      const hasCostDiff = actualCost !== originalCost;
-
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => {
-                            handleAddItemDirectly(item);
-                            setSelectedProductId("");
-                          }}
-                          className="flex flex-col p-3.5 bg-white hover:bg-slate-50/50 border border-slate-200/70 hover:border-[#0066cc] rounded-2xl text-left transition-all hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] duration-150 cursor-pointer group"
-                        >
-                          <div className="flex items-center justify-between gap-1.5 w-full mb-1.5">
-                            <span className="text-[14px] font-bold text-[#1d1d1f] group-hover:text-[#0066cc] transition-colors truncate">
-                              {item.serialNumber}
-                            </span>
-                            <span className={`text-[11.5px] font-bold px-2 py-0.5 rounded-full border ${
-                              item.condition === "new" 
-                                ? "bg-emerald-50 text-emerald-700 border-emerald-200/50" 
-                                : "bg-slate-100 text-slate-600 border-slate-200/50"
-                            }`}>
-                              {item.condition === "new" ? "Mới" : "Cũ"}
-                            </span>
-                          </div>
-                          
-                          <div className="text-[13px] text-[#7a7a7a] space-y-0.5 mt-0.5 w-full">
-                            <div className="flex justify-between">
-                              <span>Giá gốc:</span>
-                              <span className="font-semibold text-[#1d1d1f]">{formatPrice(originalCost)}</span>
-                            </div>
-                            {hasCostDiff && (
-                              <div className="flex justify-between text-amber-700 font-medium">
-                                <span>Vốn thực tế:</span>
-                                <span className="font-extrabold text-amber-600">{formatPrice(actualCost)}</span>
-                              </div>
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
 
               {/* Bảng danh sách items đã chọn */}
               {selectedItems.length === 0 ? (

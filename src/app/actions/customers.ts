@@ -184,10 +184,10 @@ export async function getCustomerDetail(customerId: string) {
       .orderBy(desc(returns.createdAt));
 
     return {
-      customer: customerData[0],
-      orders: orderHistory,
-      purchasedItems,
-      returns: returnsHistory,
+      customer: serializeDateProps(customerData[0], ["createdAt", "updatedAt"]),
+      orders: orderHistory.map(o => serializeDateProps(o, ["createdAt"])),
+      purchasedItems: purchasedItems.map(pi => serializeDateProps(pi, ["orderDate"])),
+      returns: returnsHistory.map(r => serializeDateProps(r, ["createdAt"])),
     };
   } catch (error) {
     console.error("Lỗi lấy chi tiết khách hàng:", error);
@@ -390,45 +390,16 @@ export async function getLeadSourcesList() {
   }
 }
 
-// ============================================================
-// 6. Lấy gợi ý tra cứu nhanh cho trang Tra cứu (chỉ lấy 4 bản ghi mỗi bảng)
-// ============================================================
-export async function getLookupSuggestions() {
-  try {
-    const [recentCustomers, recentSerials] = await Promise.all([
-      db
-        .select({
-          id: customers.id,
-          fullName: customers.fullName,
-          phone: customers.phone,
-          email: customers.email,
-          address: customers.address,
-        })
-        .from(customers)
-        .where(sql`${customers.phone} IS NOT NULL AND ${customers.fullName} != 'Khách vãng lai'`)
-        .orderBy(desc(customers.createdAt))
-        .limit(4),
 
-      db
-        .select({
-          id: inventoryItems.id,
-          serialNumber: inventoryItems.serialNumber,
-          status: inventoryItems.status,
-          productName: products.name,
-          brandName: brands.name,
-        })
-        .from(inventoryItems)
-        .innerJoin(products, eq(inventoryItems.productId, products.id))
-        .innerJoin(brands, eq(products.brandId, brands.id))
-        .where(sql`${inventoryItems.serialNumber} IS NOT NULL`)
-        .orderBy(desc(inventoryItems.createdAt))
-        .limit(4),
-    ]);
 
-    return { success: true, recentCustomers, recentSerials };
-  } catch (error: any) {
-    console.error("Lỗi lấy gợi ý tra cứu:", error);
-    return { success: false, message: error.message || "Lỗi lấy gợi ý" };
+function serializeDateProps<T extends Record<string, any>>(obj: T, dateKeys: string[]): T {
+  if (!obj) return obj;
+  const newObj = { ...obj } as any;
+  for (const key of dateKeys) {
+    if (key in newObj && newObj[key] !== undefined && newObj[key] !== null) {
+      newObj[key] = new Date(newObj[key]).toISOString();
+    }
   }
+  return newObj as T;
 }
 

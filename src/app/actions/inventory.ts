@@ -1376,9 +1376,20 @@ export async function getInventoryItemLifecycle(serialNumber: string) {
       accessories: attachedAccs,
     };
 
+    const serializedItem = {
+      ...itemWithAccessories,
+      createdAt: itemWithAccessories.createdAt ? new Date(itemWithAccessories.createdAt).toISOString() : null,
+      receivedDate: itemWithAccessories.receivedDate ? new Date(itemWithAccessories.receivedDate).toISOString() : null,
+      warrantyStart: itemWithAccessories.warrantyStart ? new Date(itemWithAccessories.warrantyStart).toISOString() : null,
+      warrantyEnd: itemWithAccessories.warrantyEnd ? new Date(itemWithAccessories.warrantyEnd).toISOString() : null,
+      stockedDate: itemWithAccessories.stockedDate ? new Date(itemWithAccessories.stockedDate).toISOString() : null,
+      expectedArrivalDate: itemWithAccessories.expectedArrivalDate ? new Date(itemWithAccessories.expectedArrivalDate).toISOString() : null,
+      soldDate: itemWithAccessories.soldDate ? new Date(itemWithAccessories.soldDate).toISOString() : null,
+    };
+
     return {
       success: true,
-      item: itemWithAccessories,
+      item: serializedItem,
       milestones: sortedMilestones,
     };
   } catch (error: any) {
