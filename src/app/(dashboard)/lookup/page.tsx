@@ -171,7 +171,7 @@ function LookupPageContent() {
 
     setPhoneLoading(true);
     setSearchResults([]);
-    setSelectedCustomerId(null);
+    setSelectedCustomerIdState(null);
     setCustomerDetail(null);
 
     try {
@@ -284,21 +284,18 @@ function LookupPageContent() {
     const isPhonePattern = /^\+?[0-9]{8,15}$/.test(cleanNum);
 
     if (isPhonePattern) {
-      console.log("IS_PHONE_PATTERN matched");
       setPhoneLoading(true);
       setSerialLoading(true);
       setSearchResults([]);
-      setSelectedCustomerId(null);
+      setSelectedCustomerIdState(null);
       setCustomerDetail(null);
       setLifecycleData(null);
 
       try {
-        console.log("Calling phoneRes...");
-        const phoneRes = await searchCustomersByPhone(cleanNum);
-        console.log("phoneRes received:", phoneRes);
-        console.log("Calling serialRes...");
-        const serialRes = await getInventoryItemLifecycle(target);
-        console.log("serialRes received:", serialRes);
+        const [phoneRes, serialRes] = await Promise.all([
+          searchCustomersByPhone(cleanNum),
+          getInventoryItemLifecycle(target),
+        ]);
 
         const hasCustomer = phoneRes.success && phoneRes.customers && phoneRes.customers.length > 0;
         const hasSerial = serialRes.success;

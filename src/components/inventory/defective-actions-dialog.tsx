@@ -9,7 +9,7 @@ import {
   sendToRepairAction, 
   completeRepairAction, 
   supplierRefundAction, 
-  supplierReturnWriteOffAction,
+  supplierReplaceAction,
   reportItemDefectiveAction
 } from "@/app/actions/inventory";
 
@@ -43,6 +43,8 @@ export function DefectiveActionsDialog({ isOpen, onClose, item, actionType }: De
   const [repairCost, setRepairCost] = useState("");
   const [refundAmount, setRefundAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "bank_transfer" | "card">("cash");
+  const [newSerial, setNewSerial] = useState("");
+  const [newCondition, setNewCondition] = useState<"new" | "used">("new");
 
   // Reset form when modal opens/changes
   useEffect(() => {
@@ -51,6 +53,8 @@ export function DefectiveActionsDialog({ isOpen, onClose, item, actionType }: De
       setRepairType("internal");
       setRepairCost("");
       setPaymentMethod("cash");
+      setNewSerial("");
+      setNewCondition("new");
       
       if (actionType === "refund" && item?.costPrice) {
         const priceVal = Math.round(Number(item.costPrice));
@@ -69,7 +73,7 @@ export function DefectiveActionsDialog({ isOpen, onClose, item, actionType }: De
       case "repair": return "Gửi máy đi sửa chữa / bảo hành";
       case "complete": return "Hoàn tất sửa chữa / bảo hành";
       case "refund": return "Nhập máy trả NCC - Nhận hoàn tiền";
-      case "writeoff": return "Nhập xuất trả NCC - Đổi máy mới";
+      case "writeoff": return "Đổi máy mới từ NCC";
       default: return "Xử lý máy lỗi";
     }
   };
@@ -80,7 +84,7 @@ export function DefectiveActionsDialog({ isOpen, onClose, item, actionType }: De
       case "repair": return "Xác nhận gửi đi";
       case "complete": return "Xác nhận hoàn tất";
       case "refund": return "Xác nhận hoàn tiền";
-      case "writeoff": return "Xác nhận xuất trả";
+      case "writeoff": return "Xác nhận đổi máy";
       default: return "Xác nhận";
     }
   };
@@ -119,7 +123,12 @@ export function DefectiveActionsDialog({ isOpen, onClose, item, actionType }: De
           result = await supplierRefundAction(item.id, rawRefund, paymentMethod, notes);
           break;
         case "writeoff":
-          result = await supplierReturnWriteOffAction(item.id);
+          if (!newSerial.trim() || newSerial.trim().length < 3) {
+            toast.error("Vui lòng nhập số Serial máy mới (tối thiểu 3 ký tự)");
+            setLoading(false);
+            return;
+          }
+          result = await supplierReplaceAction(item.id, newSerial.trim(), newCondition, notes || undefined);
           break;
         default:
           throw new Error("Hành động không hợp lệ");
@@ -295,10 +304,65 @@ export function DefectiveActionsDialog({ isOpen, onClose, item, actionType }: De
         {/* WRITEOFF ACTION (Đổi máy mới) */}
         {actionType === "writeoff" && (
           <div className="space-y-4">
-            <div className="bg-[#fffbeb] p-4 rounded-xl border border-amber-200 text-[13px] text-amber-800 leading-relaxed">
-              ⚠️ Hệ thống sẽ xuất trả máy cũ lỗi cho Nhà cung cấp (chuyển sang trạng thái <span className="font-semibold">Đã trả hàng - returned</span>).
+            <div className="bg-[#f0f7ff] p-4 rounded-xl border border-[#0066cc]/15 text-[13px] text-[#1d1d1f] leading-relaxed">
+              🔄 Hệ thống sẽ tự động <span className="font-semibold">xuất trả máy cũ</span> cho NCC và <span className="font-semibold">nhập kho máy mới</span> thay thế trong cùng 1 thao tác.
               <br />
-              Do mô hình giao dịch trực tiếp, anh vui lòng tự click **"Nhập kho"** ở thanh công cụ chính để khai báo số Serial của chiếc máy mới được đổi thế vào.
+              <span className="text-[#86868b]">Máy mới kế thừa đơn nhập hàng gốc → không phát sinh thêm chi phí.</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-[12px] font-semibold text-[#7a7a7a] uppercase tracking-wider pl-1 whitespace-nowrap">
+                  Serial máy mới <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newSerial}
+                  onChange={(e) => setNewSerial(e.target.value)}
+                  placeholder="Nhập số Serial máy thay thế..."
+                  required
+                  autoFocus
+                  className="w-full px-3.5 h-[40px] rounded-xl bg-white border border-[#e0e0e0] text-[14px] text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 transition-all placeholder:text-[#7a7a7a]/60 font-mono tracking-wider"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[12px] font-semibold text-[#7a7a7a] uppercase tracking-wider pl-1 whitespace-nowrap">
+                  Tình trạng máy mới
+                </label>
+                <CustomSelect
+                  options={[
+                    { value: "new", label: "Máy mới (New)" },
+                    { value: "used", label: "Máy đã qua sử dụng (Used)" },
+                  ]}
+                  value={newCondition}
+                  onChange={(val) => setNewCondition(val as any)}
+                  dropdownWidth="full"
+                  size="sm"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[12px] font-semibold text-[#7a7a7a] uppercase tracking-wider pl-1">
+                Ghi chú (tùy chọn)
+              </label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Lý do đổi máy, ghi chú thêm..."
+                rows={2}
+                className="w-full p-3.5 rounded-xl bg-white border border-[#e0e0e0] text-[14px] text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 transition-all resize-none placeholder:text-[#7a7a7a]/60"
+              />
+            </div>
+
+            {/* Thông tin máy cũ */}
+            <div className="bg-[#f5f5f7] p-3.5 rounded-xl border border-[#e0e0e0]/50">
+              <p className="text-[11.5px] font-semibold text-[#86868b] uppercase tracking-wider mb-2">Máy cũ sẽ trả NCC</p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[13px]">
+                <p className="text-[#86868b]">Serial: <span className="text-[#1d1d1f] font-medium font-mono">{item.serialNumber}</span></p>
+                <p className="text-[#86868b]">Giá vốn: <span className="text-[#1d1d1f] font-medium">{item.costPrice ? Math.round(Number(item.costPrice)).toLocaleString('vi-VN') + 'đ' : 'N/A'}</span></p>
+              </div>
             </div>
           </div>
         )}

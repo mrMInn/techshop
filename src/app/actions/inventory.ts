@@ -1683,63 +1683,146 @@ export async function supplierRefundAction(
 }
 
 export async function supplierReturnWriteOffAction(itemId: string) {
+  // Legacy: giữ lại để tương thích ngược, nhưng khuyến khích dùng supplierReplaceAction
+  return { success: false, message: "Vui lòng sử dụng chức năng 'Đổi máy mới' với Serial mới" };
+}
+
+/**
+ * Xuất trả máy cũ cho NCC và nhập máy mới thay thế trong cùng một giao dịch.
+ * Máy mới kế thừa PO cũ → không tạo phiếu chi mới → không bị gấp đôi tiền.
+ */
+export async function supplierReplaceAction(
+  oldItemId: string,
+  newSerialNumber: string,
+  newCondition?: "new" | "used",
+  notes?: string,
+) {
   try {
-    return await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => {
+      // 1. Lấy thông tin máy cũ đang trả
       const existing = await tx
         .select()
         .from(inventoryItems)
-        .where(eq(inventoryItems.id, itemId))
+        .where(eq(inventoryItems.id, oldItemId))
         .limit(1);
 
       if (existing.length === 0) {
-        return { success: false, message: "Không tìm thấy sản phẩm" };
+        return { success: false, message: "Không tìm thấy sản phẩm cũ" };
       }
 
-      const item = existing[0];
-      if (item.status !== 'defective' && item.status !== 'warranty_repair') {
-        return { success: false, message: "Chỉ xuất trả máy lỗi hoặc đang bảo hành" };
+      const oldItem = existing[0];
+      if (oldItem.status !== 'defective' && oldItem.status !== 'warranty_repair') {
+        return { success: false, message: "Chỉ xuất trả máy lỗi hoặc đang bảo hành NCC" };
+      }
+
+      const cleanSerial = newSerialNumber.trim();
+      if (!cleanSerial || cleanSerial.length < 3) {
+        return { success: false, message: "Số Serial máy mới phải có ít nhất 3 ký tự" };
+      }
+
+      // Kiểm tra serial mới chưa tồn tại
+      const duplicateCheck = await tx
+        .select({ id: inventoryItems.id })
+        .from(inventoryItems)
+        .where(eq(inventoryItems.serialNumber, cleanSerial))
+        .limit(1);
+      if (duplicateCheck.length > 0) {
+        return { success: false, message: `Serial "${cleanSerial}" đã tồn tại trong hệ thống` };
       }
 
       const ownerProfiles = await tx.select().from(profiles).limit(1);
       const performedById = ownerProfiles[0]?.id;
       if (!performedById) throw new Error("Hệ thống chưa cấu hình tài khoản nhân viên");
 
+      // 2. Xuất máy cũ → trạng thái 'returned'
       await tx
         .update(inventoryItems)
         .set({
           status: 'returned',
           updatedAt: new Date(),
         })
-        .where(eq(inventoryItems.id, itemId));
+        .where(eq(inventoryItems.id, oldItemId));
 
-      // Cập nhật trạng thái đơn nhập PO liên đới (nếu có)
-      if (item.purchaseOrderItemId) {
+      await tx.insert(inventoryMovements).values({
+        inventoryItemId: oldItemId,
+        movementType: 'returned',
+        fromStatus: oldItem.status,
+        toStatus: 'returned',
+        referenceType: 'manual',
+        quantityChange: 0,
+        notes: notes 
+          ? `[Trả NCC đổi máy] ${notes} → Máy mới: ${cleanSerial}`
+          : `Xuất trả NCC để đổi máy mới (Serial mới: ${cleanSerial})`,
+        performedBy: performedById,
+      });
+
+      // 3. Nhập máy mới - kế thừa purchaseOrderItemId từ máy cũ (KHÔNG tạo PO/phiếu chi mới)
+      const todayStr = new Date().toISOString().split('T')[0];
+      const [newItem] = await tx.insert(inventoryItems).values({
+        productId: oldItem.productId,
+        serialNumber: cleanSerial,
+        condition: newCondition || 'new',
+        status: 'in_stock',
+        costPrice: oldItem.costPrice, // Kế thừa giá vốn từ máy cũ
+        sellingPrice: oldItem.sellingPrice,
+        purchaseOrderItemId: oldItem.purchaseOrderItemId, // Cùng PO → không ghi chi thêm
+        originCountry: oldItem.originCountry,
+        stockedDate: todayStr,
+        receivedDate: todayStr,
+        notes: notes
+          ? `[Đổi máy từ NCC] Thay thế ${oldItem.serialNumber}. ${notes}`
+          : `[Đổi máy từ NCC] Thay thế máy cũ Serial: ${oldItem.serialNumber}`,
+        createdBy: performedById,
+      }).returning();
+
+      // 4. Ghi movement cho máy mới
+      await tx.insert(inventoryMovements).values({
+        inventoryItemId: newItem.id,
+        movementType: 'stocked',
+        fromStatus: null,
+        toStatus: 'in_stock',
+        referenceType: oldItem.purchaseOrderItemId ? 'purchase_order' : 'manual',
+        referenceId: oldItem.purchaseOrderItemId || null,
+        quantityChange: 1,
+        notes: `Nhập kho máy thay thế từ NCC (thay cho máy cũ ${oldItem.serialNumber})`,
+        performedBy: performedById,
+      });
+
+      // 5. Đồng bộ trạng thái PO (nếu có)
+      if (oldItem.purchaseOrderItemId) {
         const poItem = await tx
           .select({ purchaseOrderId: purchaseOrderItems.purchaseOrderId })
           .from(purchaseOrderItems)
-          .where(eq(purchaseOrderItems.id, item.purchaseOrderItemId))
+          .where(eq(purchaseOrderItems.id, oldItem.purchaseOrderItemId))
           .limit(1);
         if (poItem.length > 0 && poItem[0].purchaseOrderId) {
           await syncPurchaseOrderStatus(tx, poItem[0].purchaseOrderId);
         }
       }
 
-      await tx.insert(inventoryMovements).values({
-        inventoryItemId: itemId,
-        movementType: 'returned',
-        fromStatus: item.status,
-        toStatus: 'returned',
-        referenceType: 'manual',
-        quantityChange: 0,
-        notes: `Xuất trả máy cũ lỗi cho NCC để đổi máy mới (Người dùng tự nhập kho máy mới)`,
-        performedBy: performedById,
-      });
-
-      return { success: true, message: "Xuất trả máy cũ thành công. Vui lòng nhập kho máy mới thủ công." };
+      return {
+        success: true,
+        message: `Đổi máy thành công! Máy cũ (${oldItem.serialNumber}) đã trả NCC, máy mới (${cleanSerial}) đã nhập kho.`,
+        newItem,
+      };
     });
+
+    if (result.success) {
+      try {
+        after(() => {
+          syncHistoricalData().catch(err => console.error("Lỗi đồng bộ lịch sử tài chính:", err));
+        });
+      } catch (e) {
+        syncHistoricalData().catch(err => console.error("Lỗi đồng bộ lịch sử tài chính:", err));
+      }
+    }
+    return result;
   } catch (error: any) {
-    console.error("Lỗi xuất trả máy đổi trả NCC:", error);
-    return { success: false, message: error.message || "Lỗi xuất trả máy đổi trả NCC" };
+    console.error("Lỗi đổi máy NCC:", error);
+    if (error.code === '23505') {
+      return { success: false, message: "Serial Number máy mới đã tồn tại trong hệ thống" };
+    }
+    return { success: false, message: error.message || "Lỗi đổi máy thay thế NCC" };
   }
 }
 
