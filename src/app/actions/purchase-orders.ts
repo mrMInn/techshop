@@ -277,7 +277,7 @@ export async function updatePurchaseOrderAction(
       const finalStatus = updated.status;
       const finalTotalCost = Number(updated.totalCost || 0);
 
-      if (finalStatus === "received") {
+      if (finalStatus === "received" || finalStatus === "in_transit") {
         if (finalTotalCost > 0) {
           const existingCashEntry = await tx
             .select()

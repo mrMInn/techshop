@@ -281,7 +281,7 @@ describe('Accounting Server Actions', () => {
     it('thành công không có filter', async () => {
       mockDb.then.mockImplementationOnce((resolve) => resolve([{ id: 'cb-1' }]));
       const res = await getCashBookEntries();
-      expect(res.length).toBe(1);
+      expect(res.list.length).toBe(1);
     });
 
     it('thành công có filter đầy đủ', async () => {
@@ -293,13 +293,13 @@ describe('Accounting Server Actions', () => {
         startDate: '2026-06-01',
         endDate: '2026-06-30'
       });
-      expect(res.length).toBe(1);
+      expect(res.list.length).toBe(1);
     });
 
     it('catch block', async () => {
       mockDb.then.mockImplementationOnce((resolve, reject) => reject(new Error('CashBook error')));
       const res = await getCashBookEntries();
-      expect(res).toEqual([]);
+      expect(res).toEqual({ list: [], totalCount: 0 });
     });
   });
 

@@ -26,7 +26,7 @@ import {
   accessoryItems
 } from "@/lib/db/schema";
 import { db, recalculateRunningBalances } from "@/lib/db";
-import { eq, desc, inArray, sql, and, or } from "drizzle-orm";
+import { eq, desc, inArray, sql, and, or, like } from "drizzle-orm";
 import { syncHistoricalData } from "./accounting";
 import { after } from "next/server";
 
@@ -230,6 +230,236 @@ export async function getInventoryItems() {
   }));
 
   return itemsWithAccessories;
+}
+
+/**
+ * Lấy danh sách thiết bị gom nhóm theo Model Sản phẩm (có phân trang và bộ lọc phía máy chủ)
+ */
+export async function getInventoryGroups(filters?: {
+  page?: number;
+  limit?: number;
+  categoryName?: string;
+  brandName?: string;
+  status?: string; // 'all' | 'in_stock' | 'incoming' | 'defective'
+  search?: string;
+}) {
+  try {
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 20;
+    const offset = (page - 1) * limit;
+
+    const conditions = [];
+
+    if (filters?.categoryName && filters.categoryName !== "all") {
+      conditions.push(eq(categories.name, filters.categoryName));
+    }
+    if (filters?.brandName && filters.brandName !== "all") {
+      conditions.push(eq(brands.name, filters.brandName));
+    }
+    if (filters?.search) {
+      conditions.push(
+        or(
+          like(products.name, `%${filters.search}%`),
+          like(brands.name, `%${filters.search}%`),
+          like(products.sku, `%${filters.search}%`)
+        )
+      );
+    }
+
+    let statusCondition;
+    if (filters?.status === "in_stock") {
+      statusCondition = eq(inventoryItems.status, "in_stock");
+    } else if (filters?.status === "incoming") {
+      statusCondition = eq(inventoryItems.status, "incoming");
+    } else if (filters?.status === "defective") {
+      statusCondition = or(
+        eq(inventoryItems.status, "defective"),
+        eq(inventoryItems.status, "warranty_repair")
+      );
+    } else if (filters?.status === "returned") {
+      statusCondition = eq(inventoryItems.status, "returned");
+    } else {
+      statusCondition = inArray(inventoryItems.status, ["in_stock", "incoming", "defective", "warranty_repair"]);
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    // 1. Đếm tổng số nhóm sản phẩm
+    let countGroupsQuery = db
+      .select({
+        count: sql<number>`cast(count(distinct ${products.id}) as integer)`
+      })
+      .from(products)
+      .innerJoin(inventoryItems, and(eq(inventoryItems.productId, products.id), statusCondition))
+      .innerJoin(brands, eq(products.brandId, brands.id))
+      .innerJoin(categories, eq(products.categoryId, categories.id));
+
+    if (whereClause) {
+      countGroupsQuery.where(whereClause);
+    }
+    const countRes = await countGroupsQuery;
+    const totalCount = countRes[0]?.count || 0;
+
+    // 2. Query lấy danh sách gom nhóm và tính toán AVG/COUNT
+    let selectQuery = db
+      .select({
+        productId: products.id,
+        productName: products.name,
+        productSku: products.sku,
+        productSpecs: products.specs,
+        brandName: brands.name,
+        categoryName: categories.name,
+        inStockCount: sql<number>`cast(count(case when ${inventoryItems.status} = 'in_stock' then 1 end) as integer)`,
+        incomingCount: sql<number>`cast(count(case when ${inventoryItems.status} = 'incoming' then 1 end) as integer)`,
+        defectiveOnlyCount: sql<number>`cast(count(case when ${inventoryItems.status} = 'defective' then 1 end) as integer)`,
+        internalRepairCount: sql<number>`cast(count(case when ${inventoryItems.status} = 'warranty_repair' and ${inventoryItems.location} = 'internal_repair' then 1 end) as integer)`,
+        externalWarrantyCount: sql<number>`cast(count(case when ${inventoryItems.status} = 'warranty_repair' and ${inventoryItems.location} != 'internal_repair' then 1 end) as integer)`,
+        returnedCount: sql<number>`cast(count(case when ${inventoryItems.status} = 'returned' then 1 end) as integer)`,
+        defectiveTotalCount: sql<number>`cast(count(case when ${inventoryItems.status} in ('defective', 'warranty_repair') then 1 end) as integer)`,
+        totalCount: sql<number>`cast(count(case when ${inventoryItems.status} in ('in_stock', 'incoming', 'defective', 'warranty_repair') then 1 end) as integer)`,
+        avgCost: sql<number>`cast(coalesce(avg(${inventoryItems.costPrice}), 0) as double precision)`,
+        supplierNamesAgg: sql<string>`coalesce(string_agg(distinct ${suppliers.name}, ','), '')`,
+      })
+      .from(products)
+      .innerJoin(inventoryItems, and(eq(inventoryItems.productId, products.id), statusCondition))
+      .innerJoin(brands, eq(products.brandId, brands.id))
+      .innerJoin(categories, eq(products.categoryId, categories.id))
+      .leftJoin(purchaseOrderItems, eq(inventoryItems.purchaseOrderItemId, purchaseOrderItems.id))
+      .leftJoin(purchaseOrders, eq(purchaseOrderItems.purchaseOrderId, purchaseOrders.id))
+      .leftJoin(suppliers, eq(purchaseOrders.supplierId, suppliers.id));
+
+    if (whereClause) {
+      selectQuery.where(whereClause);
+    }
+
+    selectQuery
+      .groupBy(products.id, brands.name, categories.name)
+      .orderBy(desc(sql`max(${inventoryItems.createdAt})`))
+      .limit(limit)
+      .offset(offset);
+
+    const list = await selectQuery;
+    
+    // Convert avgCost sang chuỗi định dạng tiền số để client dễ nhận diện
+    const formattedList = list.map(item => ({
+      ...item,
+      avgCost: String(item.avgCost || 0),
+      costPrices: [Number(item.avgCost || 0)], // support client fallback costPrices array
+      supplierNames: item.supplierNamesAgg ? item.supplierNamesAgg.split(',').filter(Boolean) : [],
+    }));
+
+    return { list: formattedList, totalCount };
+  } catch (error) {
+    console.error("Lỗi lấy danh sách gom nhóm kho hàng:", error);
+    return { list: [], totalCount: 0 };
+  }
+}
+
+/**
+ * Lấy danh sách máy lẻ chi tiết của 1 sản phẩm cụ thể (cho Drawer chi tiết)
+ */
+export async function getInventoryItemsByProduct(productId: string) {
+  try {
+    const poCounts = db
+      .select({
+        purchaseOrderId: purchaseOrderItems.purchaseOrderId,
+        totalItems: sql<number>`cast(count(${inventoryItems.id}) as integer)`.as('total_items'),
+      })
+      .from(inventoryItems)
+      .innerJoin(purchaseOrderItems, eq(inventoryItems.purchaseOrderItemId, purchaseOrderItems.id))
+      .groupBy(purchaseOrderItems.purchaseOrderId)
+      .as('po_counts');
+
+    const items = await db
+      .select({
+        id: inventoryItems.id,
+        serialNumber: inventoryItems.serialNumber,
+        condition: inventoryItems.condition,
+        status: inventoryItems.status,
+        costPrice: inventoryItems.costPrice,
+        sellingPrice: inventoryItems.sellingPrice,
+        stockedDate: inventoryItems.stockedDate,
+        expectedArrivalDate: inventoryItems.expectedArrivalDate,
+        receivedDate: inventoryItems.receivedDate,
+        soldDate: inventoryItems.soldDate,
+        warrantyStart: inventoryItems.warrantyStart,
+        warrantyEnd: inventoryItems.warrantyEnd,
+        notes: inventoryItems.notes,
+        specsOverride: inventoryItems.specsOverride,
+        originCountry: inventoryItems.originCountry,
+        location: inventoryItems.location,
+        createdAt: inventoryItems.createdAt,
+        productName: products.name,
+        productSku: products.sku,
+        brandName: brands.name,
+        categoryName: categories.name,
+        images: inventoryItems.images,
+        productSpecs: products.specs,
+        productId: inventoryItems.productId,
+        supplierName: suppliers.name,
+        supplierId: suppliers.id,
+        poNumber: purchaseOrders.poNumber,
+        purchaseOrderId: purchaseOrders.id,
+        trackingNumber: purchaseOrders.trackingNumber,
+        trackingUrl: purchaseOrders.trackingUrl,
+        shippingMethod: purchaseOrders.shippingMethod,
+        shippingCost: purchaseOrders.shippingCost,
+        poStatus: purchaseOrders.status,
+        poItemsCount: sql<number>`coalesce(${poCounts.totalItems}, 0)`,
+      })
+      .from(inventoryItems)
+      .innerJoin(products, eq(inventoryItems.productId, products.id))
+      .innerJoin(brands, eq(products.brandId, brands.id))
+      .innerJoin(categories, eq(products.categoryId, categories.id))
+      .leftJoin(purchaseOrderItems, eq(inventoryItems.purchaseOrderItemId, purchaseOrderItems.id))
+      .leftJoin(purchaseOrders, eq(purchaseOrderItems.purchaseOrderId, purchaseOrders.id))
+      .leftJoin(suppliers, eq(purchaseOrders.supplierId, suppliers.id))
+      .leftJoin(poCounts, eq(purchaseOrders.id, poCounts.purchaseOrderId))
+      .where(
+        and(
+          eq(inventoryItems.productId, productId),
+          inArray(inventoryItems.status, ['incoming', 'in_stock', 'sold', 'warranty_repair', 'returned', 'defective', 'deleted'])
+        )
+      )
+      .orderBy(desc(inventoryItems.createdAt), desc(inventoryItems.id));
+
+    // Fetch attached accessories
+    const attachedAccs = await db
+      .select({
+        id: accessoryItems.id,
+        inventoryItemId: accessoryItems.inventoryItemId,
+        serialNumber: accessoryItems.serialNumber,
+        unitCost: accessoryItems.unitCost,
+        sellingPrice: accessoryItems.sellingPrice,
+        catalogName: accessoryCatalog.name,
+      })
+      .from(accessoryItems)
+      .innerJoin(accessoryCatalog, eq(accessoryItems.accessoryCatalogId, accessoryCatalog.id))
+      .where(eq(accessoryItems.status, "attached"));
+
+    const accMap: Record<string, any[]> = {};
+    for (const acc of attachedAccs) {
+      if (acc.inventoryItemId) {
+        if (!accMap[acc.inventoryItemId]) {
+          accMap[acc.inventoryItemId] = [];
+        }
+        accMap[acc.inventoryItemId].push(acc);
+      }
+    }
+
+    const itemsWithAccessories = items.map(item => ({
+      ...item,
+      accessoryCost: "0",
+      accessoryNotes: null,
+      taxImport: "0",
+      accessories: accMap[item.id] || [],
+    }));
+
+    return itemsWithAccessories;
+  } catch (error) {
+    console.error("Lỗi lấy danh sách máy lẻ theo sản phẩm:", error);
+    return [];
+  }
 }
 
 
@@ -2332,5 +2562,46 @@ export async function restoreAccessoryFromDefective(accessoryItemId: string) {
   } catch (error: any) {
     console.error("Lỗi khôi phục phụ kiện:", error);
     return { success: false, message: error.message || "Lỗi khôi phục phụ kiện" };
+  }
+}
+
+/**
+ * Lấy số lượng thống kê thiết bị theo từng trạng thái (để hiển thị badge trên các tab)
+ */
+export async function getInventoryStats() {
+  try {
+    const stats = await db
+      .select({
+        status: inventoryItems.status,
+        count: sql<number>`cast(count(${inventoryItems.id}) as integer)`
+      })
+      .from(inventoryItems)
+      .groupBy(inventoryItems.status);
+
+    let inStock = 0;
+    let incoming = 0;
+    let defective = 0;
+    let total = 0;
+
+    stats.forEach(s => {
+      const cnt = s.count || 0;
+      if (s.status === 'in_stock') inStock += cnt;
+      else if (s.status === 'incoming') incoming += cnt;
+      else if (s.status === 'defective' || s.status === 'warranty_repair') defective += cnt;
+      
+      if (s.status !== 'deleted' && s.status !== 'sold' && s.status !== 'returned') {
+        total += cnt;
+      }
+    });
+
+    return {
+      total,
+      inStock,
+      incoming,
+      defective
+    };
+  } catch (error) {
+    console.error("Lỗi lấy thống kê kho hàng:", error);
+    return { total: 0, inStock: 0, incoming: 0, defective: 0 };
   }
 }

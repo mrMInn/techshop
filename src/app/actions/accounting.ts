@@ -333,6 +333,7 @@ export async function syncHistoricalData() {
       .where(
         and(
           or(
+            eq(purchaseOrders.status, "in_transit"),
             eq(purchaseOrders.status, "received"),
             eq(purchaseOrders.status, "partially_received"),
             eq(purchaseOrders.status, "warranty_supplier"),
@@ -433,17 +434,55 @@ export async function syncHistoricalAccountingDataAction() {
 }
 
 // 2. Lấy tóm tắt tài chính (Tổng thu, chi, lãi/lỗ và thống kê biểu đồ)
-export async function getFinancialSummary() {
-  console.log("SERVER: getFinancialSummary called");
+export async function getFinancialSummary(filters?: {
+  startDate?: string;
+  endDate?: string;
+  category?: string;
+  search?: string;
+}) {
+  console.log("SERVER: getFinancialSummary called with", filters);
   await requireOwner();
   try {
-    const totals = await db
+    const conditions = [];
+
+    if (filters?.category && filters.category !== "all") {
+      conditions.push(
+        or(
+          eq(cashBookEntries.category, filters.category as any),
+          eq(cashBookEntries.incomeCategoryId, filters.category)
+        )
+      );
+    }
+    if (filters?.search) {
+      conditions.push(
+        or(
+          like(cashBookEntries.entryNumber, `%${filters.search}%`),
+          like(cashBookEntries.description, `%${filters.search}%`)
+        )
+      );
+    }
+    if (filters?.startDate) {
+      conditions.push(sql`DATE(${cashBookEntries.entryDate}) >= ${filters.startDate}`);
+    }
+    if (filters?.endDate) {
+      conditions.push(sql`DATE(${cashBookEntries.entryDate}) <= ${filters.endDate}`);
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    let totalsQuery = db
       .select({
         type: cashBookEntries.type,
         sum: sql<string>`sum(${cashBookEntries.amount})`
       })
       .from(cashBookEntries)
       .groupBy(cashBookEntries.type);
+
+    if (whereClause) {
+      totalsQuery.where(whereClause);
+    }
+
+    const totals = await totalsQuery;
 
     let totalIncome = 0;
     let totalExpense = 0;
@@ -452,7 +491,7 @@ export async function getFinancialSummary() {
       else if (t.type === 'expense') totalExpense = Number(t.sum || 0);
     });
 
-    const catStats = await db
+    let catStatsQuery = db
       .select({
         category: cashBookEntries.category,
         type: cashBookEntries.type,
@@ -461,7 +500,15 @@ export async function getFinancialSummary() {
       .from(cashBookEntries)
       .groupBy(cashBookEntries.category, cashBookEntries.type);
 
+    if (whereClause) {
+      catStatsQuery.where(whereClause);
+    }
+
+    const catStats = await catStatsQuery;
+
     const categoryStats: Record<string, number> = {};
+    const expenseCategoryStats: Record<string, number> = {};
+
     catStats.forEach((c) => {
       const cat = c.category || "other";
       const amt = Number(c.sum || 0);
@@ -469,6 +516,7 @@ export async function getFinancialSummary() {
         categoryStats[cat] = (categoryStats[cat] || 0) + amt;
       } else {
         categoryStats[cat] = (categoryStats[cat] || 0) - amt;
+        expenseCategoryStats[cat] = (expenseCategoryStats[cat] || 0) + amt;
       }
     });
 
@@ -604,6 +652,7 @@ export async function getFinancialSummary() {
       totalExpense,
       netProfit,
       categoryStats,
+      expenseCategoryStats,
       chartData,
       monthlyChartData,
     };
@@ -614,6 +663,7 @@ export async function getFinancialSummary() {
       totalExpense: 0,
       netProfit: 0,
       categoryStats: {},
+      expenseCategoryStats: {},
       chartData: [],
       monthlyChartData: [],
     };
@@ -627,29 +677,11 @@ export async function getCashBookEntries(filters?: {
   search?: string;
   startDate?: string;
   endDate?: string;
+  page?: number;
+  limit?: number;
 }) {
   await requireOwner();
   try {
-    let query = db.select({
-      id: cashBookEntries.id,
-      entryNumber: cashBookEntries.entryNumber,
-      type: cashBookEntries.type,
-      category: cashBookEntries.category,
-      amount: cashBookEntries.amount,
-      runningBalance: cashBookEntries.runningBalance,
-      paymentMethod: cashBookEntries.paymentMethod,
-      referenceType: cashBookEntries.referenceType,
-      referenceId: cashBookEntries.referenceId,
-      description: cashBookEntries.description,
-      entryDate: cashBookEntries.entryDate,
-      createdBy: cashBookEntries.createdBy,
-      createdAt: cashBookEntries.createdAt,
-      incomeCategoryId: cashBookEntries.incomeCategoryId,
-      incomeCategoryName: incomeCategories.name,
-    })
-    .from(cashBookEntries)
-    .leftJoin(incomeCategories, eq(cashBookEntries.incomeCategoryId, incomeCategories.id));
-
     const conditions = [];
 
     if (filters?.type) {
@@ -678,15 +710,55 @@ export async function getCashBookEntries(filters?: {
       conditions.push(sql`DATE(${cashBookEntries.entryDate}) <= ${filters.endDate}`);
     }
 
-    const list = await (conditions.length > 0
-      ? query.where(and(...conditions))
-      : query
-    ).orderBy(desc(cashBookEntries.createdAt));
+    // 1. Count matching entries
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    
+    let countQuery = db
+      .select({ count: sql<number>`cast(count(${cashBookEntries.id}) as integer)` })
+      .from(cashBookEntries);
+      
+    if (whereClause) {
+      countQuery.where(whereClause);
+    }
+    const countResult = await countQuery;
+    const totalCount = countResult[0]?.count || 0;
 
-    return list;
+    // 2. Fetch page list
+    let query = db.select({
+      id: cashBookEntries.id,
+      entryNumber: cashBookEntries.entryNumber,
+      type: cashBookEntries.type,
+      category: cashBookEntries.category,
+      amount: cashBookEntries.amount,
+      runningBalance: cashBookEntries.runningBalance,
+      paymentMethod: cashBookEntries.paymentMethod,
+      referenceType: cashBookEntries.referenceType,
+      referenceId: cashBookEntries.referenceId,
+      description: cashBookEntries.description,
+      entryDate: cashBookEntries.entryDate,
+      createdBy: cashBookEntries.createdBy,
+      createdAt: cashBookEntries.createdAt,
+      incomeCategoryId: cashBookEntries.incomeCategoryId,
+      incomeCategoryName: incomeCategories.name,
+    })
+    .from(cashBookEntries)
+    .leftJoin(incomeCategories, eq(cashBookEntries.incomeCategoryId, incomeCategories.id));
+
+    if (whereClause) {
+      query.where(whereClause);
+    }
+
+    query.orderBy(desc(cashBookEntries.createdAt));
+
+    if (filters?.page && filters?.limit) {
+      query.limit(filters.limit).offset((filters.page - 1) * filters.limit);
+    }
+
+    const list = await query;
+    return { list, totalCount };
   } catch (error) {
     console.error("Lỗi lấy nhật ký sổ quỹ:", error);
-    return [];
+    return { list: [], totalCount: 0 };
   }
 }
 

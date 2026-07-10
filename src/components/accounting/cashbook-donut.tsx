@@ -12,7 +12,8 @@ interface CategoryStat {
 }
  
 interface CashBookDonutProps {
-  entries: any[];
+  entries?: any[];
+  expenseCategoryStats?: Record<string, number>;
 }
  
 const categoryLabels: Record<string, { label: string; color: string }> = {
@@ -40,12 +41,39 @@ const strokeColors: Record<string, string> = {
   other: "#94a3b8", // slate
 };
  
-export function CashBookDonut({ entries }: CashBookDonutProps) {
+export function CashBookDonut({ entries, expenseCategoryStats }: CashBookDonutProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
  
   // Group and calculate only "expense" entries
   const stats = useMemo(() => {
-    const expenseEntries = entries.filter((e) => e.type === "expense");
+    if (expenseCategoryStats) {
+      const list = Object.keys(expenseCategoryStats).map((cat) => {
+        const amount = expenseCategoryStats[cat] || 0;
+        const meta = categoryLabels[cat] || {
+          label: cat,
+          color: "bg-slate-400",
+        };
+        return {
+          category: cat,
+          label: meta.label,
+          amount,
+          color: meta.color,
+        };
+      }).filter(stat => stat.amount > 0);
+
+      const totalExpense = list.reduce((sum, item) => sum + item.amount, 0);
+      const listWithPercentages = list.map(item => ({
+        ...item,
+        percentage: totalExpense > 0 ? (item.amount / totalExpense) * 100 : 0
+      })).sort((a, b) => b.amount - a.amount);
+
+      return {
+        totalExpense,
+        list: listWithPercentages
+      };
+    }
+
+    const expenseEntries = (entries || []).filter((e) => e.type === "expense");
     const totalExpense = expenseEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
  
     const grouped: Record<string, number> = {};
@@ -73,7 +101,7 @@ export function CashBookDonut({ entries }: CashBookDonutProps) {
       totalExpense,
       list: rawStats.sort((a, b) => b.amount - a.amount),
     };
-  }, [entries]);
+  }, [entries, expenseCategoryStats]);
  
   const formatPrice = (price: number) => {
     return Math.round(price).toLocaleString("vi-VN") + "đ";

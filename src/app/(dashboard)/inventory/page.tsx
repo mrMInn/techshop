@@ -2,7 +2,9 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { 
-  getInventoryItems, 
+  getInventoryGroups,
+  getInventoryItemsByProduct,
+  getInventoryStats,
   createInventoryItem, 
   createInventoryItemsBatch,
   updateInventoryItem, 
@@ -12,6 +14,7 @@ import {
   bulkConfirmArrival,
   bulkDeleteInventoryItems,
 } from "@/app/actions/inventory";
+import { getCategories, getBrands } from "@/app/actions/products";
 import { getPurchaseOrdersList, getPurchaseOrderDetail, updatePurchaseOrderAction } from "@/app/actions/purchase-orders";
 import { GlassCard } from "@/components/ui/glass-card";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -55,7 +58,7 @@ function InventoryPageContent() {
   const queryClient = useQueryClient();
   
   // Kích hoạt Supabase Realtime cho kho hàng
-  useRealtimeSubscription("inventory_items", [["inventory"]]);
+  useRealtimeSubscription("inventory_items", [["inventory"], ["inventory_stats"], ["inventory_items_by_product"]]);
 
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -186,9 +189,55 @@ function InventoryPageContent() {
 
 
 
-  const { data: items, isLoading, error } = useQuery({
-    queryKey: ["inventory"],
-    queryFn: () => getInventoryItems(),
+  // Server-side pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+
+  // Reset page to 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedCategory, selectedBrand, selectedStatus, search, activeTab]);
+
+  const { data: categoriesData } = useQuery({
+    queryKey: ["db_categories"],
+    queryFn: getCategories,
+  });
+
+  const { data: brandsData } = useQuery({
+    queryKey: ["db_brands"],
+    queryFn: getBrands,
+  });
+
+  const { data: inventoryData, isLoading, error } = useQuery({
+    queryKey: ["inventory", selectedCategory, selectedBrand, selectedStatus, search, currentPage, activeTab],
+    queryFn: () => getInventoryGroups({
+      page: currentPage,
+      limit: itemsPerPage,
+      categoryName: selectedCategory,
+      brandName: selectedBrand,
+      status: activeTab === "defective" ? "defective" : (activeTab === "returned" ? "returned" : selectedStatus),
+      search: search || undefined,
+    }),
+    placeholderData: (prev: any) => prev,
+    staleTime: 15_000,
+  });
+
+  const groupedItems = inventoryData?.list || [];
+  const totalCount = inventoryData?.totalCount || 0;
+  const totalPages = Math.ceil(totalCount / itemsPerPage);
+
+  const { data: drawerItems, isLoading: isDrawerItemsLoading } = useQuery({
+    queryKey: ["inventory_items_by_product", activeDrawerProductId],
+    queryFn: () => getInventoryItemsByProduct(activeDrawerProductId!),
+    enabled: !!activeDrawerProductId,
+    staleTime: 10_000,
+  });
+
+  const { data: statsData } = useQuery({
+    queryKey: ["inventory_stats"],
+    queryFn: getInventoryStats,
+    placeholderData: (prev: any) => prev,
+    staleTime: 15_000,
   });
 
   const { data: purchaseOrdersData, isLoading: isPoLoading } = useQuery({
@@ -408,20 +457,20 @@ function InventoryPageContent() {
   };
 
   const categoryOptions = useMemo(() => {
-    const uniqueCategories = Array.from(new Set(items?.map((item: any) => item.categoryName) || [])) as string[];
+    const cats = categoriesData || [];
     return [
       { value: "all", label: "Tất cả danh mục" },
-      ...uniqueCategories.map((cat) => ({ value: cat, label: cat })),
+      ...cats.map((c) => ({ value: c.name, label: c.name })),
     ];
-  }, [items]);
+  }, [categoriesData]);
 
   const brandOptions = useMemo(() => {
-    const uniqueBrands = Array.from(new Set(items?.map((item: any) => item.brandName) || [])) as string[];
+    const brs = brandsData || [];
     return [
       { value: "all", label: "Tất cả thương hiệu" },
-      ...uniqueBrands.map((brand) => ({ value: brand, label: brand })),
+      ...brs.map((b) => ({ value: b.name, label: b.name })),
     ];
-  }, [items]);
+  }, [brandsData]);
 
   const statusOptions = useMemo(() => {
     if (activeTab === "active") {
@@ -462,50 +511,14 @@ function InventoryPageContent() {
     ];
   }, [purchaseOrdersData]);
 
-  const filteredItems = useMemo(() => {
-    return items?.filter((item) => {
-      const specs = item.productSpecs as { cpu?: string; ram?: string; ssd?: string; screen?: string } | null;
-      const specsStr = specs ? `${specs.cpu || ""} ${specs.ram || ""} ${specs.ssd || ""} ${specs.screen || ""}`.toLowerCase() : "";
-
-      const matchesSearch =
-        item.serialNumber.toLowerCase().includes(search.toLowerCase()) ||
-        item.productName.toLowerCase().includes(search.toLowerCase()) ||
-        specsStr.includes(search.toLowerCase());
-
-      const matchesCategory = selectedCategory === "all" || item.categoryName === selectedCategory;
-      const matchesBrand = selectedBrand === "all" || item.brandName === selectedBrand;
-      
-      let matchesStatus = false;
-      if (activeTab === "active") {
-        if (selectedStatus === "all") {
-          matchesStatus = (item.status !== "deleted" && item.status !== "sold" && item.status !== "defective" && item.status !== "warranty_repair" && item.status !== "returned");
-        } else {
-          matchesStatus = item.status === selectedStatus;
-        }
-      } else if (activeTab === "defective") {
-        if (selectedStatus === "all") {
-          matchesStatus = (item.status === "defective" || item.status === "warranty_repair");
-        } else if (selectedStatus === "defective") {
-          matchesStatus = (item.status === "defective");
-        } else if (selectedStatus === "internal_repair") {
-          matchesStatus = (item.status === "warranty_repair" && item.location === "internal_repair");
-        } else if (selectedStatus === "supplier_warranty") {
-          matchesStatus = (item.status === "warranty_repair" && item.location !== "internal_repair");
-        }
-      } else if (activeTab === "returned") {
-        matchesStatus = item.status === "returned";
-      }
-
-      return matchesSearch && matchesCategory && matchesBrand && matchesStatus;
-    }) || [];
-  }, [items, search, selectedCategory, selectedBrand, selectedStatus, activeTab]);
+  const filteredItems = drawerItems || [];
 
   const handleSelectAll = () => {
-    if (!filteredItems) return;
-    if (selectedIds.length === filteredItems.length) {
+    if (!drawerItems) return;
+    if (selectedIds.length === drawerItems.length) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(filteredItems.map(item => item.id));
+      setSelectedIds(drawerItems.map(item => item.id));
     }
   };
 
@@ -515,122 +528,19 @@ function InventoryPageContent() {
     );
   };
 
-  const selectedItems = items?.filter(item => selectedIds.includes(item.id)) || [];
+  const selectedItems = drawerItems?.filter(item => selectedIds.includes(item.id)) || [];
   const hasIncomingSelected = selectedItems.some(item => item.status === 'incoming');
-
-  const groupedItems = useMemo(() => {
-    if (!filteredItems) return [];
-    
-    const groups: Record<string, {
-      productId: string;
-      productName: string;
-      productSku: string | null;
-      brandName: string;
-      categoryName: string;
-      productSpecs: any;
-      inStockCount: number;
-      incomingCount: number;
-      totalCount: number;
-      costPrices: number[];
-      items: any[];
-      supplierNames: string[];
-    }> = {};
-
-    for (const item of filteredItems) {
-      const key = item.productId;
-      if (!groups[key]) {
-        groups[key] = {
-          productId: item.productId,
-          productName: item.productName,
-          productSku: item.productSku,
-          brandName: item.brandName,
-          categoryName: item.categoryName,
-          productSpecs: item.productSpecs,
-          inStockCount: 0,
-          incomingCount: 0,
-          totalCount: 0,
-          costPrices: [],
-          items: [],
-          supplierNames: [],
-        };
-      }
-      
-      groups[key].items.push(item);
-      groups[key].totalCount += 1;
-      if (item.status === 'in_stock') {
-        groups[key].inStockCount += 1;
-      } else if (item.status === 'incoming') {
-        groups[key].incomingCount += 1;
-      }
-      if (item.supplierName && !groups[key].supplierNames.includes(item.supplierName)) {
-        groups[key].supplierNames.push(item.supplierName);
-      }
-      
-      // Calculate true actual cost including PO allocation and accessory cost
-      const costVal = Number(item.costPrice || 0);
-      const accVal = Number(item.accessoryCost || 0);
-      const shipVal = Number(item.shippingCost || 0);
-      const taxVal = Number(item.taxImport || 0);
-      const poCount = Number(item.poItemsCount || 0);
-      
-      const allocShip = poCount > 0 ? shipVal / poCount : 0;
-      const allocTax = poCount > 0 ? taxVal / poCount : 0;
-      const totalCost = costVal + allocShip + allocTax + accVal;
-      
-      groups[key].costPrices.push(totalCost);
-    }
-
-    return Object.values(groups);
-  }, [filteredItems]);
 
   const activeDrawerProductFromList = useMemo(() => {
     const found = groupedItems.find((g) => g.productId === activeDrawerProductId);
-    if (found) return found;
-
-    if (!activeDrawerProductId || !items) return null;
-    const productItems = items.filter((item) => item.productId === activeDrawerProductId);
-    if (productItems.length === 0) return null;
-
-    const first = productItems[0];
-    const brandName = first.brandName;
-    const categoryName = first.categoryName;
-    const productName = first.productName;
-    const productSku = first.productSku;
-    const productSpecs = first.productSpecs;
-
-    const supplierNames: string[] = [];
-    const costPrices: number[] = [];
-    let inStockCount = 0;
-    let incomingCount = 0;
-
-    for (const item of productItems) {
-      if (item.status === 'in_stock') {
-        inStockCount += 1;
-      } else if (item.status === 'incoming') {
-        incomingCount += 1;
-      }
-      if (item.supplierName && !supplierNames.includes(item.supplierName)) {
-        supplierNames.push(item.supplierName);
-      }
-      const totalCost = Number(item.costPrice || 0);
-      costPrices.push(totalCost);
-    }
-
+    if (!found || !drawerItems) return null;
     return {
-      productId: activeDrawerProductId,
-      productName,
-      productSku,
-      brandName,
-      categoryName,
-      productSpecs,
-      inStockCount,
-      incomingCount,
-      totalCount: productItems.length,
-      costPrices,
-      items: productItems,
-      supplierNames,
+      ...found,
+      items: drawerItems,
+      costPrices: drawerItems.map((item: any) => Number(item.costPrice || 0)),
+      supplierNames: Array.from(new Set(drawerItems.map((item: any) => item.supplierName).filter(Boolean))) as string[],
     };
-  }, [groupedItems, activeDrawerProductId, items]);
+  }, [groupedItems, activeDrawerProductId, drawerItems]);
 
   const [cachedDrawerProduct, setCachedDrawerProduct] = useState<any>(null);
 
@@ -644,9 +554,9 @@ function InventoryPageContent() {
   const activeDrawerProduct = activeDrawerProductFromList || cachedDrawerProduct;
 
   const activeDrawerDefectiveCount = useMemo(() => {
-    if (!activeDrawerProduct || !items) return 0;
-    return items.filter((item: any) => item.productId === activeDrawerProduct.productId && (item.status === 'defective' || item.status === 'warranty_repair')).length;
-  }, [activeDrawerProduct, items]);
+    if (!drawerItems) return 0;
+    return drawerItems.filter((item: any) => item.status === 'defective' || item.status === 'warranty_repair').length;
+  }, [drawerItems]);
 
   // Determine active tab index for sliding indicator position and width in Segmented Control
   const activeSegmentIndex = useMemo(() => {
@@ -665,7 +575,7 @@ function InventoryPageContent() {
 
             {/* Status Segmented Control (replaces Status Dropdown for Active/Defective tabs) */}
             {(activeTab === "active" || activeTab === "defective") && (
-              <div className="relative flex bg-[#f5f5f7] p-[3px] rounded-full border border-[#e0e0e0] h-[40px] w-full sm:w-[500px] shrink-0 select-none overflow-hidden">
+              <div className="relative flex bg-[#f5f5f7] p-[3px] rounded-full border border-[#e0e0e0] h-[40px] w-full sm:w-[580px] shrink-0 select-none overflow-hidden">
                 {/* Sliding active indicator */}
                 <div 
                   className="absolute top-[3px] bottom-[3px] rounded-full bg-[#0066cc] shadow-[0_2px_4px_rgba(0,102,204,0.25)]"
@@ -682,7 +592,7 @@ function InventoryPageContent() {
                     setActiveTab("active");
                     setSelectedStatus("all");
                   }}
-                  className={`w-1/4 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                  className={`w-1/4 h-full relative z-10 flex items-center justify-center gap-1.5 px-2 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
                     activeSegmentIndex === 0 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
                   }`}
                 >
@@ -693,19 +603,19 @@ function InventoryPageContent() {
                   }`}>
                     <SFSymbolShippingBox size={activeSegmentIndex === 0 ? 13 : 10} className="transition-all duration-200" />
                   </div>
-                  <span className="truncate">Tất cả</span>
+                  <span className="truncate min-w-0">Tất cả</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 0 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
-                    {items?.filter((i) => i.status !== "deleted" && i.status !== "sold" && i.status !== "returned").length || 0}
+                    {statsData?.total || 0}
                   </span>
                 </button>
-
+ 
                 {/* Tab 2: Sẵn kho */}
                 <button
                   onClick={() => {
                     setActiveTab("active");
                     setSelectedStatus("in_stock");
                   }}
-                  className={`w-1/4 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                  className={`w-1/4 h-full relative z-10 flex items-center justify-center gap-1.5 px-2 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
                     activeSegmentIndex === 1 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
                   }`}
                 >
@@ -716,19 +626,19 @@ function InventoryPageContent() {
                   }`}>
                     <SFSymbolLaptopComputer size={activeSegmentIndex === 1 ? 13 : 10} className="transition-all duration-200" />
                   </div>
-                  <span className="truncate">Sẵn kho</span>
+                  <span className="truncate min-w-0">Sẵn kho</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 1 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
-                    {items?.filter((i) => i.status === "in_stock").length || 0}
+                    {statsData?.inStock || 0}
                   </span>
                 </button>
-
+ 
                 {/* Tab 3: Đang về */}
                 <button
                   onClick={() => {
                     setActiveTab("active");
                     setSelectedStatus("incoming");
                   }}
-                  className={`w-1/4 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                  className={`w-1/4 h-full relative z-10 flex items-center justify-center gap-1.5 px-2 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
                     activeSegmentIndex === 2 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
                   }`}
                 >
@@ -739,19 +649,19 @@ function InventoryPageContent() {
                   }`}>
                     <SFSymbolTruck size={activeSegmentIndex === 2 ? 13 : 10} className="transition-all duration-200" />
                   </div>
-                  <span className="truncate">Đang về</span>
+                  <span className="truncate min-w-0">Đang về</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 2 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
-                    {items?.filter((i) => i.status === "incoming").length || 0}
+                    {statsData?.incoming || 0}
                   </span>
                 </button>
-
+ 
                 {/* Tab 4: Máy lỗi */}
                 <button
                   onClick={() => {
                     setActiveTab("defective");
                     setSelectedStatus("all");
                   }}
-                  className={`w-1/4 h-full relative z-10 flex items-center justify-center gap-1.5 px-1 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
+                  className={`w-1/4 h-full relative z-10 flex items-center justify-center gap-1.5 px-2 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
                     activeSegmentIndex === 3 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
                   }`}
                 >
@@ -762,9 +672,9 @@ function InventoryPageContent() {
                   }`}>
                     <SFSymbolExclamationTriangle size={activeSegmentIndex === 3 ? 13 : 10} className="transition-all duration-200" />
                   </div>
-                  <span className="truncate">Máy lỗi</span>
+                  <span className="truncate min-w-0">Máy lỗi</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 3 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
-                    {items?.filter((i) => i.status === "defective" || i.status === "warranty_repair").length || 0}
+                    {statsData?.defective || 0}
                   </span>
                 </button>
               </div>
@@ -1003,7 +913,7 @@ function InventoryPageContent() {
               </table>
             </div>
           )
-        ) : filteredItems?.length === 0 ? (
+        ) : groupedItems.length === 0 ? (
           <div className="p-20 flex flex-col items-center justify-center text-center">
             <div className="w-12 h-12 bg-[#f5f5f7] rounded-full border border-[#e0e0e0] flex items-center justify-center mb-4 text-[#7a7a7a]/60">
               <SFSymbolShippingBox size={18} />
@@ -1016,7 +926,8 @@ function InventoryPageContent() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+            <div className="overflow-x-auto">
             <table className="w-full text-left border-separate border-spacing-0 border-collapse">
               <thead>
                 <tr className="bg-[#f5f5f7]/50 text-[12px] font-semibold text-[#7a7a7a] uppercase tracking-wider whitespace-nowrap">
@@ -1046,7 +957,7 @@ function InventoryPageContent() {
               </thead>
               <tbody className="text-[16px] text-[#1d1d1f]">
                 {groupedItems.map((group, index) => {
-                  const avgCost = group.costPrices.reduce((a, b) => a + b, 0) / (group.costPrices.length || 1);
+                  const avgCost = Number(group.avgCost || 0);
                   const isLast = index === groupedItems.length - 1;
                   return (
                     <tr 
@@ -1101,13 +1012,9 @@ function InventoryPageContent() {
                       {activeTab === "returned" && (
                         <td className={`px-6 py-3 ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
                           {group.supplierNames && group.supplierNames.length > 0 ? (
-                            <div className="flex flex-wrap gap-1">
-                              {group.supplierNames.map((name) => (
-                                <span key={name} className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-800 border border-slate-200">
-                                  {name}
-                                </span>
-                              ))}
-                            </div>
+                            <span className="text-[13px] text-[#1d1d1f] font-medium">
+                              {group.supplierNames.join(", ")}
+                            </span>
                           ) : (
                             <span className="text-[#7a7a7a] text-[13px]">N/A</span>
                           )}
@@ -1120,11 +1027,11 @@ function InventoryPageContent() {
                           </span>
                         ) : activeTab === "defective" ? (
                           <span className="text-[13px] font-semibold text-red-600">
-                            {group.items.filter((i: any) => i.status === 'defective').length} máy
+                            {group.defectiveOnlyCount} máy
                           </span>
                         ) : (
                           <span className="text-[13px] font-semibold text-slate-600">
-                            {group.items.filter((i: any) => i.status === 'returned').length} máy
+                            {group.returnedCount} máy
                           </span>
                         )}
                       </td>
@@ -1132,12 +1039,12 @@ function InventoryPageContent() {
                         <>
                           <td className={`px-6 py-3 text-center ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
                             <span className="text-[13px] font-semibold text-amber-600">
-                              {group.items.filter((i: any) => i.status === 'warranty_repair' && i.location === 'internal_repair').length} máy
+                              {group.internalRepairCount} máy
                             </span>
                           </td>
                           <td className={`px-6 py-3 text-center ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
                             <span className="text-[13px] font-semibold text-[#0066cc]">
-                              {group.items.filter((i: any) => i.status === 'warranty_repair' && i.location !== 'internal_repair').length} máy
+                              {group.externalWarrantyCount} máy
                             </span>
                           </td>
                         </>
@@ -1157,12 +1064,12 @@ function InventoryPageContent() {
                       {activeTab === "active" && (
                         <td className={`px-6 py-3 text-center ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
                           <span className="text-[13px] font-semibold text-red-600">
-                            {items?.filter((item: any) => item.productId === group.productId && (item.status === 'defective' || item.status === 'warranty_repair')).length || 0} máy
+                            {group.defectiveTotalCount} máy
                           </span>
                         </td>
                       )}
                       <td className={`px-6 py-3 text-right font-semibold text-[#1d1d1f] ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
-                        {formatPrice(avgCost.toFixed(2))}
+                        {formatPrice(avgCost.toFixed(0))}
                       </td>
                     </tr>
                   );
@@ -1170,9 +1077,56 @@ function InventoryPageContent() {
               </tbody>
             </table>
           </div>
-        )}
-      </GlassCard>
+          {/* Pagination controls for model list */}
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-4 border-t border-[#e0e0e0] bg-[#f5f5f7]/30 select-none gap-3">
+              <span className="text-[12px] font-medium text-slate-500">
+                Hiển thị dòng {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, totalCount)} trong tổng số {totalCount} sản phẩm
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                  className="px-3.5 py-1.5 rounded-full bg-white border border-[#e0e0e0] text-[12px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none transition-all cursor-pointer shadow-sm active:scale-95"
+                >
+                  Trang trước
+                </button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }).map((_, i) => {
+                    const pageNum = i + 1;
+                    const isCurrent = pageNum === currentPage;
+                    return (
+                      <button
+                        key={pageNum}
+                        type="button"
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`w-7.5 h-7.5 rounded-full text-[12px] font-bold flex items-center justify-center transition-all cursor-pointer ${
+                          isCurrent
+                            ? "bg-[#0066cc] text-white shadow-sm"
+                            : "bg-transparent text-slate-600 hover:bg-slate-100"
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+                <button
+                  type="button"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                  className="px-3.5 py-1.5 rounded-full bg-white border border-[#e0e0e0] text-[12px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none transition-all cursor-pointer shadow-sm active:scale-95"
+                >
+                  Trang sau
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
+    </GlassCard>
+  )}
 
       {/* 5. Giao diện Modal bảng chi tiết cấu hình và danh sách Serials - Centered & Portal UI/UX */}
       {mounted && activeDrawerProduct && createPortal(

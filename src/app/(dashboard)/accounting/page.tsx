@@ -246,9 +246,9 @@ export default function CashBookPage() {
     const runBackgroundSync = async () => {
       try {
         await syncHistoricalAccountingDataAction();
-        queryClient.invalidateQueries({ queryKey: ["cashbook_entries"] });
-        queryClient.invalidateQueries({ queryKey: ["dashboard_bento_stats"] });
-        queryClient.invalidateQueries({ queryKey: ["financial_summary"] });
+        queryClient.refetchQueries({ queryKey: ["cashbook_entries"] });
+        queryClient.refetchQueries({ queryKey: ["dashboard_bento_stats"] });
+        queryClient.refetchQueries({ queryKey: ["financial_summary"] });
       } catch (err) {
         console.error("Lỗi đồng bộ ngầm lịch sử:", err);
       }
@@ -301,19 +301,39 @@ export default function CashBookPage() {
   
   const [incCategoryToDelete, setIncCategoryToDelete] = useState<any>(null);
 
-  const { data: entries, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ["cashbook_entries", type, category, startDate, endDate],
+  const { data: entriesData, isLoading, refetch, isFetching } = useQuery({
+    queryKey: ["cashbook_entries", type, category, startDate, endDate, currentPage],
     queryFn: () => getCashBookEntries({ 
-      type: type || undefined, 
+      type: type || undefined,
       category: category || undefined, 
       startDate: startDate || undefined,
       endDate: endDate || undefined,
+      page: currentPage,
+      limit: itemsPerPage,
     }),
+    placeholderData: (prev: any) => prev,
+    staleTime: 15_000,
   });
 
+  const entries = entriesData?.list || [];
+  const totalCount = entriesData?.totalCount || 0;
+
   const { data: financialSummary } = useQuery({
-    queryKey: ["financial_summary"],
-    queryFn: getFinancialSummary,
+    queryKey: ["financial_summary", "global"],
+    queryFn: () => getFinancialSummary(),
+    placeholderData: (prev: any) => prev,
+    staleTime: 15_000,
+  });
+
+  const { data: financialSummaryFiltered } = useQuery({
+    queryKey: ["financial_summary", "filtered", category, startDate, endDate],
+    queryFn: () => getFinancialSummary({
+      startDate: startDate || undefined,
+      endDate: endDate || undefined,
+      category: category !== "all" ? category : undefined,
+    }),
+    placeholderData: (prev: any) => prev,
+    staleTime: 15_000,
   });
 
   const { data: incomeCategoriesData } = useQuery({
@@ -364,16 +384,11 @@ export default function CashBookPage() {
     }
   }, [incomeCategoriesData, incomeCategory]);
 
-  const paginatedEntries = useMemo(() => {
-    if (!entries) return [];
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return entries.slice(startIndex, startIndex + itemsPerPage);
-  }, [entries, currentPage, itemsPerPage]);
-
+  const filteredEntries = entries;
+  const paginatedEntries = entries;
   const totalPages = useMemo(() => {
-    if (!entries) return 0;
-    return Math.ceil(entries.length / itemsPerPage);
-  }, [entries, itemsPerPage]);
+    return Math.ceil(totalCount / itemsPerPage);
+  }, [totalCount, itemsPerPage]);
 
   const { data: categoriesData } = useQuery({
     queryKey: ["expense_categories"],
@@ -688,24 +703,19 @@ export default function CashBookPage() {
     });
   };
 
+  // Ref cache để tránh nhấp nháy 0đ khi data đang refetch
+  const lastTotalsRef = useRef({ income: 0, expense: 0 });
+
   // Real-time KPI Card summary calculations based on fetched list
   const totals = useMemo(() => {
-    if (!entries) return { income: 0, expense: 0 };
-    let income = 0;
-    let expense = 0;
-    entries.forEach((e) => {
-      const amt = Number(e.amount || 0);
-      if (e.type === "income") {
-        income += amt;
-      } else {
-        expense += amt;
-      }
-    });
-    return {
-      income,
-      expense,
+    if (!financialSummaryFiltered) return lastTotalsRef.current;
+    const result = {
+      income: Number(financialSummaryFiltered.totalIncome || 0),
+      expense: Number(financialSummaryFiltered.totalExpense || 0),
     };
-  }, [entries]);
+    lastTotalsRef.current = result;
+    return result;
+  }, [financialSummaryFiltered]);
 
   // Cân đối Dòng tiền percentages for Balance Meter
   const flowPercentages = useMemo(() => {
@@ -718,9 +728,12 @@ export default function CashBookPage() {
   }, [totals]);
 
   // Số dư lũy kế thực tế (Toàn thời gian, không bị ảnh hưởng bởi filter khoảng thời gian)
+  const lastBalanceRef = useRef(0);
   const cumulativeBalance = useMemo(() => {
-    if (!financialSummary) return 0;
-    return Number(financialSummary.totalIncome || 0) - Number(financialSummary.totalExpense || 0);
+    if (!financialSummary) return lastBalanceRef.current;
+    const val = Number(financialSummary.totalIncome || 0) - Number(financialSummary.totalExpense || 0);
+    lastBalanceRef.current = val;
+    return val;
   }, [financialSummary]);
 
 
@@ -1037,7 +1050,7 @@ export default function CashBookPage() {
               <p className="text-[14px] font-bold text-slate-800">Đang tải sổ quỹ...</p>
               <p className="text-[12px] text-slate-500 mt-1">Vui lòng chờ trong giây lát</p>
             </div>
-          ) : entries && entries.length > 0 ? (
+          ) : filteredEntries && filteredEntries.length > 0 ? (
             <KinhPanel className="shadow-sm overflow-hidden flex flex-col justify-between">
               <div className="w-full overflow-x-auto">
                 <table className="w-full text-left border-separate border-spacing-0 table-fixed min-w-[700px]">
@@ -1156,7 +1169,7 @@ export default function CashBookPage() {
               {totalPages > 1 && (
                 <div className="flex flex-col sm:flex-row items-center justify-between px-5 py-3.5 border-t border-slate-200 bg-white/20 select-none gap-3">
                   <span className="text-[12px] font-medium text-slate-500">
-                    Hiển thị dòng {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, entries.length)} trong tổng số {entries.length} chứng từ
+                    Hiển thị dòng {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filteredEntries.length)} trong tổng số {filteredEntries.length} chứng từ
                   </span>
                   <div className="flex items-center gap-2">
                     <button
@@ -1222,7 +1235,7 @@ export default function CashBookPage() {
               
               {/* Custom SVG Donut Chart */}
               <KinhPanel className="p-4">
-                <CashBookDonut entries={entries || []} />
+                <CashBookDonut expenseCategoryStats={financialSummaryFiltered?.expenseCategoryStats} />
               </KinhPanel>
 
             </div>

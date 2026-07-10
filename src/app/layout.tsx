@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { ThemeProvider } from "@/providers/theme-provider";
 import { QueryProvider } from "@/providers/query-provider";
 import { Toaster } from "sonner";
 
@@ -33,17 +32,11 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <QueryProvider>
-          <ThemeProvider
-            attribute="class"
-            forcedTheme="light"
-            disableTransitionOnChange
-          >
-            {/* Liquid Bg Layer */}
-            <div className="liquid-bg-layer" />
-            
-            {children}
-            <Toaster richColors position="top-right" />
-          </ThemeProvider>
+          {/* Liquid Bg Layer */}
+          <div className="liquid-bg-layer" />
+          
+          {children}
+          <Toaster richColors position="top-right" />
         </QueryProvider>
       </body>
     </html>
