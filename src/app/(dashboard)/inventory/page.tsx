@@ -67,7 +67,7 @@ function InventoryPageContent() {
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedBrand, setSelectedBrand] = useState<string>("all");
-  const [selectedStatus, setSelectedStatus] = useState<string>("all");
+  const selectedStatus = searchParams.get("status") || "in_stock";
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
@@ -144,7 +144,6 @@ function InventoryPageContent() {
 
   // Reset all filters and search keyword when switching tab to avoid mismatch results
   useEffect(() => {
-    setSelectedStatus("all");
     setSelectedPoStatus("all");
     setSelectedPoSupplier("all");
     setSearch("");
@@ -558,130 +557,16 @@ function InventoryPageContent() {
     return drawerItems.filter((item: any) => item.status === 'defective' || item.status === 'warranty_repair').length;
   }, [drawerItems]);
 
-  // Determine active tab index for sliding indicator position and width in Segmented Control
-  const activeSegmentIndex = useMemo(() => {
-    if (activeTab === "defective") return 3;
-    if (selectedStatus === "all") return 0;
-    if (selectedStatus === "in_stock") return 1;
-    if (selectedStatus === "incoming") return 2;
-    return 0;
-  }, [activeTab, selectedStatus]);
-
   return (
     <div className="space-y-6">
       {/* Dropdown Filters & Search & Action Buttons */}
       {activeTab !== "accessories" && (
-        <div className="flex flex-wrap items-center gap-3 pb-6 border-b border-[#e0e0e0] w-full print:hidden">
-
-            {/* Status Segmented Control (replaces Status Dropdown for Active/Defective tabs) */}
-            {(activeTab === "active" || activeTab === "defective") && (
-              <div className="relative flex bg-[#f5f5f7] p-[3px] rounded-full border border-[#e0e0e0] h-[40px] w-full sm:w-[580px] shrink-0 select-none overflow-hidden">
-                {/* Sliding active indicator */}
-                <div 
-                  className="absolute top-[3px] bottom-[3px] rounded-full bg-[#0066cc] shadow-[0_2px_4px_rgba(0,102,204,0.25)]"
-                  style={{
-                    width: "calc(25% - 6px)",
-                    left: `calc(${activeSegmentIndex * 25}% + 3px)`,
-                    transition: "left 280ms cubic-bezier(0.16, 1, 0.3, 1)"
-                  }}
-                />
-
-                {/* Tab 1: Tất cả */}
-                <button
-                  onClick={() => {
-                    setActiveTab("active");
-                    setSelectedStatus("all");
-                  }}
-                  className={`w-1/4 h-full relative z-10 flex items-center justify-center gap-1.5 px-2 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
-                    activeSegmentIndex === 0 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
-                  }`}
-                >
-                  <div className={`w-5.5 h-5.5 rounded-full flex items-center justify-center text-white shrink-0 transition-all duration-200 ${
-                    activeSegmentIndex === 0
-                      ? "bg-transparent shadow-none"
-                      : "bg-gradient-to-br from-[#2ea1ff] to-[#0066cc] shadow-[0_1px_2px_rgba(0,102,204,0.1)]"
-                  }`}>
-                    <SFSymbolShippingBox size={activeSegmentIndex === 0 ? 13 : 10} className="transition-all duration-200" />
-                  </div>
-                  <span className="truncate min-w-0">Tất cả</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 0 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
-                    {statsData?.total || 0}
-                  </span>
-                </button>
- 
-                {/* Tab 2: Sẵn kho */}
-                <button
-                  onClick={() => {
-                    setActiveTab("active");
-                    setSelectedStatus("in_stock");
-                  }}
-                  className={`w-1/4 h-full relative z-10 flex items-center justify-center gap-1.5 px-2 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
-                    activeSegmentIndex === 1 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
-                  }`}
-                >
-                  <div className={`w-5.5 h-5.5 rounded-full flex items-center justify-center text-white shrink-0 transition-all duration-200 ${
-                    activeSegmentIndex === 1
-                      ? "bg-transparent shadow-none"
-                      : "bg-gradient-to-br from-[#34c759] to-[#28a745] shadow-[0_1px_2px_rgba(52,199,89,0.1)]"
-                  }`}>
-                    <SFSymbolLaptopComputer size={activeSegmentIndex === 1 ? 13 : 10} className="transition-all duration-200" />
-                  </div>
-                  <span className="truncate min-w-0">Sẵn kho</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 1 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
-                    {statsData?.inStock || 0}
-                  </span>
-                </button>
- 
-                {/* Tab 3: Đang về */}
-                <button
-                  onClick={() => {
-                    setActiveTab("active");
-                    setSelectedStatus("incoming");
-                  }}
-                  className={`w-1/4 h-full relative z-10 flex items-center justify-center gap-1.5 px-2 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
-                    activeSegmentIndex === 2 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
-                  }`}
-                >
-                  <div className={`w-5.5 h-5.5 rounded-full flex items-center justify-center text-white shrink-0 transition-all duration-200 ${
-                    activeSegmentIndex === 2
-                      ? "bg-transparent shadow-none"
-                      : "bg-gradient-to-br from-[#ff9f0a] to-[#ff7b00] shadow-[0_1px_2px_rgba(255,159,10,0.1)]"
-                  }`}>
-                    <SFSymbolTruck size={activeSegmentIndex === 2 ? 13 : 10} className="transition-all duration-200" />
-                  </div>
-                  <span className="truncate min-w-0">Đang về</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 2 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
-                    {statsData?.incoming || 0}
-                  </span>
-                </button>
- 
-                {/* Tab 4: Máy lỗi */}
-                <button
-                  onClick={() => {
-                    setActiveTab("defective");
-                    setSelectedStatus("all");
-                  }}
-                  className={`w-1/4 h-full relative z-10 flex items-center justify-center gap-1.5 px-2 rounded-full text-[13px] transition-colors duration-200 cursor-pointer active:scale-98 ${
-                    activeSegmentIndex === 3 ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
-                  }`}
-                >
-                  <div className={`w-5.5 h-5.5 rounded-full flex items-center justify-center text-white shrink-0 transition-all duration-200 ${
-                    activeSegmentIndex === 3
-                      ? "bg-transparent shadow-none"
-                      : "bg-gradient-to-br from-[#ff2d55] to-[#d6001c] shadow-[0_1px_2px_rgba(255,45,85,0.15)]"
-                  }`}>
-                    <SFSymbolExclamationTriangle size={activeSegmentIndex === 3 ? 13 : 10} className="transition-all duration-200" />
-                  </div>
-                  <span className="truncate min-w-0">Máy lỗi</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 3 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
-                    {statsData?.defective || 0}
-                  </span>
-                </button>
-              </div>
-            )}
-
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-[#e0e0e0] w-full print:hidden">
+          
+          {/* Left side: Search & Filters Group - unified toolbar */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full md:w-auto">
             {/* Search Input - Spotlight dynamic layout */}
-            <div className="relative flex-1 min-w-[180px] max-w-[320px] transition-all duration-300">
+            <div className="relative w-full sm:w-[280px] md:w-[320px] transition-all duration-300">
               <SFSymbolMagnifyingGlass className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7a7a7a]" size={14} />
               <input 
                 type="text" 
@@ -692,113 +577,119 @@ function InventoryPageContent() {
               />
             </div>
 
-            {/* Reset Button */}
-            {((activeTab !== "purchase_orders" && (selectedCategory !== "all" || selectedBrand !== "all" || selectedStatus !== "all" || search !== "")) ||
-              (activeTab === "purchase_orders" && (selectedPoStatus !== "all" || selectedPoSupplier !== "all" || search !== ""))) && (
-              <button
-                onClick={() => {
-                  if (activeTab === "purchase_orders") {
-                    setSelectedPoStatus("all");
-                    setSelectedPoSupplier("all");
-                  } else {
-                    setSelectedCategory("all");
-                    setSelectedBrand("all");
-                    setSelectedStatus("all");
-                  }
-                  setSearch("");
-                }}
-                className="h-[40px] w-[40px] bg-[#f5f5f7] hover:bg-[#e8e8ed] border border-[#e0e0e0] text-[#7a7a7a] hover:text-[#1d1d1f] rounded-full transition-all cursor-pointer flex items-center justify-center shrink-0 active:scale-95 duration-200"
-                title="Đặt lại bộ lọc"
-              >
-                <SFSymbolArrowClockwise size={14} />
-              </button>
-            )}
-
-            {/* Direct Filters for PO Tab */}
-            {activeTab === "purchase_orders" && (
-              <>
-                <div className="w-[180px] shrink-0">
-                  <CustomSelect
-                    options={poStatusOptions}
-                    value={selectedPoStatus}
-                    onChange={setSelectedPoStatus}
-                    size="sm"
-                    rounded="full"
-                    dropdownWidth="full"
-                  />
-                </div>
-                <div className="w-[220px] shrink-0">
-                  <CustomSelect
-                    options={poSupplierOptions}
-                    value={selectedPoSupplier}
-                    onChange={setSelectedPoSupplier}
-                    size="sm"
-                    rounded="full"
-                    dropdownWidth="full"
-                  />
-                </div>
-              </>
-            )}
-
-            {/* Advanced Filter Popover Button (for other tabs) */}
-            {activeTab !== "purchase_orders" && (
-              <div className="relative" ref={popoverRef}>
-                <button 
-                  onClick={() => setIsFilterOpen(!isFilterOpen)}
-                  className={`h-[40px] px-4 rounded-full border transition-all flex items-center gap-1.5 text-[13px] font-medium cursor-pointer ${
-                    selectedCategory !== "all" || selectedBrand !== "all"
-                      ? "border-[#0066cc] bg-[#0066cc]/5 text-[#0066cc]"
-                      : "border-[#e0e0e0] bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#7a7a7a] hover:text-[#1d1d1f]"
-                  }`}
-                  title="Bộ lọc nâng cao"
-                >
-                  <Filter size={14} />
-                  <span>Bộ lọc</span>
-                  {(selectedCategory !== "all" || selectedBrand !== "all") && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#0066cc]" />
-                  )}
-                </button>
-                
-                {isFilterOpen && (
-                  <div className="absolute top-[calc(100%+6px)] right-0 w-[240px] bg-white rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.15)] border border-[#e0e0e0] p-3.5 z-[99] space-y-3">
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Danh mục</label>
-                      <CustomSelect
-                        options={categoryOptions}
-                        value={selectedCategory}
-                        onChange={setSelectedCategory}
-                        size="sm"
-                        rounded="full"
-                        dropdownWidth="full"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Thương hiệu</label>
-                      <CustomSelect
-                        options={brandOptions}
-                        value={selectedBrand}
-                        onChange={setSelectedBrand}
-                        size="sm"
-                        rounded="full"
-                        dropdownWidth="full"
-                      />
-                    </div>
+            {/* Filters Row */}
+            <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+              {/* Direct Filters for PO Tab */}
+              {activeTab === "purchase_orders" && (
+                <>
+                  <div className="w-[150px] sm:w-[160px] shrink-0">
+                    <CustomSelect
+                      options={poStatusOptions}
+                      value={selectedPoStatus}
+                      onChange={setSelectedPoStatus}
+                      size="sm"
+                      rounded="full"
+                      dropdownWidth="full"
+                    />
                   </div>
-                )}
-              </div>
-            )}
+                  <div className="w-[170px] sm:w-[180px] shrink-0">
+                    <CustomSelect
+                      options={poSupplierOptions}
+                      value={selectedPoSupplier}
+                      onChange={setSelectedPoSupplier}
+                      size="sm"
+                      rounded="full"
+                      dropdownWidth="full"
+                    />
+                  </div>
+                </>
+              )}
 
+              {/* Advanced Filter Popover Button (for other tabs) */}
+              {activeTab !== "purchase_orders" && (
+                <div className="relative" ref={popoverRef}>
+                  <button 
+                    onClick={() => setIsFilterOpen(!isFilterOpen)}
+                    className={`h-[40px] px-4 rounded-full border transition-all flex items-center gap-1.5 text-[13px] font-medium cursor-pointer ${
+                      selectedCategory !== "all" || selectedBrand !== "all"
+                        ? "border-[#0066cc] bg-[#0066cc]/5 text-[#0066cc]"
+                        : "border-[#e0e0e0] bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#7a7a7a] hover:text-[#1d1d1f]"
+                    }`}
+                    title="Bộ lọc nâng cao"
+                  >
+                    <Filter size={14} />
+                    <span>Bộ lọc</span>
+                    {(selectedCategory !== "all" || selectedBrand !== "all") && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#0066cc]" />
+                    )}
+                  </button>
+                  
+                  {isFilterOpen && (
+                    <div className="absolute top-[calc(100%+6px)] left-0 w-[240px] bg-white rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.15)] border border-[#e0e0e0] p-3.5 z-[99] space-y-3">
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Danh mục</label>
+                        <CustomSelect
+                          options={categoryOptions}
+                          value={selectedCategory}
+                          onChange={setSelectedCategory}
+                          size="sm"
+                          rounded="full"
+                          dropdownWidth="full"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Thương hiệu</label>
+                        <CustomSelect
+                          options={brandOptions}
+                          value={selectedBrand}
+                          onChange={setSelectedBrand}
+                          size="sm"
+                          rounded="full"
+                          dropdownWidth="full"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Reset Button */}
+              {((activeTab !== "purchase_orders" && (selectedCategory !== "all" || selectedBrand !== "all" || selectedStatus !== "in_stock" || search !== "")) ||
+                (activeTab === "purchase_orders" && (selectedPoStatus !== "all" || selectedPoSupplier !== "all" || search !== ""))) && (
+                <button
+                  onClick={() => {
+                    if (activeTab === "purchase_orders") {
+                      setSelectedPoStatus("all");
+                      setSelectedPoSupplier("all");
+                    } else {
+                      setSelectedCategory("all");
+                      setSelectedBrand("all");
+                    }
+                    setSearch("");
+                    router.push(`${pathname}?tab=${activeTab}${activeTab === "active" ? "&status=in_stock" : ""}`);
+                  }}
+                  className="h-[40px] w-[40px] bg-[#f5f5f7] hover:bg-[#e8e8ed] border border-[#e0e0e0] text-[#7a7a7a] hover:text-[#1d1d1f] rounded-full transition-all cursor-pointer flex items-center justify-center shrink-0 active:scale-95 duration-200"
+                  title="Đặt lại bộ lọc"
+                >
+                  <SFSymbolArrowClockwise size={14} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Right side: Action Buttons - Call to Action */}
+          <div className="flex items-center gap-3 shrink-0 self-end md:self-auto w-full md:w-auto justify-end">
             {/* Nhập kho Button */}
             {(activeTab === "active" || activeTab === "defective") && (
               <button 
                 onClick={handleOpenCreateDialog}
-                className="flex items-center gap-1.5 px-5 h-[40px] bg-[#0066cc] text-white text-[13px] font-semibold rounded-full hover:bg-[#0071e3] transition-all cursor-pointer shadow-sm active:scale-95 duration-200 shrink-0 sm:ml-auto"
+                className="flex items-center gap-1.5 px-5 h-[40px] bg-[#0066cc] text-white text-[13px] font-semibold rounded-full hover:bg-[#0071e3] transition-all cursor-pointer shadow-sm active:scale-95 duration-200 shrink-0 w-full sm:w-auto justify-center"
               >
                 <SFSymbolPlus size={13} />
                 <span>Nhập kho mới</span>
               </button>
             )}
-
+          </div>
         </div>
       )}
 
@@ -842,12 +733,11 @@ function InventoryPageContent() {
                     <th className="px-6 py-3 border-b border-[#e0e0e0] whitespace-nowrap">Nhà cung cấp</th>
                     <th className="px-6 py-3 text-center border-b border-[#e0e0e0] whitespace-nowrap">Số lượng máy</th>
                     <th className="px-6 py-3 text-right border-b border-[#e0e0e0] whitespace-nowrap">Tổng tiền hàng</th>
-                    <th className="px-6 py-3 text-right border-b border-[#e0e0e0] whitespace-nowrap">Vận chuyển</th>
                     <th className="px-6 py-3 text-center border-b border-[#e0e0e0] whitespace-nowrap">Trạng thái</th>
                     <th className="px-6 py-3 text-center border-b border-[#e0e0e0] whitespace-nowrap">Ngày tạo</th>
                   </tr>
                 </thead>
-                <tbody className="text-[16px] text-[#1d1d1f]">
+                <tbody className="text-[14px] text-[#1d1d1f]">
                   {filteredPurchaseOrders.map((po: any, index: number) => {
                     const isLast = index === filteredPurchaseOrders.length - 1;
                     const poStatusConfig: Record<string, { color: string; label: string }> = {
@@ -861,8 +751,6 @@ function InventoryPageContent() {
                       returned_supplier: { color: "text-slate-600", label: "Đã trả NCC" },
                     };
                     const statusInfo = poStatusConfig[po.status] || { color: "text-slate-800", label: po.status };
-                    const shippingVal = Number(po.shippingCost || 0);
-                    const addCost = shippingVal;
 
                     return (
                       <tr 
@@ -870,7 +758,7 @@ function InventoryPageContent() {
                         className="group cursor-pointer"
                         onClick={() => setSelectedPoId(po.id)}
                       >
-                        <td className={`px-6 py-3 text-center font-semibold text-[#7a7a7a] text-[14px] ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                        <td className={`px-6 py-3 text-center font-semibold text-[#7a7a7a] text-[13px] ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
                           {index + 1}
                         </td>
                         <td className={`px-6 py-3 ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
@@ -884,19 +772,12 @@ function InventoryPageContent() {
                           </span>
                         </td>
                         <td className={`px-6 py-3 text-center ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
-                          <span className="text-[14px] font-semibold text-slate-700">
+                          <span className="text-[13px] font-semibold text-slate-700">
                             {po.totalItemsCount} máy
                           </span>
                         </td>
                         <td className={`px-6 py-3 text-right font-bold text-[#1d1d1f] ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
                           {formatPrice(po.totalCost)}
-                        </td>
-                        <td className={`px-6 py-3 text-right font-medium text-slate-600 ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
-                          {addCost > 0 ? (
-                            <span>{formatPrice(addCost.toFixed(2))}</span>
-                          ) : (
-                            <span className="text-[#7a7a7a]">—</span>
-                          )}
                         </td>
                         <td className={`px-6 py-3 text-center ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
                           <span className={`text-[13px] font-semibold ${statusInfo.color}`}>
@@ -955,7 +836,7 @@ function InventoryPageContent() {
                   <th className="px-6 py-3 text-right border-b border-[#e0e0e0] whitespace-nowrap">Giá vốn trung bình</th>
                 </tr>
               </thead>
-              <tbody className="text-[16px] text-[#1d1d1f]">
+              <tbody className="text-[14px] text-[#1d1d1f]">
                 {groupedItems.map((group, index) => {
                   const avgCost = Number(group.avgCost || 0);
                   const isLast = index === groupedItems.length - 1;
@@ -965,7 +846,7 @@ function InventoryPageContent() {
                       className="group cursor-pointer"
                       onClick={() => setActiveDrawerProductId(group.productId)}
                     >
-                      <td className={`px-6 py-3 text-center font-semibold text-[#7a7a7a] text-[14px] ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                      <td className={`px-6 py-3 text-center font-semibold text-[#7a7a7a] text-[13px] ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
                         {index + 1}
                       </td>
                       <td className={`px-6 py-3 ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>

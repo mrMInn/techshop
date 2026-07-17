@@ -776,12 +776,12 @@ export default function CashBookPage() {
       className="space-y-6 font-sans relative z-10"
       style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}
     >
-      {/* 1. Header Section - Apple premium single-row layout */}
+      {/* 1. Header Section - Apple premium responsive layout */}
       <div className="pb-6 border-b border-[#e0e0e0]">
-        <div className="flex flex-wrap items-center gap-3 justify-start">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 w-full">
           
           {/* Status Segmented Control */}
-          <div className="relative flex bg-[#f5f5f7] p-[3px] rounded-full border border-[#e0e0e0] h-[40px] w-full sm:w-[680px] shrink-0 select-none overflow-hidden">
+          <div className="relative flex bg-[#f5f5f7] p-[3px] rounded-full border border-[#e0e0e0] h-[40px] w-full lg:w-[620px] xl:w-[680px] shrink-0 select-none overflow-hidden">
             {/* Sliding active indicator */}
             <div 
               className="absolute top-[3px] bottom-[3px] rounded-full bg-[#0066cc] shadow-[0_2px_4px_rgba(0,102,204,0.25)]"
@@ -853,156 +853,8 @@ export default function CashBookPage() {
             </button>
           </div>
 
-          {/* Cán cân ngân quỹ (Balance Meter) - Compact Apple style */}
-          <div className="flex items-center gap-2 bg-[#f5f5f7] px-4 py-2 rounded-full border border-[#e0e0e0] h-[40px] w-full sm:w-[350px] shrink-0 select-none">
-            <span className="text-[11.5px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Cán cân:</span>
-            {/* Glowing HSL percentage bar meter */}
-            <div className="flex-1 h-2 rounded-full bg-slate-200/50 overflow-hidden flex border border-white/60 shadow-inner">
-              <div 
-                style={{ width: `${flowPercentages.income}%` }} 
-                className="h-full bg-gradient-to-r from-[#007aff] to-[#0056b3] shadow-[0_0_6px_rgba(0,122,255,0.2)] transition-all duration-500" 
-                title={`Thu: ${flowPercentages.income.toFixed(0)}%`}
-              />
-              <div 
-                style={{ width: `${flowPercentages.expense}%` }} 
-                className="h-full bg-gradient-to-r from-[#ff9500] to-[#e68100] shadow-[0_0_6px_rgba(255,149,0,0.2)] transition-all duration-500" 
-                title={`Chi: ${flowPercentages.expense.toFixed(0)}%`}
-              />
-            </div>
-            {/* Legend-colored percentage numbers */}
-            <div className="flex items-center gap-1.5 text-[11px] font-bold select-none whitespace-nowrap leading-none">
-              <span className="flex items-center gap-1 text-[#007aff] tabular-nums">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#007aff]" />
-                Thu: {flowPercentages.income.toFixed(0)}%
-              </span>
-              <span className="text-slate-400 font-normal">/</span>
-              <span className="flex items-center gap-1 text-[#ff9500] tabular-nums">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#ff9500]" />
-                Chi: {flowPercentages.expense.toFixed(0)}%
-              </span>
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-      {/* 2. Structured Filters & Date Range Controls */}
-      <KinhPanel className="p-4 shadow-sm relative z-20" overflowVisible={true}>
-        <div className="flex flex-wrap xl:flex-nowrap items-center gap-2 w-full">
-
-
-          {/* Category select dropdown styled as a Filter Button */}
-          <div className="w-[180px] shrink-0">
-            <CustomSelect
-              options={dynamicCategoryOptions}
-              value={category}
-              onChange={setCategory}
-              placeholder="Danh mục"
-              dropdownWidth="wide"
-              size="sm"
-              rounded="full"
-              triggerIcon={<SlidersHorizontal size={13} className="text-slate-500" />}
-            />
-          </div>
-
-          {/* Timeframe Selector (Tuần / Tháng / Năm) - Standard sliding Segmented Control */}
-          <div className="relative flex bg-[#f5f5f7] border border-[#e0e0e0] p-[3px] rounded-full w-[185px] h-9 select-none z-10 shrink-0 overflow-hidden">
-            {/* Sliding Active Capsule Overlay */}
-            <div
-              className="absolute top-[3px] bottom-[3px] rounded-full bg-[#0066cc] shadow-[0_2px_4px_rgba(0,102,204,0.25)]"
-              style={{
-                width: "calc(33.333% - 6px)",
-                left: `calc(${(activeTimeframe === "weekly" ? 0 : activeTimeframe === "monthly" ? 1 : 2) * 33.333}% + 3px)`,
-                opacity: (activeTimeframe === "weekly" || activeTimeframe === "monthly" || activeTimeframe === "yearly") ? 1 : 0,
-                transition: "left 280ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms"
-              }}
-            />
-
-            <button
-              onClick={() => setActiveTimeframe("weekly")}
-              className={`relative z-10 flex-1 h-full text-[12px] transition-colors duration-200 cursor-pointer flex items-center justify-center rounded-full focus:outline-none active:scale-[0.98] ${
-                activeTimeframe === "weekly" ? "text-white font-bold" : "text-slate-600 font-semibold hover:text-slate-900"
-              }`}
-            >
-              Tuần
-            </button>
-            <button
-              onClick={() => setActiveTimeframe("monthly")}
-              className={`relative z-10 flex-1 h-full text-[12px] transition-colors duration-200 cursor-pointer flex items-center justify-center rounded-full focus:outline-none active:scale-[0.98] ${
-                activeTimeframe === "monthly" ? "text-white font-bold" : "text-slate-600 font-semibold hover:text-slate-900"
-              }`}
-            >
-              Tháng
-            </button>
-            <button
-              onClick={() => setActiveTimeframe("yearly")}
-              className={`relative z-10 flex-1 h-full text-[12px] transition-colors duration-200 cursor-pointer flex items-center justify-center rounded-full focus:outline-none active:scale-[0.98] ${
-                activeTimeframe === "yearly" ? "text-white font-bold" : "text-slate-600 font-semibold hover:text-slate-900"
-              }`}
-            >
-              Năm
-            </button>
-          </div>
-
-          {/* From Date to Date Picker Inline */}
-          <div
-            onClick={() => setActiveTimeframe("custom")}
-            className={cn(
-              "h-9 rounded-full px-2 text-[12px] font-semibold transition-all duration-200 flex items-center gap-1 cursor-pointer select-none border shrink-0",
-              activeTimeframe === "custom"
-                ? "bg-white border-slate-200 shadow-[0_1px_2px_rgba(0,0,0,0.02)] text-slate-800"
-                : "bg-white/60 border-white/80 text-slate-700 hover:bg-white/85"
-            )}
-          >
-            <InlineDatePicker
-              label="Từ:"
-              value={customStartDate}
-              active={activeTimeframe === "custom"}
-              onChange={(val) => {
-                setCustomStartDate(val);
-                setActiveTimeframe("custom");
-                if (customEndDate && val > customEndDate) {
-                  setCustomEndDate(val);
-                }
-              }}
-            />
-            <InlineDatePicker
-              label="đến:"
-              value={customEndDate}
-              active={activeTimeframe === "custom"}
-              onChange={(val) => {
-                setCustomEndDate(val);
-                setActiveTimeframe("custom");
-                if (customStartDate && val < customStartDate) {
-                  setCustomStartDate(val);
-                }
-              }}
-            />
-          </div>
-
-          {/* Specific Month Selector Inline */}
-          <div
-            onClick={() => setActiveTimeframe("month-select")}
-            className={cn(
-              "h-9 rounded-full px-2 text-[12px] font-semibold transition-all duration-200 flex items-center gap-1 cursor-pointer select-none border shrink-0",
-              activeTimeframe === "month-select"
-                ? "bg-white border-slate-200 shadow-[0_1px_2px_rgba(0,0,0,0.02)] text-slate-800"
-                : "bg-white/60 border-white/80 text-slate-700 hover:bg-white/85"
-            )}
-          >
-            <InlineMonthPicker
-              label="Chọn tháng:"
-              value={selectedSpecificMonth}
-              active={activeTimeframe === "month-select"}
-              onChange={(val) => {
-                setSelectedSpecificMonth(val);
-                setActiveTimeframe("month-select");
-              }}
-            />
-          </div>
-
           {/* Action & Refresh Group */}
-          <div className="flex items-center gap-2 sm:ml-auto shrink-0">
+          <div className="flex items-center gap-2 self-end lg:self-auto shrink-0 w-full lg:w-auto justify-end">
             <button
               onClick={() => {
                 setIncomeDate(new Date().toISOString().split("T")[0]);
@@ -1032,6 +884,156 @@ export default function CashBookPage() {
             >
               <RefreshCcw size={13} className={isFetching ? "animate-spin text-[#0066cc]" : ""} />
             </button>
+          </div>
+
+        </div>
+      </div>
+
+      {/* 2. Structured Filters & Date Range Controls */}
+      <KinhPanel className="p-4 shadow-sm relative z-20" overflowVisible={true}>
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 w-full">
+          
+          {/* Left Side: Filter Controls */}
+          <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
+            {/* Category select dropdown styled as a Filter Button */}
+            <div className="w-[180px] shrink-0">
+              <CustomSelect
+                options={dynamicCategoryOptions}
+                value={category}
+                onChange={setCategory}
+                placeholder="Danh mục"
+                dropdownWidth="wide"
+                size="sm"
+                rounded="full"
+                triggerIcon={<SlidersHorizontal size={13} className="text-slate-500" />}
+              />
+            </div>
+
+            {/* Timeframe Selector (Tuần / Tháng / Năm) - Standard sliding Segmented Control */}
+            <div className="relative flex bg-[#f5f5f7] border border-[#e0e0e0] p-[3px] rounded-full w-[185px] h-9 select-none z-10 shrink-0 overflow-hidden">
+              {/* Sliding Active Capsule Overlay */}
+              <div
+                className="absolute top-[3px] bottom-[3px] rounded-full bg-[#0066cc] shadow-[0_2px_4px_rgba(0,102,204,0.25)]"
+                style={{
+                  width: "calc(33.333% - 6px)",
+                  left: `calc(${(activeTimeframe === "weekly" ? 0 : activeTimeframe === "monthly" ? 1 : 2) * 33.333}% + 3px)`,
+                  opacity: (activeTimeframe === "weekly" || activeTimeframe === "monthly" || activeTimeframe === "yearly") ? 1 : 0,
+                  transition: "left 280ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms"
+                }}
+              />
+
+              <button
+                onClick={() => setActiveTimeframe("weekly")}
+                className={`relative z-10 flex-1 h-full text-[12px] transition-colors duration-200 cursor-pointer flex items-center justify-center rounded-full focus:outline-none active:scale-[0.98] ${
+                  activeTimeframe === "weekly" ? "text-white font-bold" : "text-slate-600 font-semibold hover:text-slate-900"
+                }`}
+              >
+                Tuần
+              </button>
+              <button
+                onClick={() => setActiveTimeframe("monthly")}
+                className={`relative z-10 flex-1 h-full text-[12px] transition-colors duration-200 cursor-pointer flex items-center justify-center rounded-full focus:outline-none active:scale-[0.98] ${
+                  activeTimeframe === "monthly" ? "text-white font-bold" : "text-slate-600 font-semibold hover:text-slate-900"
+                }`}
+              >
+                Tháng
+              </button>
+              <button
+                onClick={() => setActiveTimeframe("yearly")}
+                className={`relative z-10 flex-1 h-full text-[12px] transition-colors duration-200 cursor-pointer flex items-center justify-center rounded-full focus:outline-none active:scale-[0.98] ${
+                  activeTimeframe === "yearly" ? "text-white font-bold" : "text-slate-600 font-semibold hover:text-slate-900"
+                }`}
+              >
+                Năm
+              </button>
+            </div>
+
+            {/* From Date to Date Picker Inline */}
+            <div
+              onClick={() => setActiveTimeframe("custom")}
+              className={cn(
+                "h-9 rounded-full px-2 text-[12px] font-semibold transition-all duration-200 flex items-center gap-1 cursor-pointer select-none border shrink-0",
+                activeTimeframe === "custom"
+                  ? "bg-white border-slate-200 shadow-[0_1px_2px_rgba(0,0,0,0.02)] text-slate-800"
+                  : "bg-white/60 border-white/80 text-slate-700 hover:bg-white/85"
+              )}
+            >
+              <InlineDatePicker
+                label="Từ:"
+                value={customStartDate}
+                active={activeTimeframe === "custom"}
+                onChange={(val) => {
+                  setCustomStartDate(val);
+                  setActiveTimeframe("custom");
+                  if (customEndDate && val > customEndDate) {
+                    setCustomEndDate(val);
+                  }
+                }}
+              />
+              <InlineDatePicker
+                label="đến:"
+                value={customEndDate}
+                active={activeTimeframe === "custom"}
+                onChange={(val) => {
+                  setCustomEndDate(val);
+                  setActiveTimeframe("custom");
+                  if (customStartDate && val < customStartDate) {
+                    setCustomStartDate(val);
+                  }
+                }}
+              />
+            </div>
+
+            {/* Specific Month Selector Inline */}
+            <div
+              onClick={() => setActiveTimeframe("month-select")}
+              className={cn(
+                "h-9 rounded-full px-2 text-[12px] font-semibold transition-all duration-200 flex items-center gap-1 cursor-pointer select-none border shrink-0",
+                activeTimeframe === "month-select"
+                  ? "bg-white border-slate-200 shadow-[0_1px_2px_rgba(0,0,0,0.02)] text-slate-800"
+                  : "bg-white/60 border-white/80 text-slate-700 hover:bg-white/85"
+              )}
+            >
+              <InlineMonthPicker
+                label="Chọn tháng:"
+                value={selectedSpecificMonth}
+                active={activeTimeframe === "month-select"}
+                onChange={(val) => {
+                  setSelectedSpecificMonth(val);
+                  setActiveTimeframe("month-select");
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Right Side: Cán cân ngân quỹ (Balance Meter) - Compact Apple style */}
+          <div className="flex items-center gap-2 bg-[#f5f5f7] px-4 py-2 rounded-full border border-[#e0e0e0] h-9 w-full lg:w-[340px] xl:w-[380px] shrink-0 select-none">
+            <span className="text-[11.5px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Cán cân:</span>
+            {/* Glowing HSL percentage bar meter */}
+            <div className="flex-1 h-2 rounded-full bg-slate-200/50 overflow-hidden flex border border-white/60 shadow-inner">
+              <div 
+                style={{ width: `${flowPercentages.income}%` }} 
+                className="h-full bg-gradient-to-r from-[#007aff] to-[#0056b3] shadow-[0_0_6px_rgba(0,122,255,0.2)] transition-all duration-500" 
+                title={`Thu: ${flowPercentages.income.toFixed(0)}%`}
+              />
+              <div 
+                style={{ width: `${flowPercentages.expense}%` }} 
+                className="h-full bg-gradient-to-r from-[#ff9500] to-[#e68100] shadow-[0_0_6px_rgba(255,149,0,0.2)] transition-all duration-500" 
+                title={`Chi: ${flowPercentages.expense.toFixed(0)}%`}
+              />
+            </div>
+            {/* Legend-colored percentage numbers */}
+            <div className="flex items-center gap-1.5 text-[11px] font-bold select-none whitespace-nowrap leading-none">
+              <span className="flex items-center gap-1 text-[#007aff] tabular-nums">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#007aff]" />
+                Thu: {flowPercentages.income.toFixed(0)}%
+              </span>
+              <span className="text-slate-400 font-normal">/</span>
+              <span className="flex items-center gap-1 text-[#ff9500] tabular-nums">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#ff9500]" />
+                Chi: {flowPercentages.expense.toFixed(0)}%
+              </span>
+            </div>
           </div>
 
         </div>

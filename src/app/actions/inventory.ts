@@ -52,12 +52,14 @@ export async function syncPurchaseOrderStatus(tx: any, purchaseOrderId: string) 
     .where(
       and(
         inArray(inventoryItems.purchaseOrderItemId, poItemIds),
-        or(
-          eq(inventoryItems.status, "in_stock"),
-          eq(inventoryItems.status, "sold"),
-          eq(inventoryItems.status, "warranty_repair"),
-          eq(inventoryItems.status, "defective")
-        )
+        inArray(inventoryItems.status, [
+          "in_stock",
+          "reserved",
+          "sold",
+          "warranty_repair",
+          "returned",
+          "defective"
+        ])
       )
     )
     .groupBy(inventoryItems.purchaseOrderItemId);
@@ -117,10 +119,15 @@ export async function syncPurchaseOrderStatus(tx: any, purchaseOrderId: string) 
     // Giữ nguyên trạng thái thủ công
     newStatus = currentStatus;
   } else {
-    // Trạng thái bình thường: Đang vận chuyển hoặc Đã sẵn hàng
-    newStatus = "in_transit";
-    if (totalReceived > 0 && totalReceived >= totalQty) {
-      newStatus = "received";
+    // Trạng thái bình thường: Đang vận chuyển, Nhận một phần hoặc Đã sẵn hàng
+    if (totalReceived > 0) {
+      if (totalReceived >= totalQty) {
+        newStatus = "received";
+      } else {
+        newStatus = "partially_received";
+      }
+    } else {
+      newStatus = "in_transit";
     }
   }
 
@@ -2581,6 +2588,7 @@ export async function getInventoryStats() {
     let inStock = 0;
     let incoming = 0;
     let defective = 0;
+    let returned = 0;
     let total = 0;
 
     stats.forEach(s => {
@@ -2588,6 +2596,7 @@ export async function getInventoryStats() {
       if (s.status === 'in_stock') inStock += cnt;
       else if (s.status === 'incoming') incoming += cnt;
       else if (s.status === 'defective' || s.status === 'warranty_repair') defective += cnt;
+      else if (s.status === 'returned') returned += cnt;
       
       if (s.status !== 'deleted' && s.status !== 'sold' && s.status !== 'returned') {
         total += cnt;
@@ -2598,10 +2607,11 @@ export async function getInventoryStats() {
       total,
       inStock,
       incoming,
-      defective
+      defective,
+      returned
     };
   } catch (error) {
     console.error("Lỗi lấy thống kê kho hàng:", error);
-    return { total: 0, inStock: 0, incoming: 0, defective: 0 };
+    return { total: 0, inStock: 0, incoming: 0, defective: 0, returned: 0 };
   }
 }

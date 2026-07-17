@@ -193,8 +193,11 @@ export function OrderForm({ onSubmit, onCancel, isLoading }: OrderFormProps) {
         specs: item.specs || null,
         sellingPrice: item.sellingPrice && Number(item.sellingPrice) > 0 ? Math.round(Number(item.sellingPrice)).toString() : "",
         discount: "",
-        warrantyMonths: "12",
-        accessories: item.accessories || [],
+        warrantyMonths: "",
+        accessories: (item.accessories || []).map((acc: any) => ({
+          ...acc,
+          warrantyMonths: "0",
+        })),
       }
     ]);
   };
@@ -278,6 +281,20 @@ export function OrderForm({ onSubmit, onCancel, isLoading }: OrderFormProps) {
     setSelectedItems(updated);
   };
 
+  // Cập nhật thời gian bảo hành cho phụ kiện đính kèm máy
+  const handleUpdateAttachedAccessoryWarranty = (itemIndex: number, accIndex: number, value: string) => {
+    const updated = [...selectedItems];
+    const item = { ...updated[itemIndex] };
+    const accs = [...(item.accessories || [])];
+    accs[accIndex] = {
+      ...accs[accIndex],
+      warrantyMonths: value.replace(/\D/g, ""), // Chỉ nhận số nguyên dương hoặc trống
+    };
+    item.accessories = accs;
+    updated[itemIndex] = item;
+    setSelectedItems(updated);
+  };
+
   // 4. Tính toán số liệu đơn hàng real-time
   const subtotal = selectedItems.reduce((sum, item) => sum + (Number(item.sellingPrice) || 0), 0);
   const totalItemDiscounts = selectedItems.reduce((sum, item) => sum + (Number(item.discount) || 0), 0);
@@ -338,6 +355,12 @@ export function OrderForm({ onSubmit, onCancel, isLoading }: OrderFormProps) {
         sellingPrice: item.sellingPrice || "0",
         discount: item.discount || "0",
         warrantyMonths: Number(item.warrantyMonths) || 0,
+        attachedAccessories: item.accessories 
+          ? item.accessories.map((acc: any) => ({
+              accessoryItemId: acc.id,
+              warrantyMonths: Number(acc.warrantyMonths) || 0,
+            }))
+          : undefined,
       })),
       discountAmount,
       taxAmount,
@@ -528,11 +551,24 @@ export function OrderForm({ onSubmit, onCancel, isLoading }: OrderFormProps) {
                                   {item.serialNumber}
                                 </span>
                                 {item.accessories && item.accessories.length > 0 && (
-                                  <div className="flex flex-col gap-1 mt-1.5 border-t border-slate-100 pt-1">
-                                    {item.accessories.map((acc: any) => (
-                                      <span key={acc.id} className="inline-flex items-center gap-1 text-[11px] text-[#0066cc] font-medium bg-blue-50/50 px-2 py-0.5 rounded-full w-fit">
-                                        🎁 Tặng kèm: {acc.catalogName} {acc.serialNumber ? `(${acc.serialNumber})` : ""}
-                                      </span>
+                                  <div className="flex flex-col gap-2 mt-2 border-t border-slate-100 pt-2">
+                                    {item.accessories.map((acc: any, accIdx: number) => (
+                                      <div key={acc.id} className="flex items-center gap-2 flex-wrap">
+                                        <span className="inline-flex items-center gap-1 text-[11px] text-[#0066cc] font-medium bg-[#0066cc]/5 px-2.5 py-0.5 rounded-full border border-[#0066cc]/10">
+                                          🎁 Tặng kèm: {acc.catalogName} {acc.serialNumber ? `(${acc.serialNumber})` : ""}
+                                        </span>
+                                        <div className="flex items-center gap-1 shrink-0">
+                                          <span className="text-[11px] text-[#7a7a7a] font-medium">BH:</span>
+                                          <input
+                                            type="text"
+                                            value={acc.warrantyMonths ?? "0"}
+                                            onChange={(e) => handleUpdateAttachedAccessoryWarranty(index, accIdx, e.target.value)}
+                                            className="w-10 h-5 px-1 bg-[#f5f5f7] border border-[#e0e0e0] rounded text-[11px] text-center font-bold focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#0066cc] placeholder:text-[#7a7a7a]/50"
+                                            placeholder="0"
+                                          />
+                                          <span className="text-[11px] text-[#7a7a7a] font-medium">tháng</span>
+                                        </div>
+                                      </div>
                                     ))}
                                   </div>
                                 )}

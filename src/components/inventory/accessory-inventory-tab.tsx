@@ -166,7 +166,7 @@ export function AccessoryInventoryTab() {
       <div className="flex flex-wrap items-center gap-3 pb-6 border-b border-[#e0e0e0] w-full">
         
         {/* Status Segmented Control (replaces Status Dropdown) */}
-        <div className="relative flex bg-[#f5f5f7] p-[3px] rounded-full border border-[#e0e0e0] h-[40px] w-full sm:w-[540px] shrink-0 select-none overflow-hidden">
+        <div className="relative flex bg-[#f5f5f7] p-[3px] rounded-full border border-[#e0e0e0] h-[40px] w-full sm:w-[460px] lg:w-[480px] xl:w-[540px] shrink-0 select-none overflow-hidden">
           {/* Sliding active indicator */}
           <div 
             className="absolute top-[3px] bottom-[3px] rounded-full bg-[#0066cc] shadow-[0_2px_4px_rgba(0,102,204,0.25)]"
@@ -211,7 +211,7 @@ export function AccessoryInventoryTab() {
             }`}>
               <SFSymbolCheckmarkCircle size={activeSegmentIndex === 1 ? 13 : 10} className="transition-all duration-200" />
             </div>
-            <span className="truncate">Sẵn kho</span>
+            <span className="truncate">Sẵn</span>
             <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${activeSegmentIndex === 1 ? "bg-white/20 text-white" : "bg-slate-200/50 text-[#7a7a7a]"}`}>
               {stats.available || 0}
             </span>
@@ -340,7 +340,7 @@ export function AccessoryInventoryTab() {
                   <th className="px-6 py-3 text-right border-b border-[#e0e0e0] whitespace-nowrap">Giá vốn TB</th>
                 </tr>
               </thead>
-              <tbody className="text-[16px] text-[#1d1d1f]">
+              <tbody className="text-[14px] text-[#1d1d1f]">
                 {filteredSummary.map((row: any, index: number) => {
                   const isLast = index === filteredSummary.length - 1;
                   return (
@@ -352,7 +352,7 @@ export function AccessoryInventoryTab() {
                         setSelectedCatalogName(row.name);
                       }}
                     >
-                      <td className={`px-6 py-3 text-center font-semibold text-[#7a7a7a] text-[14px] ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                      <td className={`px-6 py-3 text-center font-semibold text-[#7a7a7a] text-[13px] ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
                         {index + 1}
                       </td>
                       <td className={`px-6 py-3 ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>

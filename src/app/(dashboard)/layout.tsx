@@ -2,10 +2,14 @@
 
 import { Package, ShoppingCart, Users, Wrench, Settings, BarChart2, RefreshCcw, Wallet, FileText, Search, LogOut } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useRef, Fragment } from "react";
 import { getCurrentUserAction, logoutAction } from "@/app/actions/auth";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
+import { getOrdersList } from "@/app/actions/orders";
+import { getInventoryStats, getAccessoryStockSummary } from "@/app/actions/inventory";
+import { getPurchaseOrdersList } from "@/app/actions/purchase-orders";
 
 const ROLE_MAP: Record<string, string> = {
   admin: "Quản trị viên",
@@ -22,10 +26,22 @@ function getInitials(name: string) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function getPageTitle(path: string | null) {
+function getPageTitle(path: string | null, searchParams?: any) {
   if (!path) return "Hệ thống";
   if (path === "/") return "Dashboard";
-  if (path.startsWith("/inventory")) return "Kho hàng";
+  if (path.startsWith("/inventory")) {
+    const tab = searchParams?.get("tab") || "active";
+    if (tab === "active") {
+      const status = searchParams?.get("status") || "in_stock";
+      if (status === "incoming") return "Hàng đang về";
+      return "Kho bán";
+    }
+    if (tab === "defective") return "Kho lỗi";
+    if (tab === "purchase_orders") return "Đơn nhập hàng";
+    if (tab === "returned") return "Trả NCC";
+    if (tab === "accessories") return "Kho phụ kiện";
+    return "Kho hàng";
+  }
   if (path.startsWith("/orders")) return "Đơn hàng";
   if (path.startsWith("/quotations")) return "Báo giá";
   if (path.startsWith("/warranty")) return "Bảo hành";
@@ -38,6 +54,72 @@ function getPageTitle(path: string | null) {
   return "TechStore ERP";
 }
 
+function getBreadcrumbs(path: string | null, searchParams?: any): { label: string; href?: string }[] {
+  if (!path) return [];
+  const crumbs: { label: string; href?: string }[] = [];
+  
+  if (path === "/") {
+    return [{ label: "Dashboard" }];
+  }
+  
+  if (path.startsWith("/inventory")) {
+    crumbs.push({ label: "Kho hàng", href: "/inventory" });
+    const tab = searchParams?.get("tab") || "active";
+    if (tab === "active") {
+      const status = searchParams?.get("status") || "in_stock";
+      if (status === "incoming") {
+        crumbs.push({ label: "Hàng đang về" });
+      } else {
+        crumbs.push({ label: "Kho bán" });
+      }
+    } else if (tab === "defective") {
+      crumbs.push({ label: "Kho lỗi" });
+    } else if (tab === "purchase_orders") {
+      crumbs.push({ label: "Đơn nhập hàng" });
+    } else if (tab === "returned") {
+      crumbs.push({ label: "Trả NCC" });
+    } else if (tab === "accessories") {
+      crumbs.push({ label: "Kho phụ kiện" });
+    }
+  } else if (path.startsWith("/orders")) {
+    crumbs.push({ label: "Đơn hàng", href: "/orders" });
+    const status = searchParams?.get("status");
+    const channel = searchParams?.get("channel");
+    if (status === "completed") {
+      crumbs.push({ label: "Hoàn tất" });
+    } else if (status === "processing") {
+      crumbs.push({ label: "Đang giao" });
+    } else if (status === "cancelled") {
+      crumbs.push({ label: "Đã hủy" });
+    } else if (channel === "online") {
+      crumbs.push({ label: "Kênh Online" });
+    } else {
+      crumbs.push({ label: "Tất cả đơn" });
+    }
+  } else if (path.startsWith("/quotations")) {
+    crumbs.push({ label: "Báo giá", href: "/quotations" });
+  } else if (path.startsWith("/warranty")) {
+    crumbs.push({ label: "Bảo hành", href: "/warranty" });
+  } else if (path.startsWith("/returns")) {
+    crumbs.push({ label: "Đổi trả", href: "/returns" });
+  } else if (path.startsWith("/lookup")) {
+    crumbs.push({ label: "Tra cứu", href: "/lookup" });
+  } else if (path.startsWith("/accounting/expenses")) {
+    crumbs.push({ label: "Sổ quỹ", href: "/accounting" });
+    crumbs.push({ label: "Chi phí vận hành" });
+  } else if (path.startsWith("/accounting/reports")) {
+    crumbs.push({ label: "Sổ quỹ", href: "/accounting" });
+    crumbs.push({ label: "Báo cáo tài chính" });
+  } else if (path.startsWith("/accounting")) {
+    crumbs.push({ label: "Sổ quỹ", href: "/accounting" });
+    crumbs.push({ label: "Nhật ký thu chi" });
+  } else if (path.startsWith("/settings")) {
+    crumbs.push({ label: "Cấu hình hệ thống", href: "/settings" });
+  }
+  
+  return crumbs;
+}
+
 export default function DashboardLayout({
   children,
 }: {
@@ -45,27 +127,23 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [profile, setProfile] = useState<{ fullName: string; role: string; email: string } | null>(null);
-  const [loading, setLoading] = useState(true);
+  const searchParams = useSearchParams();
+  const breadcrumbs = getBreadcrumbs(pathname, searchParams);
+  // Fetch profile via TanStack Query for automatic caching, deduplication, and resilience against DB locks
+  const { data: profileData, isLoading: loading } = useQuery({
+    queryKey: ["currentUserProfile"],
+    queryFn: () => getCurrentUserAction(),
+    staleTime: 10 * 60 * 1000, // Cache for 10 minutes to avoid database queries on transition
+  });
 
-  // Fetch profile once on mount
+  const profile = profileData?.profile || null;
+
+  // Handle unauthenticated user redirect
   useEffect(() => {
-    async function fetchProfile() {
-      try {
-        const res = await getCurrentUserAction();
-        if (res.success && res.profile) {
-          setProfile(res.profile);
-        } else {
-          router.replace("/login");
-        }
-      } catch (err) {
-        console.error("Lỗi tải thông tin tài khoản:", err);
-      } finally {
-        setLoading(false);
-      }
+    if (profileData && (!profileData.success || !profileData.profile)) {
+      router.replace("/login");
     }
-    fetchProfile();
-  }, [router]);
+  }, [profileData, router]);
 
   // Handle staff redirect on path change
   useEffect(() => {
@@ -165,7 +243,7 @@ export default function DashboardLayout({
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 bg-white overflow-y-auto p-8 relative">
+      <main className="flex-1 bg-white overflow-y-auto p-4 sm:p-6 lg:p-8 relative">
         {/* Decorative Liquid Glass light beam background */}
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#0066cc]/2 blur-[100px] rounded-full pointer-events-none z-0" />
         
@@ -173,9 +251,33 @@ export default function DashboardLayout({
           {/* Global Top Header: Title & Profile Info */}
           <div className="flex justify-between items-center pb-6 border-b border-[#e0e0e0] select-none">
             <div className="flex items-center gap-6 min-w-0">
-              <h1 className="text-[40px] font-semibold tracking-tight leading-normal py-1 bg-clip-text text-transparent select-none shrink-0" style={{ backgroundImage: "linear-gradient(90deg, #2997ff, #a855f7, #ec4899)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-                {getPageTitle(pathname)}
-              </h1>
+              <div className="flex flex-col gap-0.5 min-w-0">
+                {/* Breadcrumbs tree */}
+                {breadcrumbs.length > 1 && (
+                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400 select-none">
+                    {breadcrumbs.map((crumb, idx) => (
+                      <Fragment key={crumb.label}>
+                        {idx > 0 && <span className="text-slate-300">/</span>}
+                        {crumb.href ? (
+                          <Link 
+                            href={crumb.href} 
+                            scroll={false}
+                            className="hover:text-[#0066cc] transition-colors"
+                          >
+                            {crumb.label}
+                          </Link>
+                        ) : (
+                          <span className="text-[#0066cc] font-extrabold">{crumb.label}</span>
+                        )}
+                      </Fragment>
+                    ))}
+                  </div>
+                )}
+                
+                <h1 className="text-[40px] font-semibold tracking-tight leading-normal py-1 bg-clip-text text-transparent select-none shrink-0" style={{ backgroundImage: "linear-gradient(90deg, #2997ff, #a855f7, #ec4899)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+                  {getPageTitle(pathname, searchParams)}
+                </h1>
+              </div>
               {/* Portal target for custom header components (like page stats) */}
               <div id="header-custom-portal" className="hidden lg:flex items-center gap-2.5" />
             </div>
@@ -286,8 +388,40 @@ function SidebarNavList({
   menuItems: any[]; 
   pathname: string | null; 
 }) {
+  const searchParams = useSearchParams();
+  
+  // Fetch order counts for sidebar badges
+  const { data: statsData } = useQuery({
+    queryKey: ["orders", "stats-sidebar"],
+    queryFn: () => getOrdersList({ page: 1, limit: 1, search: "", status: "all", paymentStatus: "all", saleChannel: "all" }),
+  });
+  const stats = statsData?.stats || { completedCount: 0, processingCount: 0, cancelledCount: 0, onlineCount: 0 };
+  const totalCount = statsData?.pagination?.totalItems || 0;
+
+  // Fetch inventory stats for sidebar badges
+  const { data: invStats } = useQuery({
+    queryKey: ["inventory_stats"],
+    queryFn: () => getInventoryStats(),
+  });
+
+  // Fetch purchase orders list for sidebar badges
+  const { data: poList } = useQuery({
+    queryKey: ["purchaseOrders"],
+    queryFn: () => getPurchaseOrdersList(),
+  });
+
+  // Fetch accessories stock summary for sidebar badges
+  const { data: accSummary } = useQuery({
+    queryKey: ["accessoryStockSummary"],
+    queryFn: () => getAccessoryStockSummary(),
+  });
+
+  // Calculate accessory total count
+  const totalAccCount = accSummary?.summary?.reduce((sum: number, cat: any) => sum + (cat.total || 0), 0) || 0;
+
   const [activeTab, setActiveTab] = useState("active");
   const [inventoryExpanded, setInventoryExpanded] = useState(!!pathname?.startsWith("/inventory"));
+  const [ordersExpanded, setOrdersExpanded] = useState(!!pathname?.startsWith("/orders"));
   const [accountingExpanded, setAccountingExpanded] = useState(!!pathname?.startsWith("/accounting"));
   const lastPathRef = useRef(pathname);
 
@@ -331,6 +465,14 @@ function SidebarNavList({
       setInventoryExpanded(false);
     }
 
+    const wasInOrders = lastPathRef.current?.startsWith("/orders");
+    const isInOrders = pathname?.startsWith("/orders");
+    if (isInOrders && !wasInOrders) {
+      setOrdersExpanded(true);
+    } else if (!isInOrders) {
+      setOrdersExpanded(false);
+    }
+
     const wasInAccounting = lastPathRef.current?.startsWith("/accounting");
     const isInAccounting = pathname?.startsWith("/accounting");
     if (isInAccounting && !wasInAccounting) {
@@ -352,16 +494,25 @@ function SidebarNavList({
             icon={item.icon}
             label={item.label}
             active={!!(pathname && item.match(pathname))}
-            hasSubmenu={item.href === "/inventory" || item.href === "/accounting"}
+            hasSubmenu={item.href === "/orders" || item.href === "/inventory" || item.href === "/accounting"}
             isSubmenuExpanded={
-              item.href === "/inventory" 
-                ? inventoryExpanded 
-                : item.href === "/accounting" 
-                  ? accountingExpanded 
-                  : false
+              item.href === "/orders"
+                ? ordersExpanded
+                : item.href === "/inventory" 
+                  ? inventoryExpanded 
+                  : item.href === "/accounting" 
+                    ? accountingExpanded 
+                    : false
             }
             onClick={(e) => {
-              if (item.href === "/inventory") {
+              if (item.href === "/orders") {
+                if (pathname?.startsWith("/orders")) {
+                  e.preventDefault();
+                  setOrdersExpanded(!ordersExpanded);
+                } else {
+                  setOrdersExpanded(true);
+                }
+              } else if (item.href === "/inventory") {
                 if (pathname?.startsWith("/inventory")) {
                   // Toggle collapse when clicking on the already active link
                   e.preventDefault();
@@ -382,32 +533,77 @@ function SidebarNavList({
               }
             }}
           />
+          {item.href === "/orders" && ordersExpanded && (
+            <div className="mt-1 mb-2 ml-4 pl-3.5 border-l border-[#e0e0e0]/80 flex flex-col gap-1.5 animate-in slide-in-from-top-2 duration-200">
+              <SubmenuLink 
+                href="/orders" 
+                label="Tất cả đơn" 
+                active={pathname === "/orders" && !searchParams.get("status") && !searchParams.get("channel")} 
+                badge={totalCount}
+              />
+              <SubmenuLink 
+                href="/orders?status=completed" 
+                label="Hoàn tất" 
+                active={pathname === "/orders" && searchParams.get("status") === "completed"} 
+                badge={stats.completedCount}
+              />
+              <SubmenuLink 
+                href="/orders?status=processing" 
+                label="Đang giao" 
+                active={pathname === "/orders" && searchParams.get("status") === "processing"} 
+                badge={stats.processingCount}
+              />
+              <SubmenuLink 
+                href="/orders?channel=online" 
+                label="Kênh Online" 
+                active={pathname === "/orders" && searchParams.get("channel") === "online"} 
+                badge={stats.onlineCount}
+              />
+              <SubmenuLink 
+                href="/orders?status=cancelled" 
+                label="Đã hủy" 
+                active={pathname === "/orders" && searchParams.get("status") === "cancelled"} 
+                badge={stats.cancelledCount}
+              />
+            </div>
+          )}
           {item.href === "/inventory" && inventoryExpanded && (
             <div className="mt-1 mb-2 ml-4 pl-3.5 border-l border-[#e0e0e0]/80 flex flex-col gap-1.5 animate-in slide-in-from-top-2 duration-200">
               <SubmenuLink 
-                href="/inventory?tab=active" 
+                href="/inventory?tab=active&status=in_stock" 
                 label="Kho bán" 
-                active={activeTab === "active"} 
+                active={(activeTab === "active" && searchParams.get("status") === "in_stock") || (pathname === "/inventory" && !searchParams.get("tab") && !searchParams.get("status"))} 
+                badge={invStats?.inStock}
+              />
+              <SubmenuLink 
+                href="/inventory?tab=active&status=incoming" 
+                label="Hàng đang về" 
+                active={activeTab === "active" && searchParams.get("status") === "incoming"} 
+                badge={invStats?.incoming}
               />
               <SubmenuLink 
                 href="/inventory?tab=defective" 
                 label="Kho lỗi" 
                 active={activeTab === "defective"} 
+                badge={invStats?.defective}
               />
               <SubmenuLink 
                 href="/inventory?tab=purchase_orders" 
                 label="Đơn nhập hàng" 
                 active={activeTab === "purchase_orders"} 
+                badge={poList?.purchaseOrders?.length}
               />
               <SubmenuLink 
                 href="/inventory?tab=returned" 
                 label="Trả NCC" 
                 active={activeTab === "returned"} 
+                badge={invStats?.returned}
               />
               <SubmenuLink 
                 href="/inventory?tab=accessories" 
                 label="Kho phụ kiện" 
                 active={activeTab === "accessories"} 
+                badge={totalAccCount}
               />
             </div>
           )}
@@ -436,19 +632,34 @@ function SidebarNavList({
   );
 }
 
-function SubmenuLink({ href, label, active }: { href: string; label: string; active: boolean }) {
+function SubmenuLink({ href, label, active, badge }: { href: string; label: string; active: boolean; badge?: number }) {
   return (
     <Link
       href={href}
       scroll={false}
       prefetch={false}
-      className={`group flex items-center py-2 px-4 rounded-full text-[12.5px] transition-all duration-150 ease-out cursor-pointer active:scale-[0.98] select-none ${
+      className={`group relative flex items-center justify-between py-2 px-4 rounded-full text-[12.5px] transition-all duration-150 ease-out cursor-pointer active:scale-[0.98] select-none ${
         active
           ? "bg-[#0066cc]/10 text-[#0066cc] font-semibold"
           : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 font-semibold"
       }`}
     >
-      <span>{label}</span>
+      {/* Horizontal connector line pointing back to parent vertical border */}
+      <span 
+        className={`absolute top-1/2 -translate-y-1/2 w-3.5 h-[1.5px] transition-colors duration-200 ${
+          active ? "bg-[#0066cc]" : "bg-[#e0e0e0]/80 group-hover:bg-slate-400"
+        }`} 
+        style={{ left: "-14px" }}
+      />
+      
+      <span className="truncate">{label}</span>
+      {badge !== undefined && (
+        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${
+          active ? "bg-[#0066cc] text-white" : "bg-slate-200/50 text-[#7a7a7a] group-hover:bg-slate-300/50"
+        }`}>
+          {badge}
+        </span>
+      )}
     </Link>
   );
 }

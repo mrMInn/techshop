@@ -423,6 +423,10 @@ export async function createOrderAction(data: {
     sellingPrice: string;
     discount?: string;
     warrantyMonths: number;
+    attachedAccessories?: {
+      accessoryItemId: string;
+      warrantyMonths: number;
+    }[];
   }[];
   discountAmount?: string;
   discountPercent?: string;
@@ -569,6 +573,10 @@ export async function createOrderAction(data: {
           });
 
           for (const acc of attachedAccessories) {
+            const frontendItem = data.items.find(i => i.inventoryItemId === machine.id);
+            const accInfo = frontendItem?.attachedAccessories?.find(a => a.accessoryItemId === acc.id);
+            const accWarranty = accInfo ? Number(accInfo.warrantyMonths) : 0;
+
             accessoriesToUpdateSold.push(acc.id);
             finalItemsToInsert.push({
               inventoryItemId: null,
@@ -578,7 +586,7 @@ export async function createOrderAction(data: {
               costPrice: acc.unitCost,
               discount: "0",
               profit: (-Number(acc.unitCost)).toString(),
-              warrantyMonths: 12,
+              warrantyMonths: accWarranty,
               isGift: true,
             });
           }
@@ -1328,8 +1336,8 @@ export async function getOrderDetail(orderId: string) {
 
     if (orderData.length === 0) return null;
 
-    // Lấy danh sách máy đã bán trong đơn
-    const items = await db
+    // Lấy danh sách máy và phụ kiện đã bán trong đơn
+    const itemsRaw = await db
       .select({
         id: orderItems.id,
         sellingPrice: orderItems.sellingPrice,
@@ -1337,16 +1345,50 @@ export async function getOrderDetail(orderId: string) {
         discount: orderItems.discount,
         profit: orderItems.profit,
         warrantyMonths: orderItems.warrantyMonths,
-        serialNumber: inventoryItems.serialNumber,
-        productName: products.name,
-        productSku: products.sku,
-        productSpecs: products.specs,
-        status: inventoryItems.status,
+        isGift: orderItems.isGift,
+        inventoryItemId: orderItems.inventoryItemId,
+        accessoryItemId: orderItems.accessoryItemId,
+        // Machine details
+        machineSerialNumber: inventoryItems.serialNumber,
+        machineProductName: products.name,
+        machineProductSku: products.sku,
+        machineProductSpecs: products.specs,
+        machineStatus: inventoryItems.status,
+        // Accessory details
+        accessorySerialNumber: accessoryItems.serialNumber,
+        accessoryName: accessoryCatalog.name,
+        accessoryStatus: accessoryItems.status,
       })
       .from(orderItems)
-      .innerJoin(inventoryItems, eq(orderItems.inventoryItemId, inventoryItems.id))
-      .innerJoin(products, eq(orderItems.productId, products.id))
+      .leftJoin(inventoryItems, eq(orderItems.inventoryItemId, inventoryItems.id))
+      .leftJoin(products, eq(orderItems.productId, products.id))
+      .leftJoin(accessoryItems, eq(orderItems.accessoryItemId, accessoryItems.id))
+      .leftJoin(accessoryCatalog, eq(accessoryItems.accessoryCatalogId, accessoryCatalog.id))
       .where(eq(orderItems.orderId, orderId));
+
+    const items = itemsRaw.map((item) => {
+      const isAccessory = !!item.accessoryItemId;
+      return {
+        id: item.id,
+        sellingPrice: item.sellingPrice,
+        costPrice: item.costPrice,
+        discount: item.discount,
+        profit: item.profit,
+        warrantyMonths: item.warrantyMonths,
+        isGift: item.isGift,
+        serialNumber: isAccessory 
+          ? (item.accessorySerialNumber || "Không có serial") 
+          : (item.machineSerialNumber || ""),
+        productName: isAccessory 
+          ? (item.accessoryName || item.machineProductName || "Phụ kiện lẻ") 
+          : (item.machineProductName || ""),
+        productSku: item.machineProductSku || "",
+        productSpecs: isAccessory ? null : item.machineProductSpecs,
+        status: isAccessory 
+          ? (item.accessoryStatus || "") 
+          : (item.machineStatus || ""),
+      };
+    });
 
     // Lấy lịch sử thanh toán của đơn
     const orderPayments = await db
