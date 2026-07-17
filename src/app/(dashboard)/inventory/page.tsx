@@ -510,14 +510,33 @@ function InventoryPageContent() {
     ];
   }, [purchaseOrdersData]);
 
-  const filteredItems = drawerItems || [];
+  const filteredItems = useMemo(() => {
+    if (!drawerItems) return [];
+    return drawerItems.filter((item: any) => {
+      if (activeTab === "defective") {
+        return item.status === "defective" || item.status === "warranty_repair";
+      }
+      if (activeTab === "returned") {
+        return item.status === "returned";
+      }
+      if (activeTab === "active") {
+        if (selectedStatus === "in_stock") {
+          return item.status === "in_stock" || item.status === "reserved";
+        }
+        if (selectedStatus === "incoming") {
+          return item.status === "incoming";
+        }
+        return item.status === "in_stock" || item.status === "reserved" || item.status === "incoming";
+      }
+      return true;
+    });
+  }, [drawerItems, activeTab, selectedStatus]);
 
   const handleSelectAll = () => {
-    if (!drawerItems) return;
-    if (selectedIds.length === drawerItems.length) {
+    if (selectedIds.length === filteredItems.length) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(drawerItems.map(item => item.id));
+      setSelectedIds(filteredItems.map(item => item.id));
     }
   };
 
@@ -527,7 +546,7 @@ function InventoryPageContent() {
     );
   };
 
-  const selectedItems = drawerItems?.filter(item => selectedIds.includes(item.id)) || [];
+  const selectedItems = filteredItems.filter(item => selectedIds.includes(item.id));
   const hasIncomingSelected = selectedItems.some(item => item.status === 'incoming');
 
   const activeDrawerProductFromList = useMemo(() => {
@@ -535,11 +554,11 @@ function InventoryPageContent() {
     if (!found || !drawerItems) return null;
     return {
       ...found,
-      items: drawerItems,
-      costPrices: drawerItems.map((item: any) => Number(item.costPrice || 0)),
-      supplierNames: Array.from(new Set(drawerItems.map((item: any) => item.supplierName).filter(Boolean))) as string[],
+      items: filteredItems,
+      costPrices: filteredItems.map((item: any) => Number(item.costPrice || 0)),
+      supplierNames: Array.from(new Set(filteredItems.map((item: any) => item.supplierName).filter(Boolean))) as string[],
     };
-  }, [groupedItems, activeDrawerProductId, drawerItems]);
+  }, [groupedItems, activeDrawerProductId, drawerItems, filteredItems]);
 
   const [cachedDrawerProduct, setCachedDrawerProduct] = useState<any>(null);
 
