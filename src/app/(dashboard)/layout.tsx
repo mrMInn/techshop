@@ -199,20 +199,7 @@ export default function DashboardLayout({
       <aside className="w-64 bg-[#f5f5f7]/80 backdrop-blur-2xl border-r border-[#e0e0e0]/80 hidden md:flex flex-col p-5 justify-between z-40 select-none">
         
         <div className="space-y-6">
-          {/* Glowing Brand Header */}
-          <div className="flex items-center gap-3 px-2.5 py-1.5 border-b border-[#e0e0e0]/50 pb-4.5 mb-2">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#2ea1ff] to-[#0066cc] flex items-center justify-center transform hover:rotate-6 transition-all duration-300">
-              <BarChart2 className="text-white" size={17} />
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-[16px] font-bold text-slate-800 tracking-tight leading-none">
-                TechStore ERP
-              </h1>
-              <span className="text-[9px] font-black uppercase tracking-widest text-[#0066cc] leading-none mt-1 block">
-                Workspace
-              </span>
-            </div>
-          </div>
+
 
           {/* Navigation Section */}
           <div className="space-y-2">
@@ -358,7 +345,7 @@ function SidebarLink({
       href={href}
       onClick={onClick}
       prefetch={false}
-      className={`group relative z-10 flex items-center gap-3 px-3.5 py-2 rounded-full transition-all duration-200 ease-out text-[13px] active:scale-[0.98] hover:translate-x-[2px] ${
+      className={`group relative z-10 flex items-center gap-3 px-3.5 py-2 rounded-full transition-[color,background-color,transform] duration-200 ease-out text-[13px] active:scale-[0.98] hover:translate-x-[2px] ${
         active 
           ? "bg-[#0066cc]/10 text-[#0066cc] font-semibold" 
           : "text-[#1d1d1f] hover:bg-slate-200/60 font-semibold"
@@ -419,42 +406,11 @@ function SidebarNavList({
   // Calculate accessory total count
   const totalAccCount = accSummary?.summary?.reduce((sum: number, cat: any) => sum + (cat.total || 0), 0) || 0;
 
-  const [activeTab, setActiveTab] = useState("active");
+  const activeTab = searchParams.get("tab") || "active";
   const [inventoryExpanded, setInventoryExpanded] = useState(!!pathname?.startsWith("/inventory"));
   const [ordersExpanded, setOrdersExpanded] = useState(!!pathname?.startsWith("/orders"));
   const [accountingExpanded, setAccountingExpanded] = useState(!!pathname?.startsWith("/accounting"));
   const lastPathRef = useRef(pathname);
-
-  useEffect(() => {
-    const handleUrlChange = () => {
-      if (typeof window !== "undefined") {
-        const params = new URLSearchParams(window.location.search);
-        setActiveTab(params.get("tab") || "active");
-      }
-    };
-
-    handleUrlChange();
-
-    window.addEventListener("popstate", handleUrlChange);
-
-    const originalPushState = window.history.pushState;
-    const originalReplaceState = window.history.replaceState;
-
-    window.history.pushState = function(...args) {
-      originalPushState.apply(this, args);
-      setTimeout(handleUrlChange, 0);
-    };
-    window.history.replaceState = function(...args) {
-      originalReplaceState.apply(this, args);
-      setTimeout(handleUrlChange, 0);
-    };
-
-    return () => {
-      window.removeEventListener("popstate", handleUrlChange);
-      window.history.pushState = originalPushState;
-      window.history.replaceState = originalReplaceState;
-    };
-  }, [pathname]);
 
   useEffect(() => {
     const wasInInventory = lastPathRef.current?.startsWith("/inventory");
@@ -638,7 +594,7 @@ function SubmenuLink({ href, label, active, badge }: { href: string; label: stri
       href={href}
       scroll={false}
       prefetch={false}
-      className={`group relative flex items-center justify-between py-2 px-4 rounded-full text-[12.5px] transition-all duration-150 ease-out cursor-pointer active:scale-[0.98] select-none ${
+      className={`group relative flex items-center justify-between py-2 px-4 rounded-full text-[12.5px] transition-colors duration-150 ease-out cursor-pointer active:scale-[0.98] select-none ${
         active
           ? "bg-[#0066cc]/10 text-[#0066cc] font-semibold"
           : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 font-semibold"

@@ -21,7 +21,7 @@ import {
   purchaseOrders,
   accessoryItems
 } from "@/lib/db/schema";
-import { eq, desc, and, sql, or, like, gte } from "drizzle-orm";
+import { eq, desc, and, sql, or, like, gte, lte } from "drizzle-orm";
 import { sendTelegramNotification } from "@/lib/telegram/notifier";
 async function requireOwner() {
   // Bỏ qua kiểm tra quyền khi chạy ở chế độ không đăng nhập
@@ -462,10 +462,10 @@ export async function getFinancialSummary(filters?: {
       );
     }
     if (filters?.startDate) {
-      conditions.push(sql`DATE(${cashBookEntries.entryDate}) >= ${filters.startDate}`);
+      conditions.push(gte(cashBookEntries.entryDate, filters.startDate));
     }
     if (filters?.endDate) {
-      conditions.push(sql`DATE(${cashBookEntries.entryDate}) <= ${filters.endDate}`);
+      conditions.push(lte(cashBookEntries.entryDate, filters.endDate));
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -704,10 +704,10 @@ export async function getCashBookEntries(filters?: {
       );
     }
     if (filters?.startDate) {
-      conditions.push(sql`DATE(${cashBookEntries.entryDate}) >= ${filters.startDate}`);
+      conditions.push(gte(cashBookEntries.entryDate, filters.startDate));
     }
     if (filters?.endDate) {
-      conditions.push(sql`DATE(${cashBookEntries.entryDate}) <= ${filters.endDate}`);
+      conditions.push(lte(cashBookEntries.entryDate, filters.endDate));
     }
 
     // 1. Count matching entries

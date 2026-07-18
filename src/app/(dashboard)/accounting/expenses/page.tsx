@@ -31,7 +31,9 @@ import {
   CheckCircle2,
   Edit2,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Calendar,
+  ChevronDown
 } from "lucide-react";
 import { CustomSelect } from "@/components/ui/custom-select";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -132,6 +134,145 @@ export default function ExpensesPage() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(lastDay.getDate()).padStart(2, '0')}`;
   });
   const [selectedSpecificMonth, setSelectedSpecificMonth] = useState("2026-06");
+
+  const [isPeriodOpen, setIsPeriodOpen] = useState(false);
+  const periodPopoverRef = useRef<HTMLDivElement>(null);
+
+  // Custom Inline Calendar state inside the period popover
+  const [activeDateTab, setActiveDateTab] = useState<"start" | "end" | "month-select" | null>(null);
+  const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
+  const [viewMonth, setViewMonth] = useState(() => new Date().getMonth());
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (periodPopoverRef.current && !periodPopoverRef.current.contains(event.target as Node)) {
+        setIsPeriodOpen(false);
+      }
+    }
+    if (isPeriodOpen) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isPeriodOpen]);
+
+  useEffect(() => {
+    if (!isPeriodOpen) {
+      setActiveDateTab(null);
+    }
+  }, [isPeriodOpen]);
+
+  const parseDateString = (val: string) => {
+    if (!val) return null;
+    const parts = val.split("-");
+    if (parts.length !== 3) return new Date(val);
+    return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+  };
+
+  useEffect(() => {
+    if (activeDateTab === "start" && customStartDate) {
+      const d = parseDateString(customStartDate);
+      if (d) {
+        setViewYear(d.getFullYear());
+        setViewMonth(d.getMonth());
+      }
+    } else if (activeDateTab === "end" && customEndDate) {
+      const d = parseDateString(customEndDate);
+      if (d) {
+        setViewYear(d.getFullYear());
+        setViewMonth(d.getMonth());
+      }
+    }
+  }, [activeDateTab, customStartDate, customEndDate]);
+
+  const isToday = (d: Date) => {
+    const today = new Date();
+    return d.getDate() === today.getDate() &&
+           d.getMonth() === today.getMonth() &&
+           d.getFullYear() === today.getFullYear();
+  };
+
+  const calendarCells = useMemo(() => {
+    const firstDay = new Date(viewYear, viewMonth, 1);
+    const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+    let startDay = firstDay.getDay();
+    startDay = startDay === 0 ? 6 : startDay - 1;
+
+    const cells: Date[] = [];
+    const prevMonthDays = new Date(viewYear, viewMonth, 0).getDate();
+    for (let i = startDay - 1; i >= 0; i--) {
+      cells.push(new Date(viewYear, viewMonth - 1, prevMonthDays - i));
+    }
+    for (let i = 1; i <= daysInMonth; i++) {
+      cells.push(new Date(viewYear, viewMonth, i));
+    }
+    const remaining = 42 - cells.length;
+    for (let i = 1; i <= remaining; i++) {
+      cells.push(new Date(viewYear, viewMonth + 1, i));
+    }
+    return cells;
+  }, [viewYear, viewMonth]);
+
+  const handlePrevMonth = () => {
+    if (viewMonth === 0) {
+      setViewMonth(11);
+      setViewYear(y => y - 1);
+    } else {
+      setViewMonth(m => m - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (viewMonth === 11) {
+      setViewMonth(0);
+      setViewYear(y => y + 1);
+    } else {
+      setViewMonth(m => m + 1);
+    }
+  };
+
+  const handleSelectDate = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    const formatted = `${y}-${m}-${d}`;
+
+    if (activeDateTab === "start") {
+      setCustomStartDate(formatted);
+      setActiveTimeframe("custom");
+      if (customEndDate && formatted > customEndDate) {
+        setCustomEndDate(formatted);
+      }
+      setActiveDateTab("end");
+    } else if (activeDateTab === "end") {
+      setCustomEndDate(formatted);
+      setActiveTimeframe("custom");
+      if (customStartDate && formatted < customStartDate) {
+        setCustomStartDate(formatted);
+      }
+      setActiveDateTab(null);
+    }
+  };
+
+  const getPeriodLabel = () => {
+    if (activeTimeframe === "weekly") return "Tuần này";
+    if (activeTimeframe === "monthly") return "Tháng này";
+    if (activeTimeframe === "yearly") return "Năm nay";
+    if (activeTimeframe === "month-select") {
+      const parts = selectedSpecificMonth.split("-");
+      if (parts.length === 2) {
+        return `Tháng ${parseInt(parts[1])}/${parts[0]}`;
+      }
+      return `Tháng ${selectedSpecificMonth}`;
+    }
+    if (activeTimeframe === "custom" && customStartDate && customEndDate) {
+      return `${formatToDDMMYYYY(customStartDate)} - ${formatToDDMMYYYY(customEndDate)}`;
+    }
+    return "Chọn thời gian";
+  };
+
+  const MONTHS_VN = [
+    "Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", 
+    "Tháng 5", "Tháng 6", "Tháng 7", "Tháng 8", 
+    "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"
+  ];
 
   const [startDate, setStartDate] = useState("2026-05-01");
   const [endDate, setEndDate] = useState(() => {
@@ -497,113 +638,272 @@ export default function ExpensesPage() {
  
       {/* Header - Apple Premium Single-Row Layout */}
       <div className="pb-6 border-b border-[#e0e0e0] print:hidden">
-        <div className="flex flex-wrap items-center gap-3 justify-start">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full">
           
-          {/* Timeframe Selector (Tuần / Tháng / Năm / Tùy chọn / Chọn tháng) - Apple Segmented Control Style */}
-          <div className="relative flex bg-[#f5f5f7] p-[3px] rounded-full border border-[#e0e0e0] h-[40px] w-full sm:w-[460px] shrink-0 select-none overflow-hidden">
-            {/* Sliding Active Capsule Overlay */}
-            <div
-              className="absolute top-[3px] bottom-[3px] rounded-full bg-[#0066cc] shadow-[0_2px_4px_rgba(0,102,204,0.25)]"
-              style={{
-                width: "calc(20% - 6px)",
-                left: `calc(${
-                  (activeTimeframe === "weekly"
-                    ? 0
-                    : activeTimeframe === "monthly"
-                    ? 1
-                    : activeTimeframe === "yearly"
-                    ? 2
-                    : activeTimeframe === "custom"
-                    ? 3
-                    : 4) * 20
-                }% + 3px)`,
-                transition: "left 280ms cubic-bezier(0.16, 1, 0.3, 1)"
-              }}
-            />
+          {/* Left side: Date Period Dropdown & Category Selector */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            
+            {/* 1. Unified Period Selector (Dropdown Popover) */}
+            <div className="relative w-full sm:w-auto" ref={periodPopoverRef}>
+               <button
+                  type="button"
+                  onClick={() => setIsPeriodOpen(!isPeriodOpen)}
+                  className="h-[40px] px-4 w-full sm:w-auto rounded-full border border-[#e0e0e0] bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[13px] font-semibold text-[#1d1d1f] focus:outline-none transition-all flex items-center justify-center sm:justify-start gap-2 cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.02)] active:scale-98"
+               >
+                  <Calendar size={14} className="text-[#7a7a7a]" />
+                  <span>Thời gian:</span>
+                  <span className="text-[#0066cc] font-black">{getPeriodLabel()}</span>
+                  <ChevronDown size={12} className="text-[#7a7a7a] ml-0.5" />
+               </button>
 
-            {(["weekly", "monthly", "yearly", "custom", "month-select"] as const).map((type) => {
-              const labelMap: Record<string, string> = {
-                weekly: "Tuần",
-                monthly: "Tháng",
-                yearly: "Năm",
-                custom: "Tùy chọn",
-                "month-select": "Chọn tháng",
-              };
-              const active = activeTimeframe === type;
-              return (
-                <button
-                  key={type}
-                  onClick={() => setActiveTimeframe(type)}
-                  className={`w-1/5 h-full relative z-10 flex items-center justify-center text-[12.5px] transition-colors duration-200 cursor-pointer active:scale-98 ${
-                    active ? "text-white font-semibold" : "text-[#7a7a7a] hover:text-[#1d1d1f] font-medium"
-                  }`}
-                >
-                  {labelMap[type]}
-                </button>
-              );
-            })}
+               {isPeriodOpen && (
+                  <div className="absolute top-[calc(100%+6px)] left-0 sm:left-auto right-0 sm:right-auto w-full sm:w-[280px] bg-white rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.15)] border border-[#e0e0e0] p-4 z-[99]">
+                     {activeDateTab === null ? (
+                       <div className="space-y-4 animate-in fade-in duration-200">
+                         {/* Quick options */}
+                         <div className="space-y-1">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1.5">Chọn nhanh</p>
+                            <div className="grid grid-cols-2 gap-1.5">
+                               {(["weekly", "monthly", "yearly", "month-select"] as const).map((type) => {
+                                  const labelMap: Record<string, string> = {
+                                    weekly: "Tuần này",
+                                    monthly: "Tháng này",
+                                    yearly: "Năm nay",
+                                    "month-select": "Chọn tháng",
+                                  };
+                                  const active = activeTimeframe === type;
+                                  return (
+                                    <button
+                                      type="button"
+                                      key={type}
+                                      onClick={() => {
+                                        if (type === "month-select") {
+                                          setActiveTimeframe("month-select");
+                                          setActiveDateTab("month-select");
+                                        } else {
+                                          setActiveTimeframe(type);
+                                          setActiveDateTab(null);
+                                          setIsPeriodOpen(false);
+                                        }
+                                      }}
+                                      className={cn(
+                                        "py-2 px-3 rounded-xl text-[12px] font-semibold transition-all text-center cursor-pointer select-none",
+                                        active
+                                          ? "bg-[#0066cc] text-white"
+                                          : "bg-[#f5f5f7] hover:bg-[#e8e8ed] text-slate-700 hover:text-slate-900"
+                                      )}
+                                    >
+                                      {labelMap[type]}
+                                    </button>
+                                  );
+                               })}
+                            </div>
+                         </div>
+
+                         <div className="border-t border-[#e0e0e0]/60 pt-3 space-y-2.5">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Khoảng ngày tùy chỉnh</p>
+                            
+                            <div className="flex gap-2">
+                               <button
+                                 type="button"
+                                 onClick={() => setActiveDateTab("start")}
+                                 className={cn(
+                                   "flex-1 h-9 rounded-xl border px-3 text-[12px] font-bold transition-all flex items-center justify-between cursor-pointer",
+                                   activeTimeframe === "custom"
+                                     ? "bg-blue-500/5 border-blue-500/20 text-[#0066cc]"
+                                     : "bg-[#f5f5f7] border-[#e0e0e0] text-[#1d1d1f] hover:bg-[#e8e8ed]"
+                                 )}
+                               >
+                                 <span className="text-[#7a7a7a] font-medium">Từ:</span>
+                                 <span className="tabular-nums">{formatToDDMMYYYY(customStartDate)}</span>
+                               </button>
+                               <button
+                                 type="button"
+                                 onClick={() => setActiveDateTab("end")}
+                                 className={cn(
+                                   "flex-1 h-9 rounded-xl border px-3 text-[12px] font-bold transition-all flex items-center justify-between cursor-pointer",
+                                   activeTimeframe === "custom"
+                                     ? "bg-blue-500/5 border-blue-500/20 text-[#0066cc]"
+                                     : "bg-[#f5f5f7] border-[#e0e0e0] text-[#1d1d1f] hover:bg-[#e8e8ed]"
+                                 )}
+                               >
+                                 <span className="text-[#7a7a7a] font-medium">Đến:</span>
+                                 <span className="tabular-nums">{formatToDDMMYYYY(customEndDate)}</span>
+                               </button>
+                            </div>
+                         </div>
+                       </div>
+                     ) : activeDateTab === "month-select" ? (
+                       /* Month Picker View */
+                       <div className="space-y-3 animate-in slide-in-from-right duration-200">
+                          <div className="flex items-center gap-2 pb-2 border-b border-[#e0e0e0]/65">
+                             <button
+                               type="button"
+                               onClick={() => setActiveDateTab(null)}
+                               className="p-1 rounded-full hover:bg-slate-100 text-[#7a7a7a] hover:text-[#1d1d1f]"
+                             >
+                               <ChevronLeft size={16} />
+                             </button>
+                             <span className="text-[12px] font-bold text-slate-800">
+                               Chọn tháng báo cáo
+                             </span>
+                          </div>
+                          
+                          <div className="bg-[#f5f5f7]/60 rounded-2xl border border-[#e0e0e0]/60 p-3 text-slate-800 select-none">
+                             {/* Year navigation */}
+                             <div className="flex items-center justify-between pb-2 border-b border-[#e0e0e0]/55">
+                                <span className="text-[12px] font-bold text-[#1d1d1f]">Năm {viewYear}</span>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => setViewYear(y => y - 1)}
+                                    className="w-5.5 h-5.5 rounded-full flex items-center justify-center bg-white border border-[#e0e0e0]/80 hover:bg-[#e8e8ed] text-[#7a7a7a] transition-all active:scale-95 cursor-pointer shadow-sm"
+                                  >
+                                    <ChevronLeft size={11} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setViewYear(y => y + 1)}
+                                    className="w-5.5 h-5.5 rounded-full flex items-center justify-center bg-white border border-[#e0e0e0]/80 hover:bg-[#e8e8ed] text-[#7a7a7a] transition-all active:scale-95 cursor-pointer shadow-sm"
+                                  >
+                                    <ChevronRight size={11} />
+                                  </button>
+                                </div>
+                             </div>
+                             {/* Month grid */}
+                             <div className="grid grid-cols-4 gap-1.5 mt-2.5">
+                                {["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10", "T11", "T12"].map((mLabel, mIdx) => {
+                                   const valStr = `${viewYear}-${String(mIdx + 1).padStart(2, "0")}`;
+                                   const selected = selectedSpecificMonth === valStr && activeTimeframe === "month-select";
+                                   return (
+                                     <button
+                                       type="button"
+                                       key={mIdx}
+                                       onClick={() => {
+                                         setSelectedSpecificMonth(valStr);
+                                         setActiveTimeframe("month-select");
+                                         setActiveDateTab(null);
+                                         setIsPeriodOpen(false);
+                                       }}
+                                       className={cn(
+                                         "py-2 rounded-xl text-[11px] font-bold transition-all text-center cursor-pointer select-none",
+                                         selected
+                                           ? "bg-[#0066cc] text-white"
+                                           : "bg-white hover:bg-slate-200/50 text-slate-800 border border-[#e0e0e0]/40 shadow-sm"
+                                       )}
+                                     >
+                                       {mLabel}
+                                     </button>
+                                   );
+                                })}
+                             </div>
+                          </div>
+                       </div>
+                     ) : (
+                       /* Calendar View (activeDateTab is 'start' or 'end') */
+                       <div className="space-y-3 animate-in slide-in-from-right duration-200">
+                          <div className="flex items-center gap-2 pb-2 border-b border-[#e0e0e0]/65">
+                             <button
+                               type="button"
+                               onClick={() => setActiveDateTab(null)}
+                               className="p-1 rounded-full hover:bg-slate-100 text-[#7a7a7a] hover:text-[#1d1d1f]"
+                             >
+                               <ChevronLeft size={16} />
+                             </button>
+                             <span className="text-[12px] font-bold text-slate-800">
+                               {activeDateTab === "start" ? "Chọn ngày bắt đầu" : "Chọn ngày kết thúc"}
+                             </span>
+                          </div>
+                          
+                          <div className="bg-[#f5f5f7]/60 rounded-2xl border border-[#e0e0e0]/60 p-3 text-slate-800 select-none">
+                             {/* Calendar Month Header */}
+                             <div className="flex items-center justify-between pb-2 border-b border-[#e0e0e0]/55">
+                               <span className="text-[12px] font-bold text-[#1d1d1f]">
+                                 {MONTHS_VN[viewMonth]}, {viewYear}
+                               </span>
+                               <div className="flex items-center gap-1">
+                                 <button
+                                   type="button"
+                                   onClick={() => handlePrevMonth()}
+                                   className="w-5.5 h-5.5 rounded-full flex items-center justify-center bg-white border border-[#e0e0e0]/80 hover:bg-[#e8e8ed] text-[#7a7a7a] transition-all active:scale-95 cursor-pointer shadow-sm"
+                                 >
+                                   <ChevronLeft size={11} />
+                                 </button>
+                                 <button
+                                   type="button"
+                                   onClick={() => handleNextMonth()}
+                                   className="w-5.5 h-5.5 rounded-full flex items-center justify-center bg-white border border-[#e0e0e0]/80 hover:bg-[#e8e8ed] text-[#7a7a7a] transition-all active:scale-95 cursor-pointer shadow-sm"
+                                 >
+                                   <ChevronRight size={11} />
+                                 </button>
+                               </div>
+                             </div>
+
+                             {/* Week Days */}
+                             <div className="grid grid-cols-7 gap-0.5 mt-2 text-center">
+                               {["T2", "T3", "T4", "T5", "T6", "T7", "CN"].map(d => (
+                                 <span key={d} className="text-[9px] font-bold text-slate-400 py-0.5">{d}</span>
+                               ))}
+                             </div>
+
+                             {/* Calendar Cells */}
+                             <div className="grid grid-cols-7 gap-0.5 mt-0.5">
+                               {calendarCells.map((cell, idx) => {
+                                 const isStart = activeDateTab === "start";
+                                 const currentDateString = isStart ? customStartDate : customEndDate;
+                                 const sDate = parseDateString(currentDateString);
+                                 const selected = sDate && 
+                                                  cell.getDate() === sDate.getDate() &&
+                                                  cell.getMonth() === sDate.getMonth() &&
+                                                  cell.getFullYear() === sDate.getFullYear();
+                                 const currentMonth = cell.getMonth() === viewMonth;
+                                 const today = isToday(cell);
+
+                                 return (
+                                   <button
+                                     type="button"
+                                     key={idx}
+                                     onClick={() => handleSelectDate(cell)}
+                                     className={cn(
+                                       "aspect-square w-full rounded-lg flex items-center justify-center text-[11px] font-bold transition-all active:scale-90 cursor-pointer",
+                                       selected
+                                         ? "bg-[#0066cc] text-white"
+                                         : today
+                                         ? "bg-[#0066cc]/10 text-[#0066cc]"
+                                         : currentMonth
+                                         ? "text-slate-800 hover:bg-[#e8e8ed]"
+                                         : "text-slate-300 hover:bg-slate-100"
+                                     )}
+                                   >
+                                     {cell.getDate()}
+                                   </button>
+                                 );
+                               })}
+                             </div>
+                          </div>
+                       </div>
+                     )}
+                  </div>
+               )}
+            </div>
+
+            {/* 2. Category select dropdown */}
+            <div className="w-full sm:w-[220px] shrink-0">
+              <CustomSelect
+                options={categoryFilterOptions}
+                value={selectedCategory}
+                onChange={setSelectedCategory}
+                placeholder="Tất cả danh mục"
+                dropdownWidth="full"
+                size="sm"
+                rounded="full"
+              />
+            </div>
+
           </div>
 
-          {/* Custom Date Pickers Range */}
-          {activeTimeframe === "custom" && (
-            <>
-              <InlineDatePicker
-                label="Từ:"
-                value={customStartDate}
-                active={true}
-                onChange={(val) => {
-                  setCustomStartDate(val);
-                  setActiveTimeframe("custom");
-                  if (customEndDate && val > customEndDate) {
-                    setCustomEndDate(val);
-                  }
-                }}
-              />
-              <span className="text-slate-300 font-semibold select-none">/</span>
-              <InlineDatePicker
-                label="Đến:"
-                value={customEndDate}
-                active={true}
-                onChange={(val) => {
-                  setCustomEndDate(val);
-                  setActiveTimeframe("custom");
-                  if (customStartDate && val < customStartDate) {
-                    setCustomStartDate(val);
-                  }
-                }}
-                align="right"
-              />
-            </>
-          )}
-
-          {/* Specific Month Selector */}
-          {activeTimeframe === "month-select" && (
-            <InlineMonthPicker
-              label="Chọn tháng:"
-              value={selectedSpecificMonth}
-              active={true}
-              onChange={(val) => {
-                setSelectedSpecificMonth(val);
-                setActiveTimeframe("month-select");
-              }}
-            />
-          )}
-
-          {/* Category select dropdown - Pushed to right */}
-          <div className="w-[220px] shrink-0 sm:ml-auto">
-            <CustomSelect
-              options={categoryFilterOptions}
-              value={selectedCategory}
-              onChange={setSelectedCategory}
-              placeholder="Tất cả danh mục"
-              dropdownWidth="full"
-              size="sm"
-              rounded="full"
-            />
-          </div>
-
-          {/* Action & Refresh Group */}
-          <div className="flex items-center gap-2 shrink-0">
+          {/* Right side: Action & Refresh Buttons */}
+          <div className="flex gap-2 h-[40px] items-center justify-end sm:justify-start shrink-0 sm:ml-auto">
             <button
               onClick={() => refetch()}
               className="w-10 h-10 bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#7a7a7a] hover:text-[#1d1d1f] rounded-full transition-all border border-[#e0e0e0] cursor-pointer flex items-center justify-center shadow-sm active:scale-[0.95]"
@@ -1437,7 +1737,6 @@ export default function ExpensesPage() {
         isLoading={deleteCategoryMutation.isPending}
       />
  
-      {/* Sleek Custom Confirm Dialog for Expense Deletion */}
       <ConfirmDialog
         isOpen={!!expenseToDelete}
         onClose={() => setExpenseToDelete(null)}
@@ -1456,347 +1755,3 @@ export default function ExpensesPage() {
   );
 }
 
-// Custom Apple-style Inline Date Picker
-function InlineDatePicker({
-  value,
-  onChange,
-  label,
-  active,
-  align = "left",
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  label: string;
-  active: boolean;
-  align?: "left" | "right";
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  // Parse date
-  const selectedDate = useMemo(() => {
-    if (!value) return null;
-    const parts = value.split("-");
-    if (parts.length !== 3) return new Date(value);
-    return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-  }, [value]);
-
-  const [viewYear, setViewYear] = useState(() => selectedDate ? selectedDate.getFullYear() : new Date().getFullYear());
-  const [viewMonth, setViewMonth] = useState(() => selectedDate ? selectedDate.getMonth() : new Date().getMonth());
-
-  useEffect(() => {
-    if (selectedDate) {
-      setViewYear(selectedDate.getFullYear());
-      setViewMonth(selectedDate.getMonth());
-    }
-  }, [selectedDate]);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    }
-    if (isOpen) document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isOpen]);
-
-  const displayValue = useMemo(() => {
-    if (!selectedDate) return "";
-    const d = String(selectedDate.getDate()).padStart(2, "0");
-    const m = String(selectedDate.getMonth() + 1).padStart(2, "0");
-    const y = selectedDate.getFullYear().toString().slice(-2);
-    return `${d}/${m}/${y}`;
-  }, [selectedDate]);
-
-  // Calendar math
-  const calendarCells = useMemo(() => {
-    const firstDay = new Date(viewYear, viewMonth, 1);
-    const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-    let startDay = firstDay.getDay();
-    startDay = startDay === 0 ? 6 : startDay - 1;
-
-    const cells: Date[] = [];
-    const prevMonthDays = new Date(viewYear, viewMonth, 0).getDate();
-    for (let i = startDay - 1; i >= 0; i--) {
-      cells.push(new Date(viewYear, viewMonth - 1, prevMonthDays - i));
-    }
-    for (let i = 1; i <= daysInMonth; i++) {
-      cells.push(new Date(viewYear, viewMonth, i));
-    }
-    const remaining = 42 - cells.length;
-    for (let i = 1; i <= remaining; i++) {
-      cells.push(new Date(viewYear, viewMonth + 1, i));
-    }
-    return cells;
-  }, [viewYear, viewMonth]);
-
-  const isSelected = (d: Date) => {
-    if (!selectedDate) return false;
-    return d.getDate() === selectedDate.getDate() &&
-           d.getMonth() === selectedDate.getMonth() &&
-           d.getFullYear() === selectedDate.getFullYear();
-  };
-
-  const isToday = (d: Date) => {
-    const today = new Date();
-    return d.getDate() === today.getDate() &&
-           d.getMonth() === today.getMonth() &&
-           d.getFullYear() === today.getFullYear();
-  };
-
-  const handleSelectDate = (date: Date) => {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, "0");
-    const d = String(date.getDate()).padStart(2, "0");
-    onChange(`${y}-${m}-${d}`);
-    setIsOpen(false);
-  };
-  const MONTHS_VN = [
-    "Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", 
-    "Tháng 5", "Tháng 6", "Tháng 7", "Tháng 8", 
-    "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"
-  ];
-
-  return (
-    <div ref={containerRef} className="relative select-none shrink-0">
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setIsOpen(!isOpen);
-        }}
-        className={cn(
-          "h-[40px] rounded-full border px-4 text-[12.5px] font-bold focus:outline-none transition-all flex items-center gap-2 cursor-pointer bg-[#f5f5f7] border-[#e0e0e0] text-[#1d1d1f] hover:bg-[#e8e8ed] active:scale-98 duration-200 shadow-[0_1px_2px_rgba(0,0,0,0.02)]",
-          active
-            ? "bg-blue-500/10 border-blue-500/30 text-[#0066cc] hover:bg-blue-500/15"
-            : ""
-        )}
-      >
-        <span className="text-slate-400 font-medium">{label}</span>
-        <span className="tabular-nums">{displayValue}</span>
-      </button>
-      {isOpen && (
-        <div 
-          onClick={(e) => e.stopPropagation()}
-          className={cn(
-            "absolute top-[calc(100%+6px)] w-[240px] bg-white rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.15)] border border-[#e0e0e0] p-2.5 z-[99] text-slate-800",
-            align === "right" ? "right-0" : "left-0"
-          )}
-        >
-          <div className="flex items-center justify-between pb-1.5 border-b border-[#f5f5f7]">
-            <span className="text-[12.5px] font-bold">
-              {MONTHS_VN[viewMonth]}, {viewYear}
-            </span>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (viewMonth === 0) {
-                    setViewMonth(11);
-                    setViewYear(y => y - 1);
-                  } else {
-                    setViewMonth(m => m - 1);
-                  }
-                }}
-                className="w-5 h-5 rounded-full flex items-center justify-center bg-[#f5f5f7] hover:bg-[#e0e0e0] text-[#7a7a7a] transition-all active:scale-95 cursor-pointer"
-              >
-                <ChevronLeft size={10} />
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (viewMonth === 11) {
-                    setViewMonth(0);
-                    setViewYear(y => y + 1);
-                  } else {
-                    setViewMonth(m => m + 1);
-                  }
-                }}
-                className="w-5 h-5 rounded-full flex items-center justify-center bg-[#f5f5f7] hover:bg-[#e0e0e0] text-[#7a7a7a] transition-all active:scale-95 cursor-pointer"
-              >
-                <ChevronRight size={10} />
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-7 gap-0.5 mt-1.5 text-center">
-            {["T2", "T3", "T4", "T5", "T6", "T7", "CN"].map(d => (
-              <span key={d} className="text-[10px] font-bold text-slate-400 py-0.5">{d}</span>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-7 gap-0.5 mt-0.5">
-            {calendarCells.map((cell, idx) => {
-              const selected = isSelected(cell);
-              const currentMonth = cell.getMonth() === viewMonth;
-              const today = isToday(cell);
-
-              return (
-                <button
-                  type="button"
-                  key={idx}
-                  onClick={(e) => {
-                     e.stopPropagation();
-                     handleSelectDate(cell);
-                  }}
-                  className={cn(
-                    "aspect-square w-full rounded-md flex items-center justify-center text-[11.5px] font-medium transition-all active:scale-90 cursor-pointer",
-                    selected
-                      ? "bg-[#0066cc] text-white font-bold"
-                      : today
-                      ? "bg-[#0066cc]/10 text-[#0066cc] font-bold"
-                      : currentMonth
-                      ? "text-slate-800 hover:bg-slate-100"
-                      : "text-slate-300 hover:bg-slate-50"
-                  )}
-                >
-                  {cell.getDate()}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// Custom Apple-style Inline Month Picker
-function InlineMonthPicker({
-  value,
-  onChange,
-  label,
-  active,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  label: string;
-  active: boolean;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const parsed = useMemo(() => {
-    if (!value) return null;
-    const parts = value.split("-");
-    if (parts.length !== 2) return null;
-    return {
-      year: parseInt(parts[0], 10),
-      month: parseInt(parts[1], 10) - 1,
-    };
-  }, [value]);
-
-  const [viewYear, setViewYear] = useState(() => parsed ? parsed.year : new Date().getFullYear());
-
-  useEffect(() => {
-    if (parsed) setViewYear(parsed.year);
-  }, [parsed]);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    }
-    if (isOpen) document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isOpen]);
-
-  const displayValue = useMemo(() => {
-    if (!parsed) return "";
-    return `Tháng ${parsed.month + 1}/${parsed.year}`;
-  }, [parsed]);
-
-  const handleSelectMonth = (monthIndex: number) => {
-    onChange(`${viewYear}-${String(monthIndex + 1).padStart(2, "0")}`);
-    setIsOpen(false);
-  };
-
-  const isSelected = (monthIndex: number) => {
-    if (!parsed) return false;
-    return parsed.year === viewYear && parsed.month === monthIndex;
-  };
-
-  const MONTHS_VN = ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10", "T11", "T12"];
-
-  return (
-    <div ref={containerRef} className="relative select-none shrink-0">
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setIsOpen(!isOpen);
-        }}
-        className={cn(
-          "h-[40px] rounded-full border px-4 text-[12.5px] font-bold focus:outline-none transition-all flex items-center gap-2 cursor-pointer bg-[#f5f5f7] border-[#e0e0e0] text-[#1d1d1f] hover:bg-[#e8e8ed] active:scale-98 duration-200 shadow-[0_1px_2px_rgba(0,0,0,0.02)]",
-          active
-            ? "bg-blue-500/10 border-blue-500/30 text-[#0066cc] hover:bg-blue-500/15"
-            : ""
-        )}
-      >
-        <span className="text-slate-400 font-medium">{label}</span>
-        <span className="tabular-nums">{displayValue || "Chọn..."}</span>
-      </button>
-
-      {isOpen && (
-        <div 
-          onClick={(e) => e.stopPropagation()}
-          className="absolute top-[calc(100%+6px)] right-0 w-[180px] bg-white rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.15)] border border-[#e0e0e0] p-2.5 z-[99] text-slate-800"
-        >
-          <div className="flex items-center justify-between pb-1.5 border-b border-[#f5f5f7]">
-            <span className="text-[12.5px] font-bold">Năm {viewYear}</span>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setViewYear(y => y - 1);
-                }}
-                className="w-5 h-5 rounded-full flex items-center justify-center bg-[#f5f5f7] hover:bg-[#e0e0e0] text-[#7a7a7a] transition-all active:scale-95 cursor-pointer"
-              >
-                <ChevronLeft size={10} />
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setViewYear(y => y + 1);
-                }}
-                className="w-5 h-5 rounded-full flex items-center justify-center bg-[#f5f5f7] hover:bg-[#e0e0e0] text-[#7a7a7a] transition-all active:scale-95 cursor-pointer"
-              >
-                <ChevronRight size={10} />
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-1 mt-2">
-            {MONTHS_VN.map((mName, idx) => {
-              const selected = isSelected(idx);
-              return (
-                <button
-                  type="button"
-                  key={mName}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleSelectMonth(idx);
-                  }}
-                  className={cn(
-                    "py-1.5 rounded-md text-center text-[11.5px] font-medium transition-all active:scale-95 cursor-pointer",
-                    selected
-                      ? "bg-[#0066cc] text-white font-bold"
-                      : "text-slate-800 hover:bg-slate-100"
-                  )}
-                >
-                  {mName}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}

@@ -26,7 +26,7 @@ import {
   accessoryItems
 } from "@/lib/db/schema";
 import { db, recalculateRunningBalances } from "@/lib/db";
-import { eq, desc, inArray, sql, and, or, like } from "drizzle-orm";
+import { eq, desc, inArray, sql, and, or, like, ilike } from "drizzle-orm";
 import { syncHistoricalData } from "./accounting";
 import { after } from "next/server";
 
@@ -266,9 +266,10 @@ export async function getInventoryGroups(filters?: {
     if (filters?.search) {
       conditions.push(
         or(
-          like(products.name, `%${filters.search}%`),
-          like(brands.name, `%${filters.search}%`),
-          like(products.sku, `%${filters.search}%`)
+          ilike(products.name, `%${filters.search}%`),
+          ilike(brands.name, `%${filters.search}%`),
+          ilike(products.sku, `%${filters.search}%`),
+          ilike(inventoryItems.serialNumber, `%${filters.search}%`)
         )
       );
     }

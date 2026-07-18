@@ -53,7 +53,8 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
-  SlidersHorizontal
+  SlidersHorizontal,
+  ChevronDown
 } from "lucide-react";
 import { CustomSelect } from "@/components/ui/custom-select";
 import { CustomDatePicker } from "@/components/ui/custom-date-picker";
@@ -183,6 +184,145 @@ export default function CashBookPage() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(lastDay.getDate()).padStart(2, '0')}`;
   });
   const [selectedSpecificMonth, setSelectedSpecificMonth] = useState("2026-06");
+
+  const [isPeriodOpen, setIsPeriodOpen] = useState(false);
+  const periodPopoverRef = useRef<HTMLDivElement>(null);
+
+  // Custom Inline Calendar state inside the period popover
+  const [activeDateTab, setActiveDateTab] = useState<"start" | "end" | "month-select" | null>(null);
+  const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
+  const [viewMonth, setViewMonth] = useState(() => new Date().getMonth());
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (periodPopoverRef.current && !periodPopoverRef.current.contains(event.target as Node)) {
+        setIsPeriodOpen(false);
+      }
+    }
+    if (isPeriodOpen) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isPeriodOpen]);
+
+  useEffect(() => {
+    if (!isPeriodOpen) {
+      setActiveDateTab(null);
+    }
+  }, [isPeriodOpen]);
+
+  const parseDateString = (val: string) => {
+    if (!val) return null;
+    const parts = val.split("-");
+    if (parts.length !== 3) return new Date(val);
+    return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+  };
+
+  useEffect(() => {
+    if (activeDateTab === "start" && customStartDate) {
+      const d = parseDateString(customStartDate);
+      if (d) {
+        setViewYear(d.getFullYear());
+        setViewMonth(d.getMonth());
+      }
+    } else if (activeDateTab === "end" && customEndDate) {
+      const d = parseDateString(customEndDate);
+      if (d) {
+        setViewYear(d.getFullYear());
+        setViewMonth(d.getMonth());
+      }
+    }
+  }, [activeDateTab, customStartDate, customEndDate]);
+
+  const isToday = (d: Date) => {
+    const today = new Date();
+    return d.getDate() === today.getDate() &&
+           d.getMonth() === today.getMonth() &&
+           d.getFullYear() === today.getFullYear();
+  };
+
+  const calendarCells = useMemo(() => {
+    const firstDay = new Date(viewYear, viewMonth, 1);
+    const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+    let startDay = firstDay.getDay();
+    startDay = startDay === 0 ? 6 : startDay - 1;
+
+    const cells: Date[] = [];
+    const prevMonthDays = new Date(viewYear, viewMonth, 0).getDate();
+    for (let i = startDay - 1; i >= 0; i--) {
+      cells.push(new Date(viewYear, viewMonth - 1, prevMonthDays - i));
+    }
+    for (let i = 1; i <= daysInMonth; i++) {
+      cells.push(new Date(viewYear, viewMonth, i));
+    }
+    const remaining = 42 - cells.length;
+    for (let i = 1; i <= remaining; i++) {
+      cells.push(new Date(viewYear, viewMonth + 1, i));
+    }
+    return cells;
+  }, [viewYear, viewMonth]);
+
+  const handlePrevMonth = () => {
+    if (viewMonth === 0) {
+      setViewMonth(11);
+      setViewYear(y => y - 1);
+    } else {
+      setViewMonth(m => m - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (viewMonth === 11) {
+      setViewMonth(0);
+      setViewYear(y => y + 1);
+    } else {
+      setViewMonth(m => m + 1);
+    }
+  };
+
+  const handleSelectDate = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    const formatted = `${y}-${m}-${d}`;
+
+    if (activeDateTab === "start") {
+      setCustomStartDate(formatted);
+      setActiveTimeframe("custom");
+      if (customEndDate && formatted > customEndDate) {
+        setCustomEndDate(formatted);
+      }
+      setActiveDateTab("end");
+    } else if (activeDateTab === "end") {
+      setCustomEndDate(formatted);
+      setActiveTimeframe("custom");
+      if (customStartDate && formatted < customStartDate) {
+        setCustomStartDate(formatted);
+      }
+      setActiveDateTab(null);
+    }
+  };
+
+  const getPeriodLabel = () => {
+    if (activeTimeframe === "weekly") return "Tuần này";
+    if (activeTimeframe === "monthly") return "Tháng này";
+    if (activeTimeframe === "yearly") return "Năm nay";
+    if (activeTimeframe === "month-select") {
+      const parts = selectedSpecificMonth.split("-");
+      if (parts.length === 2) {
+        return `Tháng ${parseInt(parts[1])}/${parts[0]}`;
+      }
+      return `Tháng ${selectedSpecificMonth}`;
+    }
+    if (activeTimeframe === "custom" && customStartDate && customEndDate) {
+      return `${formatToDDMMYYYY(customStartDate)} - ${formatToDDMMYYYY(customEndDate)}`;
+    }
+    return "Chọn thời gian";
+  };
+
+  const MONTHS_VN = [
+    "Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", 
+    "Tháng 5", "Tháng 6", "Tháng 7", "Tháng 8", 
+    "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"
+  ];
 
   const [startDate, setStartDate] = useState("2026-05-01");
   const [endDate, setEndDate] = useState(() => {
@@ -806,7 +946,7 @@ export default function CashBookPage() {
               }`}>
                 <Wallet size={type === "" ? 12 : 9} className="transition-all duration-200" />
               </div>
-              <span className="whitespace-nowrap">Tất cả</span>
+              <span className="whitespace-nowrap">Số dư quỹ</span>
               <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${type === "" ? "bg-white text-[#0066cc] shadow-[0_1px_2px_rgba(0,0,0,0.08)]" : "bg-slate-200 text-slate-800 border border-slate-300/20"}`}>
                 {formatPrice(cumulativeBalance)}
               </span>
@@ -894,9 +1034,9 @@ export default function CashBookPage() {
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 w-full">
           
           {/* Left Side: Filter Controls */}
-          <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
-            {/* Category select dropdown styled as a Filter Button */}
-            <div className="w-[180px] shrink-0">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+            {/* Category select dropdown */}
+            <div className="w-full sm:w-[180px] shrink-0">
               <CustomSelect
                 options={dynamicCategoryOptions}
                 value={category}
@@ -909,101 +1049,250 @@ export default function CashBookPage() {
               />
             </div>
 
-            {/* Timeframe Selector (Tuần / Tháng / Năm) - Standard sliding Segmented Control */}
-            <div className="relative flex bg-[#f5f5f7] border border-[#e0e0e0] p-[3px] rounded-full w-[185px] h-9 select-none z-10 shrink-0 overflow-hidden">
-              {/* Sliding Active Capsule Overlay */}
-              <div
-                className="absolute top-[3px] bottom-[3px] rounded-full bg-[#0066cc] shadow-[0_2px_4px_rgba(0,102,204,0.25)]"
-                style={{
-                  width: "calc(33.333% - 6px)",
-                  left: `calc(${(activeTimeframe === "weekly" ? 0 : activeTimeframe === "monthly" ? 1 : 2) * 33.333}% + 3px)`,
-                  opacity: (activeTimeframe === "weekly" || activeTimeframe === "monthly" || activeTimeframe === "yearly") ? 1 : 0,
-                  transition: "left 280ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms"
-                }}
-              />
+            {/* 1. Unified Period Selector (Dropdown Popover) */}
+            <div className="relative w-full sm:w-auto" ref={periodPopoverRef}>
+               <button
+                  type="button"
+                  onClick={() => setIsPeriodOpen(!isPeriodOpen)}
+                  className="h-[36px] px-4 w-full sm:w-auto rounded-full border border-[#e0e0e0] bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[12.5px] font-semibold text-[#1d1d1f] focus:outline-none transition-all flex items-center justify-center sm:justify-start gap-2 cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.02)] active:scale-98"
+               >
+                  <Calendar size={13} className="text-[#7a7a7a]" />
+                  <span>Thời gian:</span>
+                  <span className="text-[#0066cc] font-black">{getPeriodLabel()}</span>
+                  <ChevronDown size={12} className="text-[#7a7a7a] ml-0.5" />
+               </button>
 
-              <button
-                onClick={() => setActiveTimeframe("weekly")}
-                className={`relative z-10 flex-1 h-full text-[12px] transition-colors duration-200 cursor-pointer flex items-center justify-center rounded-full focus:outline-none active:scale-[0.98] ${
-                  activeTimeframe === "weekly" ? "text-white font-bold" : "text-slate-600 font-semibold hover:text-slate-900"
-                }`}
-              >
-                Tuần
-              </button>
-              <button
-                onClick={() => setActiveTimeframe("monthly")}
-                className={`relative z-10 flex-1 h-full text-[12px] transition-colors duration-200 cursor-pointer flex items-center justify-center rounded-full focus:outline-none active:scale-[0.98] ${
-                  activeTimeframe === "monthly" ? "text-white font-bold" : "text-slate-600 font-semibold hover:text-slate-900"
-                }`}
-              >
-                Tháng
-              </button>
-              <button
-                onClick={() => setActiveTimeframe("yearly")}
-                className={`relative z-10 flex-1 h-full text-[12px] transition-colors duration-200 cursor-pointer flex items-center justify-center rounded-full focus:outline-none active:scale-[0.98] ${
-                  activeTimeframe === "yearly" ? "text-white font-bold" : "text-slate-600 font-semibold hover:text-slate-900"
-                }`}
-              >
-                Năm
-              </button>
+               {isPeriodOpen && (
+                  <div className="absolute top-[calc(100%+6px)] left-0 sm:left-auto right-0 sm:right-auto w-full sm:w-[280px] bg-white rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.15)] border border-[#e0e0e0] p-4 z-[99]">
+                     {activeDateTab === null ? (
+                       <div className="space-y-4 animate-in fade-in duration-200">
+                         {/* Quick options */}
+                         <div className="space-y-1">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1.5">Chọn nhanh</p>
+                            <div className="grid grid-cols-2 gap-1.5">
+                               {(["weekly", "monthly", "yearly", "month-select"] as const).map((type) => {
+                                  const labelMap: Record<string, string> = {
+                                    weekly: "Tuần này",
+                                    monthly: "Tháng này",
+                                    yearly: "Năm nay",
+                                    "month-select": "Chọn tháng",
+                                  };
+                                  const active = activeTimeframe === type;
+                                  return (
+                                    <button
+                                      type="button"
+                                      key={type}
+                                      onClick={() => {
+                                        if (type === "month-select") {
+                                          setActiveTimeframe("month-select");
+                                          setActiveDateTab("month-select");
+                                        } else {
+                                          setActiveTimeframe(type);
+                                          setActiveDateTab(null);
+                                          setIsPeriodOpen(false);
+                                        }
+                                      }}
+                                      className={cn(
+                                        "py-2 px-3 rounded-xl text-[12px] font-semibold transition-all text-center cursor-pointer select-none",
+                                        active
+                                          ? "bg-[#0066cc] text-white"
+                                          : "bg-[#f5f5f7] hover:bg-[#e8e8ed] text-slate-700 hover:text-slate-900"
+                                      )}
+                                    >
+                                      {labelMap[type]}
+                                    </button>
+                                  );
+                               })}
+                            </div>
+                         </div>
+
+                         <div className="border-t border-[#e0e0e0]/60 pt-3 space-y-2.5">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Khoảng ngày tùy chỉnh</p>
+                            
+                            <div className="flex gap-2">
+                               <button
+                                 type="button"
+                                 onClick={() => setActiveDateTab("start")}
+                                 className={cn(
+                                   "flex-1 h-9 rounded-xl border px-3 text-[12px] font-bold transition-all flex items-center justify-between cursor-pointer",
+                                   activeTimeframe === "custom"
+                                     ? "bg-blue-500/5 border-blue-500/20 text-[#0066cc]"
+                                     : "bg-[#f5f5f7] border-[#e0e0e0] text-[#1d1d1f] hover:bg-[#e8e8ed]"
+                                 )}
+                               >
+                                 <span className="text-[#7a7a7a] font-medium">Từ:</span>
+                                 <span className="tabular-nums">{formatToDDMMYYYY(customStartDate)}</span>
+                               </button>
+                               <button
+                                 type="button"
+                                 onClick={() => setActiveDateTab("end")}
+                                 className={cn(
+                                   "flex-1 h-9 rounded-xl border px-3 text-[12px] font-bold transition-all flex items-center justify-between cursor-pointer",
+                                   activeTimeframe === "custom"
+                                     ? "bg-blue-500/5 border-blue-500/20 text-[#0066cc]"
+                                     : "bg-[#f5f5f7] border-[#e0e0e0] text-[#1d1d1f] hover:bg-[#e8e8ed]"
+                                 )}
+                               >
+                                 <span className="text-[#7a7a7a] font-medium">Đến:</span>
+                                 <span className="tabular-nums">{formatToDDMMYYYY(customEndDate)}</span>
+                               </button>
+                            </div>
+                         </div>
+                       </div>
+                     ) : activeDateTab === "month-select" ? (
+                       /* Month Picker View */
+                       <div className="space-y-3 animate-in slide-in-from-right duration-200">
+                          <div className="flex items-center gap-2 pb-2 border-b border-[#e0e0e0]/65">
+                             <button
+                               type="button"
+                               onClick={() => setActiveDateTab(null)}
+                               className="p-1 rounded-full hover:bg-slate-100 text-[#7a7a7a] hover:text-[#1d1d1f]"
+                             >
+                               <ChevronLeft size={16} />
+                             </button>
+                             <span className="text-[12px] font-bold text-slate-800">
+                               Chọn tháng báo cáo
+                             </span>
+                          </div>
+                          
+                          <div className="bg-[#f5f5f7]/60 rounded-2xl border border-[#e0e0e0]/60 p-3 text-slate-800 select-none">
+                             {/* Year navigation */}
+                             <div className="flex items-center justify-between pb-2 border-b border-[#e0e0e0]/55">
+                                <span className="text-[12px] font-bold text-[#1d1d1f]">Năm {viewYear}</span>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => setViewYear(y => y - 1)}
+                                    className="w-5.5 h-5.5 rounded-full flex items-center justify-center bg-white border border-[#e0e0e0]/80 hover:bg-[#e8e8ed] text-[#7a7a7a] transition-all active:scale-95 cursor-pointer shadow-sm"
+                                  >
+                                    <ChevronLeft size={11} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setViewYear(y => y + 1)}
+                                    className="w-5.5 h-5.5 rounded-full flex items-center justify-center bg-white border border-[#e0e0e0]/80 hover:bg-[#e8e8ed] text-[#7a7a7a] transition-all active:scale-95 cursor-pointer shadow-sm"
+                                  >
+                                    <ChevronRight size={11} />
+                                  </button>
+                                </div>
+                             </div>
+                             {/* Month grid */}
+                             <div className="grid grid-cols-4 gap-1.5 mt-2.5">
+                                {["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10", "T11", "T12"].map((mLabel, mIdx) => {
+                                   const valStr = `${viewYear}-${String(mIdx + 1).padStart(2, "0")}`;
+                                   const selected = selectedSpecificMonth === valStr && activeTimeframe === "month-select";
+                                   return (
+                                     <button
+                                       type="button"
+                                       key={mIdx}
+                                       onClick={() => {
+                                         setSelectedSpecificMonth(valStr);
+                                         setActiveTimeframe("month-select");
+                                         setActiveDateTab(null);
+                                         setIsPeriodOpen(false);
+                                       }}
+                                       className={cn(
+                                         "py-2 rounded-xl text-[11px] font-bold transition-all text-center cursor-pointer select-none",
+                                         selected
+                                           ? "bg-[#0066cc] text-white"
+                                           : "bg-white hover:bg-slate-200/50 text-slate-800 border border-[#e0e0e0]/40 shadow-sm"
+                                       )}
+                                     >
+                                       {mLabel}
+                                     </button>
+                                   );
+                                })}
+                             </div>
+                          </div>
+                       </div>
+                     ) : (
+                       /* Calendar View (activeDateTab is 'start' or 'end') */
+                       <div className="space-y-3 animate-in slide-in-from-right duration-200">
+                          <div className="flex items-center gap-2 pb-2 border-b border-[#e0e0e0]/65">
+                             <button
+                               type="button"
+                               onClick={() => setActiveDateTab(null)}
+                               className="p-1 rounded-full hover:bg-slate-100 text-[#7a7a7a] hover:text-[#1d1d1f]"
+                             >
+                               <ChevronLeft size={16} />
+                             </button>
+                             <span className="text-[12px] font-bold text-slate-800">
+                               {activeDateTab === "start" ? "Chọn ngày bắt đầu" : "Chọn ngày kết thúc"}
+                             </span>
+                          </div>
+                          
+                          <div className="bg-[#f5f5f7]/60 rounded-2xl border border-[#e0e0e0]/60 p-3 text-slate-800 select-none">
+                             {/* Calendar Month Header */}
+                             <div className="flex items-center justify-between pb-2 border-b border-[#e0e0e0]/55">
+                               <span className="text-[12px] font-bold text-[#1d1d1f]">
+                                 {MONTHS_VN[viewMonth]}, {viewYear}
+                               </span>
+                               <div className="flex items-center gap-1">
+                                 <button
+                                   type="button"
+                                   onClick={() => handlePrevMonth()}
+                                   className="w-5.5 h-5.5 rounded-full flex items-center justify-center bg-white border border-[#e0e0e0]/80 hover:bg-[#e8e8ed] text-[#7a7a7a] transition-all active:scale-95 cursor-pointer shadow-sm"
+                                 >
+                                   <ChevronLeft size={11} />
+                                 </button>
+                                 <button
+                                   type="button"
+                                   onClick={() => handleNextMonth()}
+                                   className="w-5.5 h-5.5 rounded-full flex items-center justify-center bg-white border border-[#e0e0e0]/80 hover:bg-[#e8e8ed] text-[#7a7a7a] transition-all active:scale-95 cursor-pointer shadow-sm"
+                                 >
+                                   <ChevronRight size={11} />
+                                 </button>
+                               </div>
+                             </div>
+
+                             {/* Week Days */}
+                             <div className="grid grid-cols-7 gap-0.5 mt-2 text-center">
+                               {["T2", "T3", "T4", "T5", "T6", "T7", "CN"].map(d => (
+                                 <span key={d} className="text-[9px] font-bold text-slate-400 py-0.5">{d}</span>
+                               ))}
+                             </div>
+
+                             {/* Calendar Cells */}
+                             <div className="grid grid-cols-7 gap-0.5 mt-0.5">
+                               {calendarCells.map((cell, idx) => {
+                                 const isStart = activeDateTab === "start";
+                                 const currentDateString = isStart ? customStartDate : customEndDate;
+                                 const sDate = parseDateString(currentDateString);
+                                 const selected = sDate && 
+                                                  cell.getDate() === sDate.getDate() &&
+                                                  cell.getMonth() === sDate.getMonth() &&
+                                                  cell.getFullYear() === sDate.getFullYear();
+                                 const currentMonth = cell.getMonth() === viewMonth;
+                                 const today = isToday(cell);
+
+                                 return (
+                                   <button
+                                     type="button"
+                                     key={idx}
+                                     onClick={() => handleSelectDate(cell)}
+                                     className={cn(
+                                       "aspect-square w-full rounded-lg flex items-center justify-center text-[11px] font-bold transition-all active:scale-90 cursor-pointer",
+                                       selected
+                                         ? "bg-[#0066cc] text-white"
+                                         : today
+                                         ? "bg-[#0066cc]/10 text-[#0066cc]"
+                                         : currentMonth
+                                         ? "text-slate-800 hover:bg-[#e8e8ed]"
+                                         : "text-slate-300 hover:bg-slate-100"
+                                     )}
+                                   >
+                                     {cell.getDate()}
+                                   </button>
+                                 );
+                               })}
+                             </div>
+                          </div>
+                       </div>
+                     )}
+                  </div>
+               )}
             </div>
 
-            {/* From Date to Date Picker Inline */}
-            <div
-              onClick={() => setActiveTimeframe("custom")}
-              className={cn(
-                "h-9 rounded-full px-2 text-[12px] font-semibold transition-all duration-200 flex items-center gap-1 cursor-pointer select-none border shrink-0",
-                activeTimeframe === "custom"
-                  ? "bg-white border-slate-200 shadow-[0_1px_2px_rgba(0,0,0,0.02)] text-slate-800"
-                  : "bg-white/60 border-white/80 text-slate-700 hover:bg-white/85"
-              )}
-            >
-              <InlineDatePicker
-                label="Từ:"
-                value={customStartDate}
-                active={activeTimeframe === "custom"}
-                onChange={(val) => {
-                  setCustomStartDate(val);
-                  setActiveTimeframe("custom");
-                  if (customEndDate && val > customEndDate) {
-                    setCustomEndDate(val);
-                  }
-                }}
-              />
-              <InlineDatePicker
-                label="đến:"
-                value={customEndDate}
-                active={activeTimeframe === "custom"}
-                onChange={(val) => {
-                  setCustomEndDate(val);
-                  setActiveTimeframe("custom");
-                  if (customStartDate && val < customStartDate) {
-                    setCustomStartDate(val);
-                  }
-                }}
-              />
-            </div>
-
-            {/* Specific Month Selector Inline */}
-            <div
-              onClick={() => setActiveTimeframe("month-select")}
-              className={cn(
-                "h-9 rounded-full px-2 text-[12px] font-semibold transition-all duration-200 flex items-center gap-1 cursor-pointer select-none border shrink-0",
-                activeTimeframe === "month-select"
-                  ? "bg-white border-slate-200 shadow-[0_1px_2px_rgba(0,0,0,0.02)] text-slate-800"
-                  : "bg-white/60 border-white/80 text-slate-700 hover:bg-white/85"
-              )}
-            >
-              <InlineMonthPicker
-                label="Chọn tháng:"
-                value={selectedSpecificMonth}
-                active={activeTimeframe === "month-select"}
-                onChange={(val) => {
-                  setSelectedSpecificMonth(val);
-                  setActiveTimeframe("month-select");
-                }}
-              />
-            </div>
           </div>
 
           {/* Right Side: Cán cân ngân quỹ (Balance Meter) - Compact Apple style */}
@@ -1040,518 +1329,478 @@ export default function CashBookPage() {
       </KinhPanel>
 
 
-      {/* 3. Dual-Pane Analysis Workspace (Co-existing feed and Voucher detail panel) */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
-        
-        {/* Left Pane (70% - xl:col-span-2) - Grouped Transaction Ledger Feed */}
-        <div className="xl:col-span-2 space-y-4">
-          
-          {isLoading ? (
-            <div className="bg-white/45 backdrop-blur-xl rounded-[28px] border border-white/70 flex flex-col items-center justify-center py-28 text-slate-500 shadow-sm">
-              <Loader2 className="animate-spin mb-3 text-[#0071e3]" size={28} />
-              <p className="text-[14px] font-bold text-slate-800">Đang tải sổ quỹ...</p>
-              <p className="text-[12px] text-slate-500 mt-1">Vui lòng chờ trong giây lát</p>
+      {/* 3. Grouped Transaction Ledger Feed */}
+      <div className="space-y-4">
+        {isLoading ? (
+          <div className="bg-white/45 backdrop-blur-xl rounded-[28px] border border-white/70 flex flex-col items-center justify-center py-28 text-slate-500 shadow-sm">
+            <Loader2 className="animate-spin mb-3 text-[#0071e3]" size={28} />
+            <p className="text-[14px] font-bold text-slate-800">Đang tải sổ quỹ...</p>
+            <p className="text-[12px] text-slate-500 mt-1">Vui lòng chờ trong giây lát</p>
+          </div>
+        ) : filteredEntries && filteredEntries.length > 0 ? (
+          <KinhPanel className="shadow-sm overflow-hidden flex flex-col justify-between">
+            <div className="w-full overflow-x-auto">
+              <table className="w-full text-left border-separate border-spacing-0 table-fixed min-w-[700px]">
+                <thead>
+                  <tr className="text-[11px] font-bold text-slate-500 uppercase tracking-wider select-none">
+                    <th className="py-3 px-3 w-[7%] text-center border-b border-slate-200 bg-slate-50">STT</th>
+                    <th className="py-3 px-3 w-[18%] border-b border-slate-200 bg-slate-50">Số chứng từ</th>
+                    <th className="py-3 px-3 w-[15%] border-b border-slate-200 bg-slate-50">Ngày hạch toán</th>
+                    <th className="py-3 px-3 w-[12%] text-center border-b border-slate-200 bg-slate-50">Phân loại</th>
+                    <th className="py-3 px-3 w-[23%] border-b border-slate-200 bg-slate-50">Diễn giải nội dung</th>
+                    <th className="py-3 px-3 w-[18%] text-right border-b border-slate-200 bg-slate-50">Số tiền</th>
+                    <th className="py-3 px-3 w-[19%] text-right pr-4 border-b border-slate-200 bg-slate-50">Số dư lũy kế</th>
+                  </tr>
+                </thead>
+                <tbody className="text-[13px] text-slate-800">
+                  {paginatedEntries.map((entry, index) => {
+                    const amt = Number(entry.amount || 0);
+                    const isIncome = entry.type === "income";
+                    const isSelected = selectedEntry?.id === entry.id;
+                    const stt = (currentPage - 1) * itemsPerPage + index + 1;
+
+                    return (
+                      <tr
+                        key={entry.id}
+                        onClick={() => {
+                          setSelectedEntry(entry);
+                          setIsEditing(false);
+                        }}
+                        className="group cursor-pointer select-none"
+                      >
+                        {/* STT */}
+                        <td className={`py-3 px-3 text-center font-bold text-[12px] transition-all ${
+                          isSelected 
+                            ? "text-[#0066cc] bg-[#0066cc]/8 group-hover:bg-[#0066cc]/12 border-y border-l border-[#0066cc]/25 rounded-l-xl" 
+                            : "text-slate-400 border-b border-slate-100 group-hover:bg-[#0071e3]/4"
+                        }`}>
+                          {stt}
+                        </td>
+
+                        {/* Số chứng từ */}
+                        <td className={`py-3 px-3 truncate whitespace-nowrap transition-all ${
+                          isSelected 
+                            ? "bg-[#0066cc]/8 group-hover:bg-[#0066cc]/12 border-y border-[#0066cc]/25 text-[#0066cc]" 
+                            : "border-b border-slate-100 group-hover:bg-[#0071e3]/4"
+                        }`} title={entry.entryNumber}>
+                          <span className={`text-[12px] tracking-tight truncate block max-w-[100px] ${isSelected ? "text-[#0066cc] font-bold" : "font-semibold text-slate-700"}`}>
+                            {entry.entryNumber}
+                          </span>
+                        </td>
+
+                        {/* Ngày hạch toán */}
+                        <td className={`py-3 px-3 font-medium whitespace-nowrap text-[12px] transition-all ${
+                          isSelected 
+                            ? "bg-[#0066cc]/8 group-hover:bg-[#0066cc]/12 border-y border-[#0066cc]/25 text-slate-700" 
+                            : "text-slate-500 border-b border-slate-100 group-hover:bg-[#0071e3]/4"
+                        }`}>
+                          {formatToDDMMYYYY(entry.entryDate)}
+                        </td>
+
+                        {/* Phân loại */}
+                        <td className={`py-3 px-3 text-center transition-all ${
+                          isSelected 
+                            ? "bg-[#0066cc]/8 group-hover:bg-[#0066cc]/12 border-y border-[#0066cc]/25" 
+                            : "border-b border-slate-100 group-hover:bg-[#0071e3]/4"
+                        }`}>
+                          {isIncome ? (
+                            <span className="text-[12px] font-extrabold text-emerald-600">
+                              Thu
+                            </span>
+                          ) : (
+                            <span className="text-[12px] font-extrabold text-rose-600">
+                              Chi
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Diễn giải nội dung */}
+                        <td className={`py-3 px-3 truncate transition-all ${
+                          isSelected 
+                            ? "bg-[#0066cc]/8 group-hover:bg-[#0066cc]/12 border-y border-[#0066cc]/25 text-slate-700 font-medium" 
+                            : "text-slate-600 border-b border-slate-100 group-hover:bg-[#0071e3]/4"
+                        }`} title={entry.description}>
+                          {entry.description}
+                        </td>
+
+                        {/* Số tiền */}
+                        <td className={`py-3 px-3 text-right font-bold tabular-nums transition-all ${
+                          isSelected 
+                            ? "bg-[#0066cc]/8 group-hover:bg-[#0066cc]/12 border-y border-[#0066cc]/25" 
+                            : "border-b border-slate-100 group-hover:bg-[#0071e3]/4"
+                        }`}>
+                          <span className={isIncome ? "text-emerald-600" : "text-rose-600"}>
+                            {isIncome ? "+" : "-"}
+                            {Math.round(amt).toLocaleString("vi-VN")}đ
+                          </span>
+                        </td>
+
+                        {/* Số dư lũy kế */}
+                        <td className={`py-3 px-3 text-right pr-4 font-bold text-slate-700 tabular-nums transition-all ${
+                          isSelected 
+                            ? "bg-[#0066cc]/8 group-hover:bg-[#0066cc]/12 border-y border-r border-[#0066cc]/25 rounded-r-xl" 
+                            : "border-b border-slate-100 group-hover:bg-[#0071e3]/4"
+                        }`}>
+                          {formatPrice(entry.runningBalance)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-          ) : filteredEntries && filteredEntries.length > 0 ? (
-            <KinhPanel className="shadow-sm overflow-hidden flex flex-col justify-between">
-              <div className="w-full overflow-x-auto">
-                <table className="w-full text-left border-separate border-spacing-0 table-fixed min-w-[700px]">
-                  <thead>
-                    <tr className="text-[11px] font-bold text-slate-500 uppercase tracking-wider select-none">
-                      <th className="py-3 px-3 w-[7%] text-center border-b border-slate-200 bg-slate-50">STT</th>
-                      <th className="py-3 px-3 w-[18%] border-b border-slate-200 bg-slate-50">Số chứng từ</th>
-                      <th className="py-3 px-3 w-[15%] border-b border-slate-200 bg-slate-50">Ngày hạch toán</th>
-                      <th className="py-3 px-3 w-[12%] text-center border-b border-slate-200 bg-slate-50">Phân loại</th>
-                      <th className="py-3 px-3 w-[23%] border-b border-slate-200 bg-slate-50">Diễn giải nội dung</th>
-                      <th className="py-3 px-3 w-[18%] text-right border-b border-slate-200 bg-slate-50">Số tiền</th>
-                      <th className="py-3 px-3 w-[19%] text-right pr-4 border-b border-slate-200 bg-slate-50">Số dư lũy kế</th>
-                    </tr>
-                  </thead>
-                  <tbody className="text-[13px] text-slate-800">
-                    {paginatedEntries.map((entry, index) => {
-                      const amt = Number(entry.amount || 0);
-                      const isIncome = entry.type === "income";
-                      const isSelected = selectedEntry?.id === entry.id;
-                      const stt = (currentPage - 1) * itemsPerPage + index + 1;
- 
+
+            {/* Pagination controls */}
+            {totalPages > 1 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between px-5 py-3.5 border-t border-slate-200 bg-white/20 select-none gap-3">
+                <span className="text-[12px] font-medium text-slate-500">
+                  Hiển thị dòng {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filteredEntries.length)} trong tổng số {filteredEntries.length} chứng từ
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                    className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none transition-all cursor-pointer shadow-sm active:scale-95"
+                  >
+                    Trang trước
+                  </button>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: totalPages }).map((_, i) => {
+                      const pageNum = i + 1;
+                      const isActive = currentPage === pageNum;
                       return (
-                        <tr
-                          key={entry.id}
-                          onClick={() => {
-                            setSelectedEntry(entry);
-                            setIsEditing(false);
-                          }}
-                          className="group cursor-pointer select-none"
-                        >
-                          {/* STT */}
-                          <td className={`py-3 px-3 text-center font-bold text-[12px] transition-all ${
-                            isSelected 
-                              ? "text-[#0066cc] bg-[#0066cc]/8 group-hover:bg-[#0066cc]/12 border-y border-l border-[#0066cc]/25 rounded-l-xl" 
-                              : "text-slate-400 border-b border-slate-100 group-hover:bg-[#0071e3]/4"
-                          }`}>
-                            {stt}
-                          </td>
- 
-                          {/* Số chứng từ */}
-                          <td className={`py-3 px-3 truncate whitespace-nowrap transition-all ${
-                            isSelected 
-                              ? "bg-[#0066cc]/8 group-hover:bg-[#0066cc]/12 border-y border-[#0066cc]/25 text-[#0066cc]" 
-                              : "border-b border-slate-100 group-hover:bg-[#0071e3]/4"
-                          }`} title={entry.entryNumber}>
-                            <span className={`text-[12px] tracking-tight truncate block max-w-[100px] ${isSelected ? "text-[#0066cc] font-bold" : "font-semibold text-slate-700"}`}>
-                              {entry.entryNumber}
-                            </span>
-                          </td>
- 
-                          {/* Ngày hạch toán */}
-                          <td className={`py-3 px-3 font-medium whitespace-nowrap text-[12px] transition-all ${
-                            isSelected 
-                              ? "bg-[#0066cc]/8 group-hover:bg-[#0066cc]/12 border-y border-[#0066cc]/25 text-slate-700" 
-                              : "text-slate-500 border-b border-slate-100 group-hover:bg-[#0071e3]/4"
-                          }`}>
-                            {formatToDDMMYYYY(entry.entryDate)}
-                          </td>
- 
-                          {/* Phân loại */}
-                          <td className={`py-3 px-3 text-center transition-all ${
-                            isSelected 
-                              ? "bg-[#0066cc]/8 group-hover:bg-[#0066cc]/12 border-y border-[#0066cc]/25" 
-                              : "border-b border-slate-100 group-hover:bg-[#0071e3]/4"
-                          }`}>
-                            <span className={`text-[12px] font-bold ${
-                              isIncome 
-                                ? "text-emerald-600" 
-                                : "text-rose-600"
-                            }`}>
-                              {isIncome ? "THU" : "CHI"}
-                            </span>
-                          </td>
- 
-                          {/* Diễn giải nội dung */}
-                          <td className={`py-3 px-3 font-medium truncate transition-all ${
-                            isSelected 
-                              ? "bg-[#0066cc]/8 group-hover:bg-[#0066cc]/12 border-y border-[#0066cc]/25 text-slate-700" 
-                              : "text-slate-700 border-b border-slate-100 group-hover:bg-[#0071e3]/4"
-                          }`} title={entry.description}>
-                            {entry.description}
-                          </td>
- 
-                          {/* Số tiền */}
-                          <td className={`py-3 px-3 text-right whitespace-nowrap transition-all ${
-                            isSelected 
-                              ? "bg-[#0066cc]/8 group-hover:bg-[#0066cc]/12 border-y border-[#0066cc]/25" 
-                              : "border-b border-slate-100 group-hover:bg-[#0071e3]/4"
-                          }`}>
-                            <span className={`text-[13px] font-bold tracking-tight ${
-                              isIncome ? "text-emerald-600" : "text-rose-600"
-                            }`}>
-                              {isIncome ? "+" : "-"}
-                              {Math.round(amt).toLocaleString("vi-VN")}đ
-                            </span>
-                          </td>
- 
-                          {/* Số dư lũy kế */}
-                          <td className={`py-3 px-3 text-right pr-4 whitespace-nowrap transition-all ${
-                            isSelected 
-                              ? "bg-[#0066cc]/8 group-hover:bg-[#0066cc]/12 border-y border-r border-[#0066cc]/25 rounded-r-xl text-slate-700" 
-                              : "text-slate-500 border-b border-slate-100 group-hover:bg-[#0071e3]/4"
-                          }`}>
-                            <span className={`text-[12px] font-semibold ${isSelected ? "text-slate-700" : "text-slate-500"}`}>
-                              {Math.round(Number(entry.runningBalance || 0)).toLocaleString("vi-VN")}đ
-                            </span>
-                          </td>
-                        </tr>
+                         <button
+                           key={pageNum}
+                           type="button"
+                           onClick={() => setCurrentPage(pageNum)}
+                           className={`w-7.5 h-7.5 rounded-lg text-[12px] font-bold transition-all cursor-pointer flex items-center justify-center active:scale-90 ${
+                             isActive 
+                               ? "bg-[#0071e3] text-white shadow-md shadow-blue-500/20" 
+                               : "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200"
+                           }`}
+                         >
+                           {pageNum}
+                         </button>
                       );
                     })}
-                  </tbody>
-                </table>
-              </div>
- 
-              {/* Pagination controls */}
-              {totalPages > 1 && (
-                <div className="flex flex-col sm:flex-row items-center justify-between px-5 py-3.5 border-t border-slate-200 bg-white/20 select-none gap-3">
-                  <span className="text-[12px] font-medium text-slate-500">
-                    Hiển thị dòng {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filteredEntries.length)} trong tổng số {filteredEntries.length} chứng từ
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      disabled={currentPage === 1}
-                      onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                      className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none transition-all cursor-pointer shadow-sm active:scale-95"
-                    >
-                      Trang trước
-                    </button>
-                    <div className="flex items-center gap-1">
-                      {Array.from({ length: totalPages }).map((_, i) => {
-                        const pageNum = i + 1;
-                        const isActive = currentPage === pageNum;
-                        return (
-                           <button
-                             key={pageNum}
-                             type="button"
-                             onClick={() => setCurrentPage(pageNum)}
-                             className={`w-7.5 h-7.5 rounded-lg text-[12px] font-bold transition-all cursor-pointer flex items-center justify-center active:scale-90 ${
-                               isActive 
-                                 ? "bg-[#0071e3] text-white shadow-md shadow-blue-500/20" 
-                                 : "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200"
-                             }`}
-                           >
-                             {pageNum}
-                           </button>
-                        );
-                      })}
-                    </div>
-                    <button
-                      type="button"
-                      disabled={currentPage === totalPages}
-                      onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                      className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none transition-all cursor-pointer shadow-sm active:scale-95"
-                    >
-                      Trang sau
-                    </button>
                   </div>
+                  <button
+                    type="button"
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                    className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none transition-all cursor-pointer shadow-sm active:scale-95"
+                  >
+                    Trang sau
+                  </button>
                 </div>
-              )}
-            </KinhPanel>
-          ) : (
-            <KinhPanel className="p-12 text-center shadow-sm">
-              <div className="w-11 h-11 rounded-xl bg-slate-100/60 flex items-center justify-center text-slate-400 mx-auto mb-3 border border-slate-200 shadow-inner">
-                <AlertCircle size={20} className="text-slate-500" />
               </div>
-              <h5 className="text-[14px] font-bold text-slate-900">Sổ quỹ chưa ghi nhận giao dịch</h5>
-              <p className="text-[12px] text-slate-500 mt-1.5 max-w-sm mx-auto leading-relaxed">
-                Không tìm thấy dòng tiền thu chi nào khớp với bộ lọc tìm kiếm của bạn. Hãy thử thay đổi mốc ngày hoặc chọn danh mục khác.
-              </p>
-            </KinhPanel>
-          )}
-
-        </div>
-
-        {/* Right Pane (30% - xl:col-span-1) - Dynamic Workspace Detail/Donut Panel */}
-        <div className="xl:col-span-1 space-y-5 sticky top-6">
-          
-          {!selectedEntry ? (
-            /* Standard Mode: Show Donut Chart and helpful guidelines */
-            <div className="space-y-5">
-              
-              {/* Custom SVG Donut Chart */}
-              <KinhPanel className="p-4">
-                <CashBookDonut expenseCategoryStats={financialSummaryFiltered?.expenseCategoryStats} />
-              </KinhPanel>
-
+            )}
+          </KinhPanel>
+        ) : (
+          <KinhPanel className="p-12 text-center shadow-sm">
+            <div className="w-11 h-11 rounded-xl bg-slate-100/60 flex items-center justify-center text-slate-400 mx-auto mb-3 border border-slate-200 shadow-inner">
+              <AlertCircle size={20} className="text-slate-500" />
             </div>
-          ) : (
-            /* Selected Mode: Slide-in voucher detail and inline editor slip */
-            <KinhPanel className="shadow-sm p-4.5 space-y-4 relative transition-all duration-300" overflowVisible={true}>
-              
-              {/* Voucher panel header */}
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
-                <h3 className="text-[12px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
-                  {isEditing ? (
-                    <>
-                      <Edit2 size={13} className="text-[#0066cc]" />
-                      <span>Hiệu chỉnh chi phí</span>
-                    </>
-                  ) : (
-                    <>
-                      <Wallet size={13} className="text-[#0066cc]" />
-                      <span>Chi tiết phiếu</span>
-                    </>
-                  )}
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedEntry(null);
-                    setIsEditing(false);
-                  }}
-                  className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-700 transition-all cursor-pointer"
-                  title="Đóng panel"
-                >
-                  <X size={15} />
-                </button>
-              </div>
+            <h5 className="text-[14px] font-bold text-slate-900">Sổ quỹ chưa ghi nhận giao dịch</h5>
+            <p className="text-[12px] text-slate-500 mt-1.5 max-w-sm mx-auto leading-relaxed">
+              Không tìm thấy dòng tiền thu chi nào khớp với bộ lọc tìm kiếm của bạn. Hãy thử thay đổi mốc ngày hoặc chọn danh mục khác.
+            </p>
+          </KinhPanel>
+        )}
+      </div>
 
-              {/* View/Edit Voucher Toggle Slots */}
-              {isEditing ? (
-                /* Edit manual slip view */
-                (selectedEntry.referenceType === "expense" && isLoadingExpenseDetails) ? (
-                  <div className="flex flex-col items-center justify-center py-16 text-slate-500">
-                    <Loader2 className="animate-spin mb-2.5 text-[#0066cc]" size={24} />
-                    <p className="text-[13px] font-bold text-slate-800">Đang tải chi tiết...</p>
-                  </div>
-                ) : (
-                  <form onSubmit={handleUpdateSubmit} className="space-y-3.5">
-                    
-                    {/* Category */}
-                    <div className="space-y-1.5">
-                      {selectedEntry.referenceType === null ? (
-                        <>
-                          <div className="flex items-center justify-between pl-0.5">
-                            <label className="text-[11.5px] font-semibold text-slate-500 uppercase tracking-wide">
-                              Danh mục thu nhập *
-                            </label>
-                            <button
-                              type="button"
-                              onClick={() => setIsIncomeCategoryDialogOpen(true)}
-                              className="text-[11px] font-semibold text-[#0066cc] hover:underline hover:text-[#0071e3]"
-                            >
-                              + Quản lý danh mục
-                            </button>
-                          </div>
+      {/* 4. Elegant Overlay Dialog Modal for Voucher Details */}
+      <Dialog
+        isOpen={selectedEntry !== null}
+        onClose={() => {
+          setSelectedEntry(null);
+          setIsEditing(false);
+        }}
+        title={isEditing ? "Hiệu chỉnh chứng từ" : "Chi tiết chứng từ"}
+        description={
+          isEditing 
+            ? "Thay đổi thông tin phiếu thu hoặc phiếu chi thủ công." 
+            : `Mã số chứng từ: ${selectedEntry?.entryNumber || ""}`
+        }
+        size="md"
+      >
+        {selectedEntry && (
+          <div className="space-y-4 pt-2">
+            {/* View/Edit Voucher Toggle Slots */}
+            {isEditing ? (
+              /* Edit manual slip view */
+              (selectedEntry.referenceType === "expense" && isLoadingExpenseDetails) ? (
+                <div className="flex flex-col items-center justify-center py-16 text-slate-500">
+                  <Loader2 className="animate-spin mb-2.5 text-[#0066cc]" size={24} />
+                  <p className="text-[13px] font-bold text-slate-800">Đang tải chi tiết...</p>
+                </div>
+              ) : (
+                <form onSubmit={handleUpdateSubmit} className="space-y-3.5">
+                  
+                  {/* Category */}
+                  <div className="space-y-1.5">
+                    {selectedEntry.referenceType === null ? (
+                      <>
+                        <div className="flex items-center justify-between pl-0.5">
+                          <label className="text-[11.5px] font-bold text-[#7a7a7a] uppercase tracking-wide">
+                            Danh mục thu nhập *
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setIsIncomeCategoryDialogOpen(true)}
+                            className="text-[11px] font-semibold text-[#0066cc] hover:underline hover:text-[#0071e3]"
+                          >
+                            + Quản lý danh mục
+                          </button>
+                        </div>
+                        <CustomSelect
+                          options={manualIncomeOptions}
+                          value={editCategoryId}
+                          onChange={setEditCategoryId}
+                          dropdownWidth="full"
+                          size="sm"
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <label className="text-[11.5px] font-bold text-[#7a7a7a] uppercase pl-0.5 tracking-wide">
+                          Danh mục chi phí *
+                        </label>
+                        {categoriesData && categoriesData.length > 0 ? (
                           <CustomSelect
-                            options={manualIncomeOptions}
+                            options={categoriesData.map((c) => ({ value: c.id, label: c.name }))}
                             value={editCategoryId}
                             onChange={setEditCategoryId}
                             dropdownWidth="full"
                             size="sm"
                           />
-                        </>
-                      ) : (
-                        <>
-                          <label className="text-[11.5px] font-semibold text-slate-500 uppercase pl-0.5 tracking-wide">
-                            Danh mục chi phí *
-                          </label>
-                          {categoriesData && categoriesData.length > 0 ? (
-                            <CustomSelect
-                              options={categoriesData.map((c) => ({ value: c.id, label: c.name }))}
-                              value={editCategoryId}
-                              onChange={setEditCategoryId}
-                              dropdownWidth="full"
-                              size="sm"
-                            />
-                          ) : (
-                            <div className="text-[13px] text-slate-400 pl-1 font-semibold">Đang tải danh mục...</div>
-                          )}
-                        </>
-                      )}
-                    </div>
-
-                    {/* Amount */}
-                    <div className="space-y-1.5">
-                      <label className="text-[11.5px] font-semibold text-slate-500 uppercase pl-0.5 tracking-wide">
-                        {selectedEntry.referenceType === null ? "Số tiền thu (VND) *" : "Số tiền chi (VND) *"}
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          value={formatVNDInput(editAmount)}
-                          onChange={(e) => setEditAmount(e.target.value.replace(/\D/g, ""))}
-                          placeholder="0"
-                          className="w-full pl-3.5 pr-12 h-[40px] rounded-xl bg-white border border-[#e0e0e0] text-[14px] font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 focus:bg-white transition-all shadow-sm"
-                          required
-                        />
-                        <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">VNĐ</span>
-                      </div>
-                    </div>
-
-                    {/* Date and Payment Method */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <label className="text-[11.5px] font-semibold text-slate-500 uppercase pl-0.5 tracking-wide">
-                          {selectedEntry.referenceType === null ? "Ngày thu *" : "Ngày chi *"}
-                        </label>
-                        <CustomDatePicker
-                          value={editExpenseDate}
-                          onChange={setEditExpenseDate}
-                          size="sm"
-                          placeholder={selectedEntry.referenceType === null ? "Chọn ngày thu..." : "Chọn ngày chi..."}
-                          anchorDate="2026-05-30"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[11.5px] font-semibold text-slate-500 uppercase pl-0.5 tracking-wide">Thanh toán *</label>
-                        <CustomSelect
-                          options={[
-                            { value: "cash", label: "Tiền mặt" },
-                            { value: "bank_transfer", label: "Chuyển khoản" },
-                            { value: "card", label: "Thẻ ngân hàng" },
-                          ]}
-                          value={editPaymentMethod}
-                          onChange={setEditPaymentMethod}
-                          dropdownWidth="full"
-                          size="sm"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Description */}
-                    <div className="space-y-1.5">
-                      <label className="text-[11.5px] font-semibold text-slate-500 uppercase pl-0.5 tracking-wide">Diễn giải nội dung *</label>
-                      <textarea
-                        value={editDescription}
-                        onChange={(e) => setEditDescription(e.target.value)}
-                        placeholder="Nội dung diễn giải chi tiết..."
-                        className="w-full px-3 py-2 rounded-xl bg-white border border-[#e0e0e0] text-[13px] font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 focus:bg-white transition-all resize-none shadow-sm"
-                        rows={3}
-                        required
-                      />
-                    </div>
-
-                    {/* Submission triggers & Destructive control */}
-                    <div className="pt-3.5 border-t border-slate-100 space-y-2">
-                      <div className="flex gap-2 justify-end">
-                        <button
-                          type="button"
-                          onClick={() => setIsEditing(false)}
-                          className="px-4 h-[34px] bg-[#fafafc] hover:bg-[#f5f5f7] border border-[#e0e0e0] text-slate-700 rounded-lg text-[12px] font-semibold transition-all cursor-pointer active:scale-[0.97]"
-                        >
-                          Hủy
-                        </button>
-                        <button
-                          type="submit"
-                          disabled={updateMutation.isPending || updateManualIncomeMutation.isPending}
-                          className="flex items-center justify-center gap-1.5 px-4.5 h-[34px] bg-[#0066cc] text-white hover:bg-blue-600 rounded-lg text-[12px] font-semibold transition-all disabled:opacity-50 cursor-pointer active:scale-[0.97] shadow-sm"
-                        >
-                          {updateMutation.isPending || updateManualIncomeMutation.isPending ? "Đang lưu..." : "Lưu thay đổi"}
-                        </button>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => setIsConfirmDeleteOpen(true)}
-                        className="w-full flex items-center justify-center gap-1.5 h-[34px] bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg text-[12px] font-semibold transition-all border border-rose-200 cursor-pointer active:scale-[0.97]"
-                      >
-                        <Trash2 size={13} /> Xóa chứng từ
-                      </button>
-                    </div>
-
-                  </form>
-                )
-              ) : (
-                /* High-fidelity Receipt Voucher Slip layout */
-                <div className="space-y-4">
-                  
-                
-
-                  {/* Coupon layout voucher box */}
-                  <div className="bg-slate-50/70 border border-slate-200 rounded-xl p-3.5 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] relative overflow-hidden">
-                    
-                    {/* Voucher Header with Stamp Badge */}
-                    <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                      <span className="text-[10px] font-bold text-slate-400 tracking-wider">TICKET VOUCHER</span>
-                      {selectedEntry.type === "income" ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-extrabold bg-emerald-600 text-white uppercase tracking-wider shadow-sm">
-                          Thu quỹ
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-extrabold bg-rose-600 text-white uppercase tracking-wider shadow-sm">
-                          Chi quỹ
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Big Amount Spot */}
-                    <div className="text-center py-4">
-                      <p className="text-[10.5px] font-semibold text-[#7a7a7a] uppercase tracking-wide leading-none">Số tiền hạch toán</p>
-                      <h2 className={`text-[21px] font-bold mt-1.5 leading-none tracking-tight tabular-nums ${
-                        selectedEntry.type === "income" ? "text-emerald-600" : "text-rose-600"
-                      }`}>
-                        {selectedEntry.type === "income" ? "+" : "-"}
-                        {Math.round(Number(selectedEntry.amount)).toLocaleString("vi-VN")}đ
-                      </h2>
-                    </div>
-
-                    {/* Serrated coupon dash lines with cutout circles */}
-                    <div className="relative my-2.5">
-                      <div className="border-t border-dashed border-slate-300" />
-                      <div className="absolute -left-[21.5px] top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-white border-r border-slate-200 z-10" />
-                      <div className="absolute -right-[21.5px] top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-white border-l border-slate-200 z-10" />
-                    </div>
-
-                    {/* Attributes Grid */}
-                    <div className="space-y-2 text-[12.5px]">
-                      <div className="flex justify-between">
-                        <span className="font-medium text-slate-400">Mã số phiếu:</span>
-                        <span className="font-semibold text-slate-800 tracking-tight">{selectedEntry.entryNumber}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="font-medium text-slate-400">Ngày ghi nhận:</span>
-                        <span className="font-semibold text-slate-800">
-                          {formatToDDMMYYYY(selectedEntry.entryDate)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="font-medium text-slate-400">Phân loại danh mục:</span>
-                        <span className="font-semibold text-slate-800">
-                          {selectedEntry.incomeCategoryName || categoryLabels[selectedEntry.category] || selectedEntry.category}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="font-medium text-slate-400">Thanh toán bằng:</span>
-                        <span className="font-semibold text-slate-800">
-                          {payMethods[selectedEntry.paymentMethod] || selectedEntry.paymentMethod}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="font-medium text-slate-400">Số dư ngân quỹ lũy kế:</span>
-                        <span className="font-bold text-[#0066cc] tracking-tight">{formatPrice(selectedEntry.runningBalance)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="font-medium text-slate-400">Nguồn gốc dữ liệu:</span>
-                        <span className="font-semibold text-slate-500 text-right">
-                          {selectedEntry.referenceType === "order" ? (
-                            "Đơn hàng (Tự động)"
-                          ) : selectedEntry.referenceType === "purchase_order" ? (
-                            "Nhập hàng PO (Tự động)"
-                          ) : selectedEntry.referenceType === "other" ? (
-                            "Đổi trả bảo hành (Tự động)"
-                          ) : selectedEntry.referenceType === "expense" ? (
-                            "Chi phí thủ công"
-                          ) : selectedEntry.type === "expense" ? (
-                            "Chi phí thủ công"
-                          ) : (
-                            "Thu nhập thủ công"
-                          )}
-                        </span>
-                      </div>
-                    </div>
-
-                  </div>
-
-                  {/* Diễn giải card block */}
-                  <div className="space-y-1.5">
-                    <span className="text-[11px] font-semibold text-[#7a7a7a] uppercase tracking-wide pl-0.5">Nội dung diễn giải</span>
-                    <p className="text-[12.5px] text-slate-600 font-medium bg-slate-50 p-3 rounded-xl border border-[#e0e0e0]/70 leading-relaxed select-all">
-                      {selectedEntry.description}
-                    </p>
-                  </div>
-
-                  {/* Edit action block for manual entries */}
-                  <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedEntry(null)}
-                      className="px-4 h-[34px] bg-[#fafafc] hover:bg-[#f5f5f7] border border-[#e0e0e0] text-slate-700 rounded-lg text-[12px] font-semibold transition-all cursor-pointer active:scale-[0.97]"
-                    >
-                      Đóng
-                    </button>
-                    {(selectedEntry.referenceType === "expense" || (selectedEntry.referenceType === null && selectedEntry.type === "income")) && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsEditing(true);
-                          setEditCategoryId(selectedEntry.referenceType === null ? (selectedEntry.incomeCategoryId || "") : (selectedEntry.categoryId || ""));
-                          setEditAmount(selectedEntry.amount ? Math.round(Number(selectedEntry.amount)).toString() : "");
-                          setEditDescription(selectedEntry.description || "");
-                          setEditExpenseDate(selectedEntry.entryDate || "");
-                          setEditPaymentMethod(selectedEntry.paymentMethod || "cash");
-                        }}
-                        className="flex items-center gap-1 px-4.5 h-[34px] bg-[#0066cc] text-white hover:bg-[#0071e3] rounded-lg text-[12px] font-semibold transition-all cursor-pointer shadow-sm active:scale-[0.97]"
-                      >
-                        <Edit2 size={12} /> Hiệu chỉnh
-                      </button>
+                        ) : (
+                          <div className="text-[13px] text-slate-400 pl-1 font-semibold">Đang tải danh mục...</div>
+                        )}
+                      </>
                     )}
                   </div>
 
-                </div>
-              )}
-            </KinhPanel>
-          )}
+                  {/* Amount */}
+                  <div className="space-y-1.5">
+                    <label className="text-[11.5px] font-bold text-[#7a7a7a] uppercase pl-0.5 tracking-wide">
+                      {selectedEntry.referenceType === null ? "Số tiền thu (VND) *" : "Số tiền chi (VND) *"}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={formatVNDInput(editAmount)}
+                        onChange={(e) => setEditAmount(e.target.value.replace(/\D/g, ""))}
+                        placeholder="0"
+                        className="w-full pl-3.5 pr-12 h-[40px] rounded-xl bg-white border border-[#e0e0e0] text-[14px] font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 focus:bg-white transition-all shadow-sm"
+                        required
+                      />
+                      <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">VNĐ</span>
+                    </div>
+                  </div>
 
-            </div>
+                  {/* Date and Payment Method */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-[11.5px] font-bold text-[#7a7a7a] uppercase pl-0.5 tracking-wide">
+                        {selectedEntry.referenceType === null ? "Ngày thu *" : "Ngày chi *"}
+                      </label>
+                      <CustomDatePicker
+                        value={editExpenseDate}
+                        onChange={setEditExpenseDate}
+                        size="sm"
+                        placeholder={selectedEntry.referenceType === null ? "Chọn ngày thu..." : "Chọn ngày chi..."}
+                        anchorDate="2026-05-30"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[11.5px] font-bold text-[#7a7a7a] uppercase pl-0.5 tracking-wide">Thanh toán *</label>
+                      <CustomSelect
+                        options={[
+                          { value: "cash", label: "Tiền mặt" },
+                          { value: "bank_transfer", label: "Chuyển khoản" },
+                          { value: "card", label: "Thẻ ngân hàng" },
+                        ]}
+                        value={editPaymentMethod}
+                        onChange={setEditPaymentMethod}
+                        dropdownWidth="full"
+                        size="sm"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  <div className="space-y-1.5">
+                    <label className="text-[11.5px] font-bold text-[#7a7a7a] uppercase pl-0.5 tracking-wide">Diễn giải nội dung *</label>
+                    <textarea
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                      placeholder="Nội dung diễn giải chi tiết..."
+                      className="w-full px-3 py-2 rounded-xl bg-white border border-[#e0e0e0] text-[13px] font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 focus:bg-white transition-all resize-none shadow-sm"
+                      rows={3}
+                      required
+                    />
+                  </div>
+
+                  {/* Submission triggers & Destructive control */}
+                  <div className="pt-3.5 border-t border-slate-100 space-y-2">
+                    <div className="flex gap-2 justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setIsEditing(false)}
+                        className="px-4 h-[34px] bg-[#fafafc] hover:bg-[#f5f5f7] border border-[#e0e0e0] text-slate-700 rounded-lg text-[12px] font-semibold transition-all cursor-pointer active:scale-[0.97]"
+                      >
+                        Hủy
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={updateMutation.isPending || updateManualIncomeMutation.isPending}
+                        className="flex items-center justify-center gap-1.5 px-4.5 h-[34px] bg-[#0066cc] text-white hover:bg-blue-600 rounded-lg text-[12px] font-semibold transition-all disabled:opacity-50 cursor-pointer active:scale-[0.97] shadow-sm"
+                      >
+                        {updateMutation.isPending || updateManualIncomeMutation.isPending ? "Đang lưu..." : "Lưu thay đổi"}
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsConfirmDeleteOpen(true)}
+                      className="w-full flex items-center justify-center gap-1.5 h-[34px] bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg text-[12px] font-semibold transition-all border border-rose-200 cursor-pointer active:scale-[0.97]"
+                    >
+                      <Trash2 size={13} /> Xóa chứng từ
+                    </button>
+                  </div>
+
+                </form>
+              )
+            ) : (
+              /* High-fidelity Receipt Voucher Slip layout */
+              <div className="space-y-4">
+                {/* Coupon layout voucher box */}
+                <div className="bg-slate-50/70 border border-slate-200 rounded-xl p-3.5 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] relative overflow-hidden">
+                  
+                  {/* Voucher Header with Stamp Badge */}
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                    <span className="text-[10px] font-bold text-slate-400 tracking-wider">TICKET VOUCHER</span>
+                    {selectedEntry.type === "income" ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-extrabold bg-emerald-600 text-white uppercase tracking-wider shadow-sm">
+                        Thu quỹ
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-extrabold bg-rose-600 text-white uppercase tracking-wider shadow-sm">
+                        Chi quỹ
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Big Amount Spot */}
+                  <div className="text-center py-4">
+                    <p className="text-[10.5px] font-semibold text-[#7a7a7a] uppercase tracking-wide leading-none">Số tiền hạch toán</p>
+                    <h2 className={`text-[21px] font-bold mt-1.5 leading-none tracking-tight tabular-nums ${
+                      selectedEntry.type === "income" ? "text-emerald-600" : "text-rose-600"
+                    }`}>
+                      {selectedEntry.type === "income" ? "+" : "-"}
+                      {Math.round(Number(selectedEntry.amount)).toLocaleString("vi-VN")}đ
+                    </h2>
+                  </div>
+
+                  {/* Serrated coupon dash lines with cutout circles */}
+                  <div className="relative my-2.5">
+                    <div className="border-t border-dashed border-slate-300" />
+                    <div className="absolute -left-[21.5px] top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-white border-r border-slate-200 z-10" />
+                    <div className="absolute -right-[21.5px] top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-white border-l border-slate-200 z-10" />
+                  </div>
+
+                  {/* Attributes Grid */}
+                  <div className="space-y-2 text-[12.5px]">
+                    <div className="flex justify-between">
+                      <span className="font-medium text-slate-400">Mã số phiếu:</span>
+                      <span className="font-semibold text-slate-800 tracking-tight">{selectedEntry.entryNumber}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium text-slate-400">Ngày ghi nhận:</span>
+                      <span className="font-semibold text-slate-800">
+                        {formatToDDMMYYYY(selectedEntry.entryDate)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium text-slate-400">Phân loại danh mục:</span>
+                      <span className="font-semibold text-slate-800">
+                        {selectedEntry.incomeCategoryName || categoryLabels[selectedEntry.category] || selectedEntry.category}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium text-slate-400">Thanh toán bằng:</span>
+                      <span className="font-semibold text-slate-800">
+                        {payMethods[selectedEntry.paymentMethod] || selectedEntry.paymentMethod}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium text-slate-400">Số dư ngân quỹ lũy kế:</span>
+                      <span className="font-bold text-[#0066cc] tracking-tight">{formatPrice(selectedEntry.runningBalance)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium text-slate-400">Nguồn gốc dữ liệu:</span>
+                      <span className="font-semibold text-slate-500 text-right">
+                        {selectedEntry.referenceType === "order" ? (
+                          "Đơn hàng (Tự động)"
+                        ) : selectedEntry.referenceType === "purchase_order" ? (
+                          "Nhập hàng PO (Tự động)"
+                        ) : selectedEntry.referenceType === "other" ? (
+                          "Đổi trả bảo hành (Tự động)"
+                        ) : selectedEntry.referenceType === "expense" ? (
+                          "Chi phí thủ công"
+                        ) : selectedEntry.type === "expense" ? (
+                          "Chi phí thủ công"
+                        ) : (
+                          "Thu nhập thủ công"
+                        )}
+                      </span>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Diễn giải card block */}
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-semibold text-[#7a7a7a] uppercase tracking-wide pl-0.5">Nội dung diễn giải</span>
+                  <p className="text-[12.5px] text-slate-600 font-medium bg-slate-50 p-3 rounded-xl border border-[#e0e0e0]/70 leading-relaxed select-all">
+                    {selectedEntry.description}
+                  </p>
+                </div>
+
+                {/* Edit action block for manual entries */}
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedEntry(null)}
+                    className="px-4 h-[34px] bg-[#fafafc] hover:bg-[#f5f5f7] border border-[#e0e0e0] text-slate-700 rounded-lg text-[12px] font-semibold transition-all cursor-pointer active:scale-[0.97]"
+                  >
+                    Đóng
+                  </button>
+                  {(selectedEntry.referenceType === "expense" || (selectedEntry.referenceType === null && selectedEntry.type === "income")) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsEditing(true);
+                        setEditCategoryId(selectedEntry.referenceType === null ? (selectedEntry.incomeCategoryId || "") : (selectedEntry.categoryId || ""));
+                        setEditAmount(selectedEntry.amount ? Math.round(Number(selectedEntry.amount)).toString() : "");
+                        setEditDescription(selectedEntry.description || "");
+                        setEditExpenseDate(selectedEntry.entryDate || "");
+                        setEditPaymentMethod(selectedEntry.paymentMethod || "cash");
+                      }}
+                      className="flex items-center gap-1 px-4.5 h-[34px] bg-[#0066cc] text-white hover:bg-[#0071e3] rounded-lg text-[12px] font-semibold transition-all cursor-pointer shadow-sm active:scale-[0.97]"
+                    >
+                      <Edit2 size={12} /> Hiệu chỉnh
+                    </button>
+                  )}
+                </div>
+
+              </div>
+            )}
           </div>
+        )}
+      </Dialog>
 
       {/* Re-designed Custom Confirm Dialog for Expense/Income Deletion */}
       <ConfirmDialog
@@ -2125,357 +2374,6 @@ export default function CashBookPage() {
         isLoading={deleteIncomeCategoryMutation.isPending}
       />
 
-    </div>
-  );
-}
-
-// ============================================================
-// INLINE CUSTOM PICKERS (DASHBOARD SYNCED)
-// ============================================================
-
-// Custom Apple-style Inline Date Picker
-function InlineDatePicker({
-  value,
-  onChange,
-  label,
-  active,
-  align = "left",
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  label: string;
-  active: boolean;
-  align?: "left" | "right";
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  // Parse date
-  const selectedDate = useMemo(() => {
-    if (!value) return null;
-    const parts = value.split("-");
-    if (parts.length !== 3) return new Date(value);
-    return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-  }, [value]);
-
-  const [viewYear, setViewYear] = useState(() => selectedDate ? selectedDate.getFullYear() : new Date().getFullYear());
-  const [viewMonth, setViewMonth] = useState(() => selectedDate ? selectedDate.getMonth() : new Date().getMonth());
-
-  useEffect(() => {
-    if (selectedDate) {
-      setViewYear(selectedDate.getFullYear());
-      setViewMonth(selectedDate.getMonth());
-    }
-  }, [selectedDate]);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    }
-    if (isOpen) document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isOpen]);
-
-  const displayValue = useMemo(() => {
-    if (!selectedDate) return "";
-    const d = String(selectedDate.getDate()).padStart(2, "0");
-    const m = String(selectedDate.getMonth() + 1).padStart(2, "0");
-    const y = selectedDate.getFullYear().toString().slice(-2);
-    return `${d}/${m}/${y}`;
-  }, [selectedDate]);
-
-  // Calendar math
-  const calendarCells = useMemo(() => {
-    const firstDay = new Date(viewYear, viewMonth, 1);
-    const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-    let startDay = firstDay.getDay();
-    startDay = startDay === 0 ? 6 : startDay - 1;
-
-    const cells: Date[] = [];
-    const prevMonthDays = new Date(viewYear, viewMonth, 0).getDate();
-    for (let i = startDay - 1; i >= 0; i--) {
-      cells.push(new Date(viewYear, viewMonth - 1, prevMonthDays - i));
-    }
-    for (let i = 1; i <= daysInMonth; i++) {
-      cells.push(new Date(viewYear, viewMonth, i));
-    }
-    const remaining = 42 - cells.length;
-    for (let i = 1; i <= remaining; i++) {
-      cells.push(new Date(viewYear, viewMonth + 1, i));
-    }
-    return cells;
-  }, [viewYear, viewMonth]);
-
-  const isSelected = (d: Date) => {
-    if (!selectedDate) return false;
-    return d.getDate() === selectedDate.getDate() &&
-           d.getMonth() === selectedDate.getMonth() &&
-           d.getFullYear() === selectedDate.getFullYear();
-  };
-
-  const isToday = (d: Date) => {
-    const today = new Date();
-    return d.getDate() === today.getDate() &&
-           d.getMonth() === today.getMonth() &&
-           d.getFullYear() === today.getFullYear();
-  };
-
-  const handleSelectDate = (date: Date) => {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, "0");
-    const d = String(date.getDate()).padStart(2, "0");
-    onChange(`${y}-${m}-${d}`);
-    setIsOpen(false);
-  };
-
-  const MONTHS_VN = [
-    "Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", 
-    "Tháng 5", "Tháng 6", "Tháng 7", "Tháng 8", 
-    "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"
-  ];
-
-  return (
-    <div ref={containerRef} className="relative flex items-center gap-1.5 select-none text-slate-700">
-      <span className="opacity-80">{label}</span>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setIsOpen(!isOpen);
-        }}
-        className={cn(
-          "h-6 rounded-[8px] border px-1.5 text-[11.5px] font-bold focus:outline-none transition-all min-w-[70px] text-center cursor-pointer",
-          active
-            ? "bg-blue-500/10 border-blue-500/30 text-[#0066cc] hover:bg-blue-500/15"
-            : "bg-white/60 border-slate-200/80 text-slate-700 hover:bg-white/80"
-        )}
-      >
-        {displayValue}
-      </button>
-
-      {isOpen && (
-        <div 
-          onClick={(e) => e.stopPropagation()}
-          className={cn(
-            "absolute top-[calc(100%+6px)] w-[240px] bg-white rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.15)] border border-[#e0e0e0] p-2.5 z-[99] text-slate-800",
-            align === "right" ? "right-0" : "left-0"
-          )}
-        >
-          <div className="flex items-center justify-between pb-1.5 border-b border-[#f5f5f7]">
-            <span className="text-[12.5px] font-bold">
-              {MONTHS_VN[viewMonth]}, {viewYear}
-            </span>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (viewMonth === 0) {
-                    setViewMonth(11);
-                    setViewYear(y => y - 1);
-                  } else {
-                    setViewMonth(m => m - 1);
-                  }
-                }}
-                className="w-5 h-5 rounded-full flex items-center justify-center bg-[#f5f5f7] hover:bg-[#e0e0e0] text-[#7a7a7a] transition-all active:scale-95 cursor-pointer"
-              >
-                <ChevronLeft size={10} />
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (viewMonth === 11) {
-                    setViewMonth(0);
-                    setViewYear(y => y + 1);
-                  } else {
-                    setViewMonth(m => m + 1);
-                  }
-                }}
-                className="w-5 h-5 rounded-full flex items-center justify-center bg-[#f5f5f7] hover:bg-[#e0e0e0] text-[#7a7a7a] transition-all active:scale-95 cursor-pointer"
-              >
-                <ChevronRight size={10} />
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-7 gap-0.5 mt-1.5 text-center">
-            {["T2", "T3", "T4", "T5", "T6", "T7", "CN"].map(d => (
-              <span key={d} className="text-[10px] font-bold text-slate-400 py-0.5">{d}</span>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-7 gap-0.5 mt-0.5">
-            {calendarCells.map((cell, idx) => {
-              const selected = isSelected(cell);
-              const currentMonth = cell.getMonth() === viewMonth;
-              const today = isToday(cell);
-
-              return (
-                <button
-                  type="button"
-                  key={idx}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleSelectDate(cell);
-                  }}
-                  className={cn(
-                    "aspect-square w-full rounded-md flex items-center justify-center text-[11.5px] font-medium transition-all active:scale-90 cursor-pointer",
-                    selected
-                      ? "bg-[#0066cc] text-white font-bold"
-                      : today
-                      ? "bg-[#0066cc]/10 text-[#0066cc] font-bold"
-                      : currentMonth
-                      ? "text-slate-800 hover:bg-slate-100"
-                      : "text-slate-300 hover:bg-slate-50"
-                  )}
-                >
-                  {cell.getDate()}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// Custom Apple-style Inline Month Picker
-function InlineMonthPicker({
-  value,
-  onChange,
-  label,
-  active,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  label: string;
-  active: boolean;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const parsed = useMemo(() => {
-    if (!value) return null;
-    const parts = value.split("-");
-    if (parts.length !== 2) return null;
-    return {
-      year: parseInt(parts[0], 10),
-      month: parseInt(parts[1], 10) - 1,
-    };
-  }, [value]);
-
-  const [viewYear, setViewYear] = useState(() => parsed ? parsed.year : new Date().getFullYear());
-
-  useEffect(() => {
-    if (parsed) setViewYear(parsed.year);
-  }, [parsed]);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    }
-    if (isOpen) document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isOpen]);
-
-  const displayValue = useMemo(() => {
-    if (!parsed) return "";
-    return `Tháng ${parsed.month + 1}/${parsed.year}`;
-  }, [parsed]);
-
-  const handleSelectMonth = (monthIndex: number) => {
-    onChange(`${viewYear}-${String(monthIndex + 1).padStart(2, "0")}`);
-    setIsOpen(false);
-  };
-
-  const isSelected = (monthIndex: number) => {
-    if (!parsed) return false;
-    return parsed.year === viewYear && parsed.month === monthIndex;
-  };
-
-  const MONTHS_VN = ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10", "T11", "T12"];
-
-  return (
-    <div ref={containerRef} className="relative flex items-center gap-1.5 select-none text-slate-700">
-      <span className="opacity-80">{label}</span>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setIsOpen(!isOpen);
-        }}
-        className={cn(
-          "h-6 rounded-[8px] border px-1.5 text-[11.5px] font-bold focus:outline-none transition-all min-w-[76px] text-center cursor-pointer",
-          active
-            ? "bg-blue-500/10 border-blue-500/30 text-[#0066cc] hover:bg-blue-500/15"
-            : "bg-white/60 border-slate-200/80 text-slate-700 hover:bg-white/80"
-        )}
-      >
-        {displayValue || "Chọn..."}
-      </button>
-
-      {isOpen && (
-        <div 
-          onClick={(e) => e.stopPropagation()}
-          className="absolute top-[calc(100%+6px)] right-0 w-[180px] bg-white rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.15)] border border-[#e0e0e0] p-2.5 z-[99] text-slate-800"
-        >
-          <div className="flex items-center justify-between pb-1.5 border-b border-[#f5f5f7]">
-            <span className="text-[12.5px] font-bold">Năm {viewYear}</span>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setViewYear(y => y - 1);
-                }}
-                className="w-5 h-5 rounded-full flex items-center justify-center bg-[#f5f5f7] hover:bg-[#e0e0e0] text-[#7a7a7a] transition-all active:scale-95 cursor-pointer"
-              >
-                <ChevronLeft size={10} />
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setViewYear(y => y + 1);
-                }}
-                className="w-5 h-5 rounded-full flex items-center justify-center bg-[#f5f5f7] hover:bg-[#e0e0e0] text-[#7a7a7a] transition-all active:scale-95 cursor-pointer"
-              >
-                <ChevronRight size={10} />
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-1 mt-2">
-            {MONTHS_VN.map((mName, idx) => {
-              const selected = isSelected(idx);
-              return (
-                <button
-                  type="button"
-                  key={mName}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleSelectMonth(idx);
-                  }}
-                  className={cn(
-                    "py-1.5 rounded-md text-center text-[11.5px] font-medium transition-all active:scale-95 cursor-pointer",
-                    selected
-                      ? "bg-[#0066cc] text-white font-bold"
-                      : "text-slate-800 hover:bg-slate-100"
-                  )}
-                >
-                  {mName}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

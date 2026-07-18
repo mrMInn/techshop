@@ -9,7 +9,7 @@ import {
   returns, 
   cashBookEntries 
 } from "@/lib/db/schema";
-import { eq, and, sql, or } from "drizzle-orm";
+import { eq, and, sql, or, gte, lte, lt } from "drizzle-orm";
 
 // 1. Lấy Báo cáo Kết quả Kinh doanh (P&L - Profit & Loss)
 export async function getIncomeStatementReport(startDate: string, endDate: string) {
@@ -24,8 +24,8 @@ export async function getIncomeStatementReport(startDate: string, endDate: strin
       .where(
         and(
           eq(orders.status, "completed"),
-          sql`DATE(${orders.createdAt}) >= ${startDate}`,
-          sql`DATE(${orders.createdAt}) <= ${endDate}`
+          gte(orders.createdAt, sql`${startDate}::timestamp`),
+          lt(orders.createdAt, sql`(${endDate}::date + 1)::timestamp`)
         )
       );
 
@@ -41,8 +41,8 @@ export async function getIncomeStatementReport(startDate: string, endDate: strin
       .from(warrantyClaims)
       .where(
         and(
-          sql`DATE(${warrantyClaims.createdAt}) >= ${startDate}`,
-          sql`DATE(${warrantyClaims.createdAt}) <= ${endDate}`
+          gte(warrantyClaims.createdAt, sql`${startDate}::timestamp`),
+          lt(warrantyClaims.createdAt, sql`(${endDate}::date + 1)::timestamp`)
         )
       );
     const warrantyIncome = Number(warrantyStats[0]?.warrantyRevenue || 0);
@@ -56,8 +56,8 @@ export async function getIncomeStatementReport(startDate: string, endDate: strin
       .where(
         and(
           eq(returns.status, "completed"),
-          sql`DATE(${returns.createdAt}) >= ${startDate}`,
-          sql`DATE(${returns.createdAt}) <= ${endDate}`
+          gte(returns.createdAt, sql`${startDate}::timestamp`),
+          lt(returns.createdAt, sql`(${endDate}::date + 1)::timestamp`)
         )
       );
     const salesRefunds = Number(returnsStats[0]?.refunds || 0);
@@ -73,8 +73,8 @@ export async function getIncomeStatementReport(startDate: string, endDate: strin
       .innerJoin(expenseCategories, eq(expenses.categoryId, expenseCategories.id))
       .where(
         and(
-          sql`DATE(${expenses.expenseDate}) >= ${startDate}`,
-          sql`DATE(${expenses.expenseDate}) <= ${endDate}`
+          gte(expenses.expenseDate, startDate),
+          lte(expenses.expenseDate, endDate)
         )
       )
       .groupBy(expenses.categoryId, expenseCategories.name);
@@ -128,8 +128,8 @@ export async function getCashFlowStatementReport(startDate: string, endDate: str
       .from(cashBookEntries)
       .where(
         and(
-          sql`DATE(${cashBookEntries.entryDate}) >= ${startDate}`,
-          sql`DATE(${cashBookEntries.entryDate}) <= ${endDate}`
+          gte(cashBookEntries.entryDate, startDate),
+          lte(cashBookEntries.entryDate, endDate)
         )
       );
 

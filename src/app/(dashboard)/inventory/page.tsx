@@ -41,6 +41,7 @@ import {
 import { useState, useMemo, useEffect, Suspense, useRef } from "react";
 import { Filter } from "lucide-react";
 import { useRealtimeSubscription } from "@/hooks/use-realtime";
+import { useDebounce } from "@/hooks/use-debounce";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { Dialog } from "@/components/ui/dialog";
@@ -65,6 +66,15 @@ function InventoryPageContent() {
   const pathname = usePathname();
 
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 300);
+  const [instantSearch, setInstantSearch] = useState<string | null>(null);
+
+  const activeSearchQuery = instantSearch !== null ? instantSearch : debouncedSearch;
+
+  useEffect(() => {
+    setInstantSearch(null);
+  }, [debouncedSearch]);
+
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedBrand, setSelectedBrand] = useState<string>("all");
   const selectedStatus = searchParams.get("status") || "in_stock";
@@ -114,6 +124,56 @@ function InventoryPageContent() {
       params.delete("modelId");
     }
     router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+
+  const [isDrawerAnimatingOut, setIsDrawerAnimatingOut] = useState(false);
+  const closeTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleCloseDrawer = () => {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    setIsDrawerAnimatingOut(true);
+    closeTimerRef.current = setTimeout(() => {
+      setActiveDrawerProductId(null);
+      closeTimerRef.current = null;
+    }, 200);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    };
+  }, []);
+
+  // Reset animating out state when drawer opens
+  useEffect(() => {
+    if (activeDrawerProductId) {
+      setIsDrawerAnimatingOut(false);
+    }
+  }, [activeDrawerProductId]);
+
+  // Listen for Escape key to close drawer
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && activeDrawerProductId) {
+        setActiveDrawerProductId(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeDrawerProductId]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      setInstantSearch(search);
+    }
+  };
+
+  const prefetchDrawerItems = (productId: string) => {
+    queryClient.prefetchQuery({
+      queryKey: ["inventory_items_by_product", productId],
+      queryFn: () => getInventoryItemsByProduct(productId),
+      staleTime: 30_000,
+    });
   };
 
   // Sync selectedPoId with URL query param 'poId'
@@ -208,14 +268,14 @@ function InventoryPageContent() {
   });
 
   const { data: inventoryData, isLoading, error } = useQuery({
-    queryKey: ["inventory", selectedCategory, selectedBrand, selectedStatus, search, currentPage, activeTab],
+    queryKey: ["inventory", selectedCategory, selectedBrand, selectedStatus, activeSearchQuery, currentPage, activeTab],
     queryFn: () => getInventoryGroups({
       page: currentPage,
       limit: itemsPerPage,
       categoryName: selectedCategory,
       brandName: selectedBrand,
       status: activeTab === "defective" ? "defective" : (activeTab === "returned" ? "returned" : selectedStatus),
-      search: search || undefined,
+      search: activeSearchQuery || undefined,
     }),
     placeholderData: (prev: any) => prev,
     staleTime: 15_000,
@@ -592,6 +652,7 @@ function InventoryPageContent() {
                 placeholder={activeTab === "purchase_orders" ? "Tìm số đơn, nhà cung cấp..." : "Tìm sản phẩm"} 
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={handleKeyDown}
                 className="w-full pl-9 pr-4 h-[40px] rounded-full bg-[#f5f5f7] border border-[#e0e0e0] text-[13px] font-medium text-[#1d1d1f] focus:bg-white focus:border-[#0066cc] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/20 transition-all placeholder:text-[#7a7a7a]/60 shadow-sm"
               />
             </div>
@@ -856,14 +917,16 @@ function InventoryPageContent() {
                 </tr>
               </thead>
               <tbody className="text-[14px] text-[#1d1d1f]">
-                {groupedItems.map((group, index) => {
+                 {groupedItems.map((group, index) => {
                   const avgCost = Number(group.avgCost || 0);
                   const isLast = index === groupedItems.length - 1;
+                  const specs = group.productSpecs as any;
                   return (
                     <tr 
                       key={group.productId} 
                       className="group cursor-pointer"
                       onClick={() => setActiveDrawerProductId(group.productId)}
+                      onMouseEnter={() => prefetchDrawerItems(group.productId)}
                     >
                       <td className={`px-6 py-3 text-center font-semibold text-[#7a7a7a] text-[13px] ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
                         {index + 1}
@@ -875,33 +938,20 @@ function InventoryPageContent() {
                               <span className="mr-1.5">{group.brandName}</span>
                               {group.productName}
                             </p>
-                            {group.productSpecs && (
-                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-[12px] text-[#7a7a7a] font-medium tracking-tight select-none">
-                                {group.productSpecs.cpu && (
-                                  <span className="flex items-center gap-1">
-                                    <SFSymbolCPU size={11} className="text-[#7a7a7a]/60 shrink-0" />
-                                    <span>{group.productSpecs.cpu}</span>
+                            {specs && (
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1 text-[12px] text-[#7a7a7a] font-medium tracking-tight select-none">
+                                {[
+                                  specs.cpu,
+                                  specs.ram ? `RAM ${specs.ram}` : null,
+                                  specs.ssd ? `SSD ${specs.ssd}` : null,
+                                  specs.screen,
+                                ].filter(Boolean).map((spec, sIdx) => (
+                                  <span key={sIdx} className="flex items-center gap-2">
+                                    {sIdx > 0 && <span className="text-slate-300 select-none">•</span>}
+                                    <span>{spec}</span>
                                   </span>
-                                )}
-                                {group.productSpecs.ram && (
-                                  <span className="flex items-center gap-1">
-                                    <SFSymbolMemoryChip size={11} className="text-[#7a7a7a]/60 shrink-0" />
-                                    <span>RAM {group.productSpecs.ram}</span>
-                                  </span>
-                                )}
-                                {group.productSpecs.ssd && (
-                                  <span className="flex items-center gap-1">
-                                    <SFSymbolInternalDrive size={11} className="text-[#7a7a7a]/60 shrink-0" />
-                                    <span>SSD {group.productSpecs.ssd}</span>
-                                  </span>
-                                )}
-                                {group.productSpecs.screen && (
-                                  <span className="flex items-center gap-1">
-                                    <SFSymbolDisplay size={11} className="text-[#7a7a7a]/60 shrink-0" />
-                                    <span>{group.productSpecs.screen}</span>
-                                  </span>
-                                )}
-                                {!group.productSpecs.cpu && !group.productSpecs.ram && !group.productSpecs.ssd && !group.productSpecs.screen && (
+                                ))}
+                                {!specs.cpu && !specs.ram && !specs.ssd && !specs.screen && (
                                   <span className="text-[#a0a0a5] italic text-[11.5px]">Chưa cấu hình</span>
                                 )}
                               </div>
@@ -1033,13 +1083,19 @@ function InventoryPageContent() {
         <>
           {/* Backdrop overlay */}
           <div 
-            className="fixed inset-0 bg-[#1d1d1f]/40 backdrop-blur-[8px] z-40 transition-opacity duration-300 animate-in fade-in"
-            onClick={() => setActiveDrawerProductId(null)}
+            className={`fixed inset-0 bg-[#1d1d1f]/40 backdrop-blur-[8px] z-40 transition-opacity duration-200 ${
+              isDrawerAnimatingOut ? "opacity-0" : "opacity-100 animate-in fade-in"
+            }`}
+            onClick={handleCloseDrawer}
           />
           
           {/* Responsive Modal / Bottom Sheet Wrapper */}
           <div className="fixed inset-0 flex items-end sm:items-center justify-center z-50 pointer-events-none p-0 sm:p-6">
-            <div className="w-full max-w-7xl bg-white rounded-t-[32px] sm:rounded-[28px] shadow-[0_-8px_30px_rgba(0,0,0,0.12),0_12px_50px_rgba(0,0,0,0.18)] border-t sm:border border-[#e0e0e0]/80 overflow-hidden transform transition-all flex flex-col max-h-[94vh] sm:max-h-[88vh] pointer-events-auto animate-in slide-in-from-bottom sm:slide-in-from-none sm:zoom-in-95 duration-300 ease-out">
+            <div className={`w-full max-w-7xl bg-white rounded-t-[32px] sm:rounded-[28px] shadow-[0_-8px_30px_rgba(0,0,0,0.12),0_12px_50px_rgba(0,0,0,0.18)] border-t sm:border border-[#e0e0e0]/80 overflow-hidden transform transition-all duration-200 flex flex-col max-h-[94vh] sm:max-h-[88vh] pointer-events-auto ${
+              isDrawerAnimatingOut 
+                ? "opacity-0 translate-y-10 sm:translate-y-4 sm:scale-95" 
+                : "opacity-100 translate-y-0 sm:scale-100 animate-in slide-in-from-bottom sm:slide-in-from-none sm:zoom-in-95"
+            }`}>
               
               {/* Mobile drag handle indicator */}
               <div className="w-full flex justify-center py-3.5 sm:hidden shrink-0 bg-[#f5f5f7]/55 border-b border-[#e0e0e0]/40">
@@ -1050,39 +1106,24 @@ function InventoryPageContent() {
               <div className="px-8 py-6 border-b border-[#e0e0e0] bg-[#f5f5f7]/50 flex items-start justify-between">
                 <div className="space-y-2">
                   <h2 className="text-[24px] font-extrabold tracking-tight leading-snug bg-gradient-to-r from-[#1d1d1f] via-[#2d2d30] to-[#434345] bg-clip-text text-transparent flex items-center gap-2">
-                    {(() => {
-                      const cat = (activeDrawerProduct.categoryName || "").toLowerCase();
-                      if (cat.includes("laptop") || cat.includes("máy tính")) {
-                        return <SFSymbolLaptopComputer size={24} className="text-[#0066cc] drop-shadow-sm shrink-0" />;
-                      }
-                      if (cat.includes("màn hình") || cat.includes("display") || cat.includes("screen")) {
-                        return <SFSymbolDisplay size={24} className="text-[#34c759] drop-shadow-sm shrink-0" />;
-                      }
-                      if (cat.includes("cpu") || cat.includes("chip") || cat.includes("ram") || cat.includes("ổ cứng") || cat.includes("ssd") || cat.includes("hdd")) {
-                        return <SFSymbolCPU size={24} className="text-[#ff9500] drop-shadow-sm shrink-0" />;
-                      }
-                      return <SFSymbolShippingBox size={24} className="text-[#0066cc] drop-shadow-sm shrink-0" />;
-                    })()}
                     <span>{activeDrawerProduct.productName}</span>
                   </h2>
                   <div className="flex items-center gap-2.5 flex-wrap">
                     <span className="text-[14.5px] text-[#7a7a7a] font-medium">
-                      {activeDrawerProduct.brandName} • {activeDrawerProduct.categoryName}
+                      {activeDrawerProduct.brandName} • {activeDrawerProduct.categoryName} {activeDrawerProduct.productSku && `• SKU: ${activeDrawerProduct.productSku}`}
                     </span>
-                    {activeDrawerProduct.productSku && (
-                      <span className="text-[13.5px] text-[#7a7a7a] bg-[#f5f5f7] border border-[#e0e0e0] px-2.5 py-0.5 rounded-md font-medium">
-                        SKU: {activeDrawerProduct.productSku}
-                      </span>
-                    )}
                     {activeTab === "active" && (
-                      <div className="flex items-center gap-1.5 ml-2 flex-wrap select-none">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[13px] font-bold bg-emerald-50 border border-emerald-200/50 text-emerald-700">
+                      <div className="flex items-center gap-2.5 ml-2 flex-wrap select-none text-[13.5px]">
+                        <span className="text-slate-300">•</span>
+                        <span className="font-semibold text-emerald-600">
                           Sẵn kho: {activeDrawerProduct.inStockCount}
                         </span>
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[13px] font-bold bg-blue-50 border border-blue-200/50 text-blue-700">
+                        <span className="text-slate-300">•</span>
+                        <span className="font-semibold text-blue-600">
                           Đang về: {activeDrawerProduct.incomingCount}
                         </span>
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[13px] font-bold bg-red-50 border border-red-200/50 text-red-600">
+                        <span className="text-slate-300">•</span>
+                        <span className="font-semibold text-red-600">
                           Đang lỗi: {activeDrawerDefectiveCount}
                         </span>
                       </div>
@@ -1115,7 +1156,7 @@ function InventoryPageContent() {
                 </div>
                 
                 <button 
-                  onClick={() => setActiveDrawerProductId(null)}
+                  onClick={handleCloseDrawer}
                   className="w-9 h-9 text-[15px] rounded-full flex items-center justify-center bg-[#e8e8ed] text-[#7a7a7a] hover:text-[#1d1d1f] hover:bg-[#d5d5da] cursor-pointer transition-colors active:scale-95 duration-200 shrink-0"
                 >
                   ✕
@@ -1259,18 +1300,27 @@ function InventoryPageContent() {
                               )}
                             </td>
 
-                            <td className="px-5 py-3 whitespace-nowrap">
-                              {item.status === 'warranty_repair' ? (
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[12px] font-semibold border ${
-                                  item.location === 'internal_repair'
-                                    ? "bg-orange-50 text-orange-700 border-orange-200/50"
-                                    : "bg-amber-50 text-amber-700 border-amber-200/50"
-                                } text-[14px]`}>
-                                  {item.location === 'internal_repair' ? 'Đang sửa' : 'Đang BH'}
-                                </span>
-                              ) : (
-                                <StatusBadge status={item.status} className="text-[14px]" />
-                              )}
+                            <td className="px-5 py-3 whitespace-nowrap text-[13.5px] font-semibold">
+                              {(() => {
+                                const statusConfig: Record<string, { text: string; label: string }> = {
+                                  in_stock: { text: "text-emerald-600", label: "Sẵn" },
+                                  incoming: { text: "text-blue-600", label: "Đang về" },
+                                  sold: { text: "text-slate-500", label: "Đã bán" },
+                                  warranty_repair: { text: "text-amber-600", label: "Bảo hành" },
+                                  returned: { text: "text-slate-500", label: "Đã trả NCC" },
+                                  defective: { text: "text-red-600", label: "Lỗi" },
+                                  deleted: { text: "text-red-500", label: "Đã xóa" },
+                                };
+                                
+                                if (item.status === 'warranty_repair') {
+                                  const repairLabel = item.location === 'internal_repair' ? 'Đang sửa' : 'Đang BH';
+                                  const repairColor = item.location === 'internal_repair' ? 'text-orange-600' : 'text-amber-600';
+                                  return <span className={repairColor}>{repairLabel}</span>;
+                                }
+                                
+                                const config = statusConfig[item.status] || { text: "text-slate-700", label: item.status };
+                                return <span className={config.text}>{config.label}</span>;
+                              })()}
                             </td>
 
                             {/* Ngày nhập */}
