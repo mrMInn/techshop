@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Mail, Lock, BarChart2, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Mail, Lock, LayoutDashboard, Eye, EyeOff, Loader2 } from "lucide-react";
 import { loginAction } from "@/app/actions/auth";
 import { toast } from "sonner";
 
@@ -46,7 +46,7 @@ export default function LoginPage() {
       {/* Brand Header */}
       <div className="flex flex-col items-center text-center mb-8">
         <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#0066cc] to-[#0088ff] flex items-center justify-center shadow-[0_4px_12px_rgba(0,102,204,0.22)] mb-4">
-          <BarChart2 className="text-white" size={22} />
+          <LayoutDashboard className="text-white" size={22} />
         </div>
         <h1 className="text-xl font-bold text-slate-800 tracking-tight">
           Đăng nhập TechStore ERP

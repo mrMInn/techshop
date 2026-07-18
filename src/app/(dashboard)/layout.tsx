@@ -1,6 +1,6 @@
 "use client";
 
-import { Package, ShoppingCart, Users, Wrench, Settings, BarChart2, RefreshCcw, Wallet, FileText, Search, LogOut } from "lucide-react";
+import { Package, ShoppingCart, Users, Wrench, Settings, LayoutDashboard, RefreshCcw, Wallet, FileText, Search, LogOut } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useRef, Fragment } from "react";
@@ -180,7 +180,7 @@ export default function DashboardLayout({
 
   // Build menu items list based on role
   const menuItems = [
-    ...(isAdmin ? [{ href: "/", label: "Dashboard", icon: <BarChart2 size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-[#2ea1ff] to-[#0066cc]", match: (p: string) => p === "/" }] : []),
+    ...(isAdmin ? [{ href: "/", label: "Dashboard", icon: <LayoutDashboard size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-[#2ea1ff] to-[#0066cc]", match: (p: string) => p === "/" }] : []),
     { href: "/inventory", label: "Quản lý kho", icon: <Package size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-[#34c759] to-[#28a745]", match: (p: string) => p.startsWith("/inventory") },
     { href: "/orders", label: "Đơn hàng", icon: <ShoppingCart size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-[#ff2d55] to-[#d6001c]", match: (p: string) => p.startsWith("/orders") },
     { href: "/quotations", label: "Báo giá", icon: <FileText size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-[#ff9f0a] to-[#ff7b00]", match: (p: string) => p.startsWith("/quotations") },
@@ -345,13 +345,13 @@ function SidebarLink({
       href={href}
       onClick={onClick}
       prefetch={false}
-      className={`group relative z-10 flex items-center gap-3 px-3.5 py-2 rounded-full transition-[color,background-color,transform] duration-200 ease-out text-[13px] active:scale-[0.98] hover:translate-x-[2px] ${
+      className={`group relative z-10 flex items-center gap-3 px-3.5 py-2 rounded-full transition-colors duration-150 ease-out text-[13px] ${
         active 
           ? "bg-[#0066cc]/10 text-[#0066cc] font-semibold" 
           : "text-[#1d1d1f] hover:bg-slate-200/60 font-semibold"
       }`}
     >
-      <div className={`sidebar-icon-container flex h-7.5 w-7.5 items-center justify-center rounded-[8px] border border-white/10 shrink-0 transition-transform duration-200 ease-out group-hover:scale-[1.08] ${bgColor} text-white shadow-[0_1px_3px_rgba(0,0,0,0.02)]`}>
+      <div className={`sidebar-icon-container flex h-7.5 w-7.5 items-center justify-center rounded-[8px] border border-white/10 shrink-0 ${bgColor} text-white shadow-[0_1px_3px_rgba(0,0,0,0.02)]`}>
         {icon}
       </div>
       <span className="truncate">{label}</span>
@@ -594,7 +594,7 @@ function SubmenuLink({ href, label, active, badge }: { href: string; label: stri
       href={href}
       scroll={false}
       prefetch={false}
-      className={`group relative flex items-center justify-between py-2 px-4 rounded-full text-[12.5px] transition-colors duration-150 ease-out cursor-pointer active:scale-[0.98] select-none ${
+      className={`group relative flex items-center justify-between py-2 px-4 rounded-full text-[12.5px] transition-colors duration-150 ease-out cursor-pointer select-none ${
         active
           ? "bg-[#0066cc]/10 text-[#0066cc] font-semibold"
           : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 font-semibold"
