@@ -1,6 +1,6 @@
 "use client";
 
-import { Package, ShoppingCart, Users, Wrench, Settings, LayoutDashboard, RefreshCcw, Wallet, FileText, Search, LogOut } from "lucide-react";
+import { Package, ShoppingCart, Users, Wrench, Settings, LayoutDashboard, RefreshCcw, Wallet, FileText, Search, LogOut, List, CheckCircle, Truck, Globe, XCircle, Boxes, Inbox, AlertOctagon, ClipboardList, CornerUpLeft, Cable, Receipt, Landmark, BarChart3 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useRef, Fragment } from "react";
@@ -10,6 +10,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getOrdersList } from "@/app/actions/orders";
 import { getInventoryStats, getAccessoryStockSummary } from "@/app/actions/inventory";
 import { getPurchaseOrdersList } from "@/app/actions/purchase-orders";
+import { getWarrantyClaims } from "@/app/actions/warranty";
 
 const ROLE_MAP: Record<string, string> = {
   admin: "Quản trị viên",
@@ -44,7 +45,13 @@ function getPageTitle(path: string | null, searchParams?: any) {
   }
   if (path.startsWith("/orders")) return "Đơn hàng";
   if (path.startsWith("/quotations")) return "Báo giá";
-  if (path.startsWith("/warranty")) return "Bảo hành";
+  if (path.startsWith("/warranty")) {
+    const status = searchParams?.get("status");
+    if (status === "pending") return "Tiếp nhận";
+    if (status === "processing") return "Đang xử lý";
+    if (status === "completed") return "Hoàn tất";
+    return "Tất cả phiếu";
+  }
   if (path.startsWith("/returns")) return "Đổi trả";
   if (path.startsWith("/lookup")) return "Tra cứu";
   if (path.startsWith("/accounting/expenses")) return "Chi phí";
@@ -100,6 +107,16 @@ function getBreadcrumbs(path: string | null, searchParams?: any): { label: strin
     crumbs.push({ label: "Báo giá", href: "/quotations" });
   } else if (path.startsWith("/warranty")) {
     crumbs.push({ label: "Bảo hành", href: "/warranty" });
+    const status = searchParams?.get("status");
+    if (status === "pending") {
+      crumbs.push({ label: "Tiếp nhận" });
+    } else if (status === "processing") {
+      crumbs.push({ label: "Đang xử lý" });
+    } else if (status === "completed") {
+      crumbs.push({ label: "Hoàn tất" });
+    } else {
+      crumbs.push({ label: "Tất cả phiếu" });
+    }
   } else if (path.startsWith("/returns")) {
     crumbs.push({ label: "Đổi trả", href: "/returns" });
   } else if (path.startsWith("/lookup")) {
@@ -381,6 +398,7 @@ function SidebarNavList({
   const { data: statsData } = useQuery({
     queryKey: ["orders", "stats-sidebar"],
     queryFn: () => getOrdersList({ page: 1, limit: 1, search: "", status: "all", paymentStatus: "all", saleChannel: "all" }),
+    staleTime: 5 * 60 * 1000,
   });
   const stats = statsData?.stats || { completedCount: 0, processingCount: 0, cancelledCount: 0, onlineCount: 0 };
   const totalCount = statsData?.pagination?.totalItems || 0;
@@ -389,27 +407,42 @@ function SidebarNavList({
   const { data: invStats } = useQuery({
     queryKey: ["inventory_stats"],
     queryFn: () => getInventoryStats(),
+    staleTime: 5 * 60 * 1000,
   });
 
   // Fetch purchase orders list for sidebar badges
   const { data: poList } = useQuery({
     queryKey: ["purchaseOrders"],
     queryFn: () => getPurchaseOrdersList(),
+    staleTime: 5 * 60 * 1000,
   });
 
   // Fetch accessories stock summary for sidebar badges
   const { data: accSummary } = useQuery({
     queryKey: ["accessoryStockSummary"],
     queryFn: () => getAccessoryStockSummary(),
+    staleTime: 5 * 60 * 1000,
   });
 
   // Calculate accessory total count
   const totalAccCount = accSummary?.summary?.reduce((sum: number, cat: any) => sum + (cat.total || 0), 0) || 0;
 
+  // Fetch warranty claims for sidebar badges
+  const { data: warrantyClaimsData } = useQuery({
+    queryKey: ["warranty_claims"],
+    queryFn: () => getWarrantyClaims(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const warrantyPendingCount = warrantyClaimsData?.filter((w: any) => w.status === 'pending').length || 0;
+  const warrantyProcessingCount = warrantyClaimsData?.filter((w: any) => w.status === 'repairing' || w.status === 'inspecting' || w.status === 'waiting_parts').length || 0;
+  const warrantyCompletedCount = warrantyClaimsData?.filter((w: any) => w.status === 'completed' || w.status === 'replaced' || w.status === 'rejected').length || 0;
+
   const activeTab = searchParams.get("tab") || "active";
   const [inventoryExpanded, setInventoryExpanded] = useState(!!pathname?.startsWith("/inventory"));
   const [ordersExpanded, setOrdersExpanded] = useState(!!pathname?.startsWith("/orders"));
   const [accountingExpanded, setAccountingExpanded] = useState(!!pathname?.startsWith("/accounting"));
+  const [warrantyExpanded, setWarrantyExpanded] = useState(!!pathname?.startsWith("/warranty"));
   const lastPathRef = useRef(pathname);
 
   useEffect(() => {
@@ -437,6 +470,14 @@ function SidebarNavList({
       setAccountingExpanded(false);
     }
 
+    const wasInWarranty = lastPathRef.current?.startsWith("/warranty");
+    const isInWarranty = pathname?.startsWith("/warranty");
+    if (isInWarranty && !wasInWarranty) {
+      setWarrantyExpanded(true);
+    } else if (!isInWarranty) {
+      setWarrantyExpanded(false);
+    }
+
     lastPathRef.current = pathname;
   }, [pathname]);
 
@@ -450,7 +491,7 @@ function SidebarNavList({
             icon={item.icon}
             label={item.label}
             active={!!(pathname && item.match(pathname))}
-            hasSubmenu={item.href === "/orders" || item.href === "/inventory" || item.href === "/accounting"}
+            hasSubmenu={item.href === "/orders" || item.href === "/inventory" || item.href === "/accounting" || item.href === "/warranty"}
             isSubmenuExpanded={
               item.href === "/orders"
                 ? ordersExpanded
@@ -458,7 +499,9 @@ function SidebarNavList({
                   ? inventoryExpanded 
                   : item.href === "/accounting" 
                     ? accountingExpanded 
-                    : false
+                    : item.href === "/warranty"
+                      ? warrantyExpanded
+                      : false
             }
             onClick={(e) => {
               if (item.href === "/orders") {
@@ -486,98 +529,151 @@ function SidebarNavList({
                   // Open dropdown when navigating to accounting
                   setAccountingExpanded(true);
                 }
+              } else if (item.href === "/warranty") {
+                if (pathname?.startsWith("/warranty")) {
+                  e.preventDefault();
+                  setWarrantyExpanded(!warrantyExpanded);
+                } else {
+                  setWarrantyExpanded(true);
+                }
               }
             }}
           />
           {item.href === "/orders" && ordersExpanded && (
-            <div className="mt-1 mb-2 ml-4 pl-3.5 border-l border-[#e0e0e0]/80 flex flex-col gap-1.5 animate-in slide-in-from-top-2 duration-200">
+            <div className="mt-1 mb-2 ml-4 pl-3.5 flex flex-col gap-1.5 animate-in slide-in-from-top-2 duration-200">
               <SubmenuLink 
                 href="/orders" 
                 label="Tất cả đơn" 
+                icon={<List size={13} />}
                 active={pathname === "/orders" && !searchParams.get("status") && !searchParams.get("channel")} 
                 badge={totalCount}
               />
               <SubmenuLink 
                 href="/orders?status=completed" 
                 label="Hoàn tất" 
+                icon={<CheckCircle size={13} />}
                 active={pathname === "/orders" && searchParams.get("status") === "completed"} 
                 badge={stats.completedCount}
               />
               <SubmenuLink 
                 href="/orders?status=processing" 
                 label="Đang giao" 
+                icon={<Truck size={13} />}
                 active={pathname === "/orders" && searchParams.get("status") === "processing"} 
                 badge={stats.processingCount}
               />
               <SubmenuLink 
                 href="/orders?channel=online" 
                 label="Kênh Online" 
+                icon={<Globe size={13} />}
                 active={pathname === "/orders" && searchParams.get("channel") === "online"} 
                 badge={stats.onlineCount}
               />
               <SubmenuLink 
                 href="/orders?status=cancelled" 
                 label="Đã hủy" 
+                icon={<XCircle size={13} />}
                 active={pathname === "/orders" && searchParams.get("status") === "cancelled"} 
                 badge={stats.cancelledCount}
               />
             </div>
           )}
           {item.href === "/inventory" && inventoryExpanded && (
-            <div className="mt-1 mb-2 ml-4 pl-3.5 border-l border-[#e0e0e0]/80 flex flex-col gap-1.5 animate-in slide-in-from-top-2 duration-200">
+            <div className="mt-1 mb-2 ml-4 pl-3.5 flex flex-col gap-1.5 animate-in slide-in-from-top-2 duration-200">
               <SubmenuLink 
                 href="/inventory?tab=active&status=in_stock" 
                 label="Kho bán" 
+                icon={<Boxes size={13} />}
                 active={(activeTab === "active" && searchParams.get("status") === "in_stock") || (pathname === "/inventory" && !searchParams.get("tab") && !searchParams.get("status"))} 
                 badge={invStats?.inStock}
               />
               <SubmenuLink 
                 href="/inventory?tab=active&status=incoming" 
                 label="Hàng đang về" 
+                icon={<Inbox size={13} />}
                 active={activeTab === "active" && searchParams.get("status") === "incoming"} 
                 badge={invStats?.incoming}
               />
               <SubmenuLink 
                 href="/inventory?tab=defective" 
                 label="Kho lỗi" 
+                icon={<AlertOctagon size={13} />}
                 active={activeTab === "defective"} 
                 badge={invStats?.defective}
               />
               <SubmenuLink 
                 href="/inventory?tab=purchase_orders" 
                 label="Đơn nhập hàng" 
+                icon={<ClipboardList size={13} />}
                 active={activeTab === "purchase_orders"} 
                 badge={poList?.purchaseOrders?.length}
               />
               <SubmenuLink 
                 href="/inventory?tab=returned" 
                 label="Trả NCC" 
+                icon={<CornerUpLeft size={13} />}
                 active={activeTab === "returned"} 
                 badge={invStats?.returned}
               />
               <SubmenuLink 
                 href="/inventory?tab=accessories" 
                 label="Kho phụ kiện" 
+                icon={<Cable size={13} />}
                 active={activeTab === "accessories"} 
                 badge={totalAccCount}
               />
             </div>
           )}
+          {item.href === "/warranty" && warrantyExpanded && (
+            <div className="mt-1 mb-2 ml-4 pl-3.5 flex flex-col gap-1.5 animate-in slide-in-from-top-2 duration-200">
+              <SubmenuLink 
+                href="/warranty" 
+                label="Tất cả phiếu" 
+                icon={<List size={13} />}
+                active={pathname === "/warranty" && !searchParams.get("status")} 
+                badge={warrantyClaimsData?.length}
+              />
+              <SubmenuLink 
+                href="/warranty?status=pending" 
+                label="Tiếp nhận" 
+                icon={<Inbox size={13} />}
+                active={pathname === "/warranty" && searchParams.get("status") === "pending"} 
+                badge={warrantyPendingCount}
+              />
+              <SubmenuLink 
+                href="/warranty?status=processing" 
+                label="Đang xử lý" 
+                icon={<Wrench size={13} />}
+                active={pathname === "/warranty" && searchParams.get("status") === "processing"} 
+                badge={warrantyProcessingCount}
+              />
+              <SubmenuLink 
+                href="/warranty?status=completed" 
+                label="Hoàn tất" 
+                icon={<CheckCircle size={13} />}
+                active={pathname === "/warranty" && searchParams.get("status") === "completed"} 
+                badge={warrantyCompletedCount}
+              />
+            </div>
+          )}
           {item.href === "/accounting" && accountingExpanded && (
-            <div className="mt-1 mb-2 ml-4 pl-3.5 border-l border-[#e0e0e0]/80 flex flex-col gap-1.5 animate-in slide-in-from-top-2 duration-200">
+            <div className="mt-1 mb-2 ml-4 pl-3.5 flex flex-col gap-1.5 animate-in slide-in-from-top-2 duration-200">
               <SubmenuLink 
                 href="/accounting" 
                 label="Nhật ký thu chi" 
+                icon={<Receipt size={13} />}
                 active={pathname === "/accounting"} 
               />
               <SubmenuLink 
                 href="/accounting/expenses" 
                 label="Chi phí vận hành" 
+                icon={<Landmark size={13} />}
                 active={pathname === "/accounting/expenses"} 
               />
               <SubmenuLink 
                 href="/accounting/reports" 
                 label="Báo cáo tài chính" 
+                icon={<BarChart3 size={13} />}
                 active={pathname === "/accounting/reports"} 
               />
             </div>
@@ -588,30 +684,41 @@ function SidebarNavList({
   );
 }
 
-function SubmenuLink({ href, label, active, badge }: { href: string; label: string; active: boolean; badge?: number }) {
+function SubmenuLink({ 
+  href, 
+  label, 
+  active, 
+  icon, 
+  badge 
+}: { 
+  href: string; 
+  label: string; 
+  active: boolean; 
+  icon: React.ReactNode; 
+  badge?: number; 
+}) {
   return (
     <Link
       href={href}
       scroll={false}
       prefetch={false}
-      className={`group relative flex items-center justify-between py-2 px-4 rounded-full text-[12.5px] transition-colors duration-150 ease-out cursor-pointer select-none ${
+      className={`group relative flex items-center gap-2.5 py-1.5 px-3.5 rounded-full text-[12.5px] transition-all duration-150 ease-out cursor-pointer select-none active:scale-[0.98] ${
         active
           ? "bg-[#0066cc]/10 text-[#0066cc] font-semibold"
           : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 font-semibold"
       }`}
     >
-      {/* Horizontal connector line pointing back to parent vertical border */}
-      <span 
-        className={`absolute top-1/2 -translate-y-1/2 w-3.5 h-[1.5px] transition-colors duration-200 ${
-          active ? "bg-[#0066cc]" : "bg-[#e0e0e0]/80 group-hover:bg-slate-400"
-        }`} 
-        style={{ left: "-14px" }}
-      />
-      
+      <span className={`shrink-0 transition-colors duration-150 ${
+        active ? "text-[#0066cc]" : "text-slate-400 group-hover:text-slate-600"
+      }`}>
+        {icon}
+      </span>
       <span className="truncate">{label}</span>
       {badge !== undefined && (
-        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-200 ${
-          active ? "bg-[#0066cc] text-white" : "bg-slate-200/50 text-[#7a7a7a] group-hover:bg-slate-300/50"
+        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 transition-colors duration-150 ml-auto ${
+          active 
+            ? "bg-[#0066cc] text-white" 
+            : "bg-slate-200/50 text-[#7a7a7a] group-hover:bg-slate-300/50"
         }`}>
           {badge}
         </span>

@@ -478,19 +478,6 @@ export async function getFinancialSummary(filters?: {
       .from(cashBookEntries)
       .groupBy(cashBookEntries.type);
 
-    if (whereClause) {
-      totalsQuery.where(whereClause);
-    }
-
-    const totals = await totalsQuery;
-
-    let totalIncome = 0;
-    let totalExpense = 0;
-    totals.forEach((t) => {
-      if (t.type === 'income') totalIncome = Number(t.sum || 0);
-      else if (t.type === 'expense') totalExpense = Number(t.sum || 0);
-    });
-
     let catStatsQuery = db
       .select({
         category: cashBookEntries.category,
@@ -501,10 +488,45 @@ export async function getFinancialSummary(filters?: {
       .groupBy(cashBookEntries.category, cashBookEntries.type);
 
     if (whereClause) {
+      totalsQuery.where(whereClause);
       catStatsQuery.where(whereClause);
     }
 
-    const catStats = await catStatsQuery;
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const sevenDaysAgoStr = sevenDaysAgo.toISOString().split("T")[0];
+
+    const twelveMonthsAgo = new Date();
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+    twelveMonthsAgo.setDate(1);
+    const twelveMonthsAgoStr = twelveMonthsAgo.toISOString().split("T")[0];
+
+    const [
+      totals,
+      catStats,
+      ordersStats,
+      warrantyStats,
+      expensesStats,
+      returnsStats,
+      daysData,
+      monthlyData
+    ] = await Promise.all([
+      totalsQuery,
+      catStatsQuery,
+      db.select({ totalProfit: sql<string>`sum(${orders.profit})` }).from(orders).where(eq(orders.status, "completed")),
+      db.select({ totalWarrantyCost: sql<string>`sum(${warrantyClaims.repairCost})` }).from(warrantyClaims),
+      db.select({ totalExpense: sql<string>`sum(${expenses.amount})` }).from(expenses),
+      db.select({ totalRefund: sql<string>`sum(${returns.refundAmount})`, totalFee: sql<string>`sum(${returns.feeAmount})` }).from(returns).where(eq(returns.status, "completed")),
+      db.select({ date: cashBookEntries.entryDate, type: cashBookEntries.type, totalAmount: sql<string>`sum(${cashBookEntries.amount})` }).from(cashBookEntries).where(gte(cashBookEntries.entryDate, sevenDaysAgoStr)).groupBy(cashBookEntries.entryDate, cashBookEntries.type).orderBy(cashBookEntries.entryDate),
+      db.select({ month: sql<string>`to_char(${cashBookEntries.entryDate}, 'YYYY-MM')`, type: cashBookEntries.type, sum: sql<string>`sum(${cashBookEntries.amount})` }).from(cashBookEntries).where(gte(cashBookEntries.entryDate, twelveMonthsAgoStr)).groupBy(sql`to_char(${cashBookEntries.entryDate}, 'YYYY-MM')`, cashBookEntries.type)
+    ]);
+
+    let totalIncome = 0;
+    let totalExpense = 0;
+    totals.forEach((t) => {
+      if (t.type === 'income') totalIncome = Number(t.sum || 0);
+      else if (t.type === 'expense') totalExpense = Number(t.sum || 0);
+    });
 
     const categoryStats: Record<string, number> = {};
     const expenseCategoryStats: Record<string, number> = {};
@@ -519,46 +541,6 @@ export async function getFinancialSummary(filters?: {
         expenseCategoryStats[cat] = (expenseCategoryStats[cat] || 0) + amt;
       }
     });
-
-    const ordersStats = await db
-      .select({
-        totalProfit: sql<string>`sum(${orders.profit})`
-      })
-      .from(orders)
-      .where(eq(orders.status, "completed"));
-    const warrantyStats = await db
-      .select({
-        totalWarrantyCost: sql<string>`sum(${warrantyClaims.repairCost})`
-      })
-      .from(warrantyClaims);
-    const expensesStats = await db
-      .select({
-        totalExpense: sql<string>`sum(${expenses.amount})`
-      })
-      .from(expenses);
-    const returnsStats = await db
-      .select({
-        totalRefund: sql<string>`sum(${returns.refundAmount})`,
-        totalFee: sql<string>`sum(${returns.feeAmount})`
-      })
-      .from(returns)
-      .where(eq(returns.status, "completed"));
-
-    // Lọc lấy 7 ngày gần nhất cho biểu đồ hàng ngày
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const sevenDaysAgoStr = sevenDaysAgo.toISOString().split("T")[0];
-
-    const daysData = await db
-      .select({
-        date: cashBookEntries.entryDate,
-        type: cashBookEntries.type,
-        totalAmount: sql<string>`sum(${cashBookEntries.amount})`,
-      })
-      .from(cashBookEntries)
-      .where(gte(cashBookEntries.entryDate, sevenDaysAgoStr))
-      .groupBy(cashBookEntries.entryDate, cashBookEntries.type)
-      .orderBy(cashBookEntries.entryDate);
 
     // Tính toán lợi nhuận kinh doanh ròng thực tế (Lợi nhuận gộp đơn hàng + Doanh thu bảo hành - Chi vận hành - Hoàn tiền khách trả)
     const salesProfit = Number(ordersStats[0]?.totalProfit || 0);
@@ -614,20 +596,6 @@ export async function getFinancialSummary(filters?: {
     }
 
     // Lọc 12 tháng gần nhất từ database bằng SQL aggregation
-    const twelveMonthsAgo = new Date();
-    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
-    twelveMonthsAgo.setDate(1); // Ngày đầu tiên của tháng đó
-    const twelveMonthsAgoStr = twelveMonthsAgo.toISOString().split("T")[0];
-
-    const monthlyData = await db
-      .select({
-        month: sql<string>`to_char(${cashBookEntries.entryDate}, 'YYYY-MM')`,
-        type: cashBookEntries.type,
-        sum: sql<string>`sum(${cashBookEntries.amount})`
-      })
-      .from(cashBookEntries)
-      .where(gte(cashBookEntries.entryDate, twelveMonthsAgoStr))
-      .groupBy(sql`to_char(${cashBookEntries.entryDate}, 'YYYY-MM')`, cashBookEntries.type);
 
     monthlyData.forEach((m) => {
       if (!m.month) return;
@@ -1371,90 +1339,37 @@ export async function getDashboardBentoData(targetMonth: string) {
     // ==========================================
     
     // Đơn hàng hoàn thành (Hôm nay vs Tháng này), báo giá, kho hàng, bảo hành, tài chính, đơn hàng gần nhất, và phiếu hoàn trả tháng này
-    const todayOrdersCount = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(orders)
-      .where(and(eq(orders.status, "completed"), sql`DATE(${orders.createdAt}) = ${todayStr}`));
-    
-    const monthOrdersCount = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(orders)
-      .where(and(eq(orders.status, "completed"), sql`to_char(${orders.createdAt}, 'YYYY-MM') = ${currentMonthStr}`));
-    
-    const activeQuotes = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(quotations)
-      .where(or(eq(quotations.status, "draft"), eq(quotations.status, "sent"), eq(quotations.status, "viewed")));
-    
-    const inventoryStatusStats = await db
-      .select({ status: inventoryItems.status, count: sql<number>`count(*)` })
-      .from(inventoryItems)
-      .groupBy(inventoryItems.status);
-    
-    const warrantyStatusStats = await db
-      .select({ status: warrantyClaims.status, count: sql<number>`count(*)` })
-      .from(warrantyClaims)
-      .groupBy(warrantyClaims.status);
-    
-    const monthSales = await db
-      .select({
-        revenue: sql<string>`sum(${orders.totalAmount})`,
-        cogs: sql<string>`sum(${orders.totalCost})`,
-      })
-      .from(orders)
-      .where(and(eq(orders.status, "completed"), sql`to_char(${orders.createdAt}, 'YYYY-MM') = ${currentMonthStr}`));
-    
-    const monthExpenses = await db
-      .select({ total: sql<string>`sum(${expenses.amount})` })
-      .from(expenses)
-      .where(sql`to_char(${expenses.expenseDate}, 'YYYY-MM') = ${currentMonthStr}`);
-    
-    const monthReturns = await db
-      .select({ refund: sql<string>`sum(${returns.refundAmount})`, fee: sql<string>`sum(${returns.feeAmount})` })
-      .from(returns)
-      .where(and(eq(returns.status, "completed"), sql`to_char(${returns.createdAt}, 'YYYY-MM') = ${currentMonthStr}`));
-    
-    const monthWarrantyIncome = await db
-      .select({ total: sql<string>`sum(${warrantyClaims.repairCost})` })
-      .from(warrantyClaims)
-      .where(and(eq(warrantyClaims.status, "completed"), sql`to_char(${warrantyClaims.createdAt}, 'YYYY-MM') = ${currentMonthStr}`));
-    
-    const todaySales = await db
-      .select({
-        revenue: sql<string>`sum(${orders.totalAmount})`,
-        cogs: sql<string>`sum(${orders.totalCost})`,
-      })
-      .from(orders)
-      .where(and(eq(orders.status, "completed"), sql`DATE(${orders.createdAt}) = ${todayStr}`));
-    
-    const todayExpenses = await db
-      .select({ total: sql<string>`sum(${expenses.amount})` })
-      .from(expenses)
-      .where(sql`DATE(${expenses.expenseDate}) = ${todayStr}`);
-    
-    const todayReturns = await db
-      .select({ refund: sql<string>`sum(${returns.refundAmount})`, fee: sql<string>`sum(${returns.feeAmount})` })
-      .from(returns)
-      .where(and(eq(returns.status, "completed"), sql`DATE(${returns.createdAt}) = ${todayStr}`));
-    
-    const recentOrdersList = await db
-      .select({
-        id: orders.id,
-        orderNumber: orders.orderNumber,
-        customerName: customers.fullName,
-        totalAmount: orders.totalAmount,
-        status: orders.status,
-        createdAt: orders.createdAt,
-      })
-      .from(orders)
-      .innerJoin(customers, eq(orders.customerId, customers.id))
-      .orderBy(desc(orders.createdAt))
-      .limit(5);
-    
-    const monthReturnCount = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(returns)
-      .where(and(eq(returns.status, "completed"), sql`to_char(${returns.createdAt}, 'YYYY-MM') = ${currentMonthStr}`));
+    const [
+      todayOrdersCount,
+      monthOrdersCount,
+      activeQuotes,
+      inventoryStatusStats,
+      warrantyStatusStats,
+      monthSales,
+      monthExpenses,
+      monthReturns,
+      monthWarrantyIncome,
+      todaySales,
+      todayExpenses,
+      todayReturns,
+      recentOrdersList,
+      monthReturnCount
+    ] = await Promise.all([
+      db.select({ count: sql<number>`count(*)` }).from(orders).where(and(eq(orders.status, "completed"), sql`DATE(${orders.createdAt}) = ${todayStr}`)),
+      db.select({ count: sql<number>`count(*)` }).from(orders).where(and(eq(orders.status, "completed"), sql`to_char(${orders.createdAt}, 'YYYY-MM') = ${currentMonthStr}`)),
+      db.select({ count: sql<number>`count(*)` }).from(quotations).where(or(eq(quotations.status, "draft"), eq(quotations.status, "sent"), eq(quotations.status, "viewed"))),
+      db.select({ status: inventoryItems.status, count: sql<number>`count(*)` }).from(inventoryItems).groupBy(inventoryItems.status),
+      db.select({ status: warrantyClaims.status, count: sql<number>`count(*)` }).from(warrantyClaims).groupBy(warrantyClaims.status),
+      db.select({ revenue: sql<string>`sum(${orders.totalAmount})`, cogs: sql<string>`sum(${orders.totalCost})` }).from(orders).where(and(eq(orders.status, "completed"), sql`to_char(${orders.createdAt}, 'YYYY-MM') = ${currentMonthStr}`)),
+      db.select({ total: sql<string>`sum(${expenses.amount})` }).from(expenses).where(sql`to_char(${expenses.expenseDate}, 'YYYY-MM') = ${currentMonthStr}`),
+      db.select({ refund: sql<string>`sum(${returns.refundAmount})`, fee: sql<string>`sum(${returns.feeAmount})` }).from(returns).where(and(eq(returns.status, "completed"), sql`to_char(${returns.createdAt}, 'YYYY-MM') = ${currentMonthStr}`)),
+      db.select({ total: sql<string>`sum(${warrantyClaims.repairCost})` }).from(warrantyClaims).where(and(eq(warrantyClaims.status, "completed"), sql`to_char(${warrantyClaims.createdAt}, 'YYYY-MM') = ${currentMonthStr}`)),
+      db.select({ revenue: sql<string>`sum(${orders.totalAmount})`, cogs: sql<string>`sum(${orders.totalCost})` }).from(orders).where(and(eq(orders.status, "completed"), sql`DATE(${orders.createdAt}) = ${todayStr}`)),
+      db.select({ total: sql<string>`sum(${expenses.amount})` }).from(expenses).where(sql`DATE(${expenses.expenseDate}) = ${todayStr}`),
+      db.select({ refund: sql<string>`sum(${returns.refundAmount})`, fee: sql<string>`sum(${returns.feeAmount})` }).from(returns).where(and(eq(returns.status, "completed"), sql`DATE(${returns.createdAt}) = ${todayStr}`)),
+      db.select({ id: orders.id, orderNumber: orders.orderNumber, customerName: customers.fullName, totalAmount: orders.totalAmount, status: orders.status, createdAt: orders.createdAt }).from(orders).innerJoin(customers, eq(orders.customerId, customers.id)).orderBy(desc(orders.createdAt)).limit(5),
+      db.select({ count: sql<number>`count(*)` }).from(returns).where(and(eq(returns.status, "completed"), sql`to_char(${returns.createdAt}, 'YYYY-MM') = ${currentMonthStr}`))
+    ]);
 
 
     const invMap = { in_stock: 0, incoming: 0, defective: 0 };

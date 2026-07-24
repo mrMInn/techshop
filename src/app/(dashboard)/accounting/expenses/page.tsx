@@ -38,6 +38,7 @@ import {
 import { CustomSelect } from "@/components/ui/custom-select";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CustomDatePicker } from "@/components/ui/custom-date-picker";
+import { Dialog } from "@/components/ui/dialog";
  
 const formatVNDInput = (value: string) => {
   if (!value) return "";
@@ -916,406 +917,342 @@ export default function ExpensesPage() {
         </div>
       </div>
  
-      {/* Dual-Pane Workspace Layout */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
-        
-        {/* Left Pane (70% - xl:col-span-2) - Expenses Ledger List */}
-        <div className="xl:col-span-2 space-y-4">
-          {isLoadingExpenses ? (
-            <div className="bg-white rounded-[18px] border border-[#e0e0e0] flex flex-col items-center justify-center py-24 text-slate-500 shadow-sm">
-              <Loader2 className="animate-spin mb-2.5 text-[#0066cc]" size={24} />
-              <p className="text-[13px] font-bold text-slate-800">Đang tải danh sách chi phí...</p>
-            </div>
-          ) : filteredExpenses && filteredExpenses.length > 0 ? (
-            <KinhPanel className="shadow-sm overflow-hidden flex flex-col justify-between">
-              <div className="w-full overflow-x-auto">
-                <table className="w-full text-left border-separate border-spacing-0 table-fixed min-w-[700px]">
-                  <thead>
-                    <tr className="text-[11px] font-bold text-slate-500 uppercase tracking-wider select-none">
-                      <th className="py-3 px-3 w-[8%] text-center border-b border-slate-200 bg-slate-50">STT</th>
-                      <th className="py-3 px-3 w-[18%] border-b border-slate-200 bg-slate-50">Mã chứng từ</th>
-                      <th className="py-3 px-3 w-[16%] border-b border-slate-200 bg-slate-50">Ngày chi</th>
-                      <th className="py-3 px-3 w-[24%] border-b border-slate-200 bg-slate-50">Danh mục</th>
-                      <th className="py-3 px-3 w-[18%] text-right border-b border-slate-200 bg-slate-50">Số tiền</th>
-                      <th className="py-3 px-3 w-[16%] border-b border-slate-200 bg-slate-50">Người lập</th>
-                    </tr>
-                  </thead>
-                  <tbody className="text-[13px] text-slate-800">
-                    {filteredExpenses.map((exp, index) => {
-                      const amt = Number(exp.amount || 0);
-                      const isSelected = selectedExpenseForDetail?.id === exp.id;
-                      const stt = index + 1;
- 
-                      return (
-                        <tr
-                          key={exp.id}
-                          onClick={() => {
-                            setSelectedExpenseForDetail(exp);
-                            setIsEditing(false);
-                          }}
-                          className="group cursor-pointer select-none"
-                        >
-                          {/* STT (rounded-l-xl) */}
-                          <td className={`py-3.5 px-3 text-center font-bold text-[12px] transition-all truncate whitespace-nowrap ${
-                            isSelected 
-                              ? "text-amber-900 bg-amber-500/20 group-hover:bg-amber-500/25 border-y border-l border-amber-500/35 rounded-l-xl" 
-                              : "text-slate-400 border-b border-slate-100 group-hover:bg-[#0071e3]/4"
-                          }`}>
-                            {stt}
-                          </td>
- 
-                          {/* Mã chứng từ */}
-                          <td className={`py-3.5 px-3 font-mono text-[12px] transition-all truncate whitespace-nowrap ${
-                            isSelected 
-                              ? "text-amber-900 bg-amber-500/20 group-hover:bg-amber-500/25 border-y border-amber-500/35" 
-                              : "text-slate-500 border-b border-slate-100 group-hover:bg-[#0071e3]/4"
-                          }`} title={exp.expenseNumber}>
-                            <span className={`truncate block max-w-[100px] ${isSelected ? "font-bold text-amber-900" : "font-semibold text-slate-700"}`}>
-                              {exp.expenseNumber}
-                            </span>
-                          </td>
- 
-                          {/* Ngày chi */}
-                          <td className={`py-3.5 px-3 transition-all truncate whitespace-nowrap text-[12px] ${
-                            isSelected 
-                              ? "bg-amber-500/20 group-hover:bg-amber-500/25 border-y border-amber-500/35 text-slate-700 font-semibold" 
-                              : "text-slate-500 border-b border-slate-100 group-hover:bg-[#0071e3]/4"
-                          }`}>
-                            {formatToDDMMYYYY(exp.expenseDate)}
-                          </td>
- 
-                          {/* Danh mục */}
-                          <td className={`py-3.5 px-3 transition-all truncate whitespace-nowrap text-[12px] ${
-                            isSelected 
-                              ? "bg-amber-500/20 group-hover:bg-amber-500/25 border-y border-amber-500/35 text-amber-900 font-bold" 
-                              : "text-amber-800 font-semibold border-b border-slate-100 group-hover:bg-[#0071e3]/4"
-                          }`} title={exp.categoryName}>
-                            {exp.categoryName}
-                          </td>
- 
-                          {/* Số tiền */}
-                          <td className={`py-3.5 px-3 text-right font-bold transition-all truncate whitespace-nowrap text-[13px] ${
-                            isSelected 
-                              ? "bg-amber-500/20 group-hover:bg-amber-500/25 border-y border-amber-500/35 text-rose-600" 
-                              : "text-rose-600 border-b border-slate-100 group-hover:bg-[#0071e3]/4"
-                          }`}>
-                            -{Math.round(amt).toLocaleString("vi-VN")}đ
-                          </td>
- 
-                          {/* Người lập (rounded-r-xl) */}
-                          <td className={`py-3.5 px-3 pr-4 transition-all whitespace-nowrap truncate text-[12px] ${
-                            isSelected 
-                              ? "bg-amber-500/20 group-hover:bg-amber-500/25 border-y border-r border-amber-500/35 rounded-r-xl text-slate-700 font-semibold" 
-                              : "text-slate-500 border-b border-slate-100 group-hover:bg-[#0071e3]/4"
-                          }`} title={exp.createdByName || "Hệ thống"}>
-                            {exp.createdByName || "Hệ thống"}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </KinhPanel>
-          ) : (
-            <KinhPanel className="p-16 text-center shadow-sm">
-              <div className="w-12 h-12 rounded-xl bg-slate-100/60 flex items-center justify-center text-slate-400 mx-auto mb-3 border border-slate-200 shadow-inner">
-                <AlertCircle size={22} className="text-slate-500" />
-              </div>
-              <h5 className="text-[14px] font-bold text-slate-900">
-                {expensesList && expensesList.length > 0 
-                  ? "Không tìm thấy khoản chi phí nào phù hợp" 
-                  : "Chưa ghi nhận chi phí vận hành nào"}
-              </h5>
-              <p className="text-[12px] text-slate-500 mt-1.5 max-w-sm mx-auto leading-relaxed">
-                {expensesList && expensesList.length > 0 
-                  ? "Vui lòng thử điều chỉnh lại bộ lọc danh mục hoặc khoảng thời gian để tìm kiếm." 
-                  : "Nhấp nút \"Ghi nhận khoản chi\" để bắt đầu thiết lập dòng tiền chi phí ngoài mua hàng."}
-              </p>
-            </KinhPanel>
-          )}
-        </div>
- 
-        {/* Right Pane (30% - xl:col-span-1) - Details slip / Summary stats */}
-        <div className="xl:col-span-1 space-y-5 sticky top-6">
-          {!selectedExpenseForDetail ? (
-            /* Standby view: Show breakdown statistics vertical progress list */
-            <KinhPanel className="p-4.5">
-              <div className="space-y-4 w-full">
-                <div className="flex items-center justify-between pb-1">
-                  <div>
-                    <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Cơ cấu Chi vận hành</h4>
-                    <h3 className="text-[20px] font-bold text-slate-800 mt-1 tracking-tight">
-                      {formatPrice(stats.totalExpense)}
-                    </h3>
-                  </div>
-                  <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-100 uppercase tracking-wide">
-                    Chi quỹ
-                  </span>
-                </div>
- 
-                {/* Apple Health-style list for Expenses page categories */}
-                <div className="space-y-3.5 pt-1 max-h-[380px] overflow-y-auto pr-3">
-                  {stats.list.map((stat) => {
-                    const meta = categoryMeta[stat.label] || { color: "bg-slate-400", bg: "#94a3b8" };
+       {/* Ledger List */}
+      <div className="space-y-4">
+        {isLoadingExpenses ? (
+          <div className="bg-white rounded-[18px] border border-[#e0e0e0] flex flex-col items-center justify-center py-24 text-slate-500 shadow-sm">
+            <Loader2 className="animate-spin mb-2.5 text-[#0066cc]" size={24} />
+            <p className="text-[13px] font-bold text-slate-800">Đang tải danh sách chi phí...</p>
+          </div>
+        ) : filteredExpenses && filteredExpenses.length > 0 ? (
+          <KinhPanel className="shadow-sm overflow-hidden flex flex-col justify-between">
+            <div className="w-full overflow-x-auto">
+              <table className="w-full text-left border-separate border-spacing-0 table-fixed min-w-[700px]">
+                <thead>
+                  <tr className="text-[11px] font-bold text-slate-500 uppercase tracking-wider select-none">
+                    <th className="py-3 px-3 w-[8%] text-center border-b border-slate-200 bg-slate-50">STT</th>
+                    <th className="py-3 px-3 w-[18%] border-b border-slate-200 bg-slate-50">Mã chứng từ</th>
+                    <th className="py-3 px-3 w-[16%] border-b border-slate-200 bg-slate-50">Ngày chi</th>
+                    <th className="py-3 px-3 w-[24%] border-b border-slate-200 bg-slate-50">Danh mục</th>
+                    <th className="py-3 px-3 w-[18%] text-right border-b border-slate-200 bg-slate-50">Số tiền</th>
+                    <th className="py-3 px-3 w-[16%] border-b border-slate-200 bg-slate-50">Người lập</th>
+                  </tr>
+                </thead>
+                <tbody className="text-[13px] text-slate-800">
+                  {filteredExpenses.map((exp, index) => {
+                    const amt = Number(exp.amount || 0);
+                    const isSelected = selectedExpenseForDetail?.id === exp.id;
+                    const stt = index + 1;
+
                     return (
-                      <div key={stat.label} className="space-y-1.5 p-1 rounded-xl">
-                        <div className="flex justify-between text-[12px] font-semibold leading-normal">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${meta.color}`} />
-                            <span className="text-slate-700 truncate">{stat.label}</span>
-                          </div>
-                          <div className="flex gap-2 text-right shrink-0">
-                            <span className="text-slate-900 tracking-tight">{formatPrice(stat.amount)}</span>
-                            <span className="text-slate-400 font-medium">{stat.percentage.toFixed(1)}%</span>
-                          </div>
-                        </div>
-                        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                          <div 
-                            style={{ 
-                              width: `${stat.percentage}%`, 
-                              backgroundColor: meta.bg 
-                            }}
-                            className="h-full rounded-full transition-all duration-300"
-                          />
-                        </div>
-                      </div>
+                      <tr
+                        key={exp.id}
+                        onClick={() => {
+                          setSelectedExpenseForDetail(exp);
+                          setIsEditing(false);
+                        }}
+                        className="group cursor-pointer select-none"
+                      >
+                        {/* STT (rounded-l-xl) */}
+                        <td className={`py-3.5 px-3 text-center font-bold text-[12px] transition-all truncate whitespace-nowrap ${
+                          isSelected 
+                            ? "text-[#0066cc] bg-[#0066cc]/8 group-hover:bg-[#0066cc]/12 border-y border-l border-[#0066cc]/25 rounded-l-xl" 
+                            : "text-slate-400 border-b border-slate-100 group-hover:bg-[#0071e3]/4"
+                        }`}>
+                          {stt}
+                        </td>
+
+                        {/* Mã chứng từ */}
+                        <td className={`py-3.5 px-3 font-mono text-[12px] transition-all truncate whitespace-nowrap ${
+                          isSelected 
+                            ? "text-[#0066cc] bg-[#0066cc]/8 group-hover:bg-[#0066cc]/12 border-y border-[#0066cc]/25" 
+                            : "text-slate-500 border-b border-slate-100 group-hover:bg-[#0071e3]/4"
+                        }`} title={exp.expenseNumber}>
+                          <span className={`truncate block max-w-[100px] ${isSelected ? "font-bold text-[#0066cc]" : "font-semibold text-slate-700"}`}>
+                            {exp.expenseNumber}
+                          </span>
+                        </td>
+
+                        {/* Ngày chi */}
+                        <td className={`py-3.5 px-3 transition-all truncate whitespace-nowrap text-[12px] ${
+                          isSelected 
+                            ? "bg-[#0066cc]/8 group-hover:bg-[#0066cc]/12 border-y border-[#0066cc]/25 text-slate-700 font-semibold" 
+                            : "text-slate-500 border-b border-slate-100 group-hover:bg-[#0071e3]/4"
+                        }`}>
+                          {formatToDDMMYYYY(exp.expenseDate)}
+                        </td>
+
+                        {/* Danh mục */}
+                        <td className={`py-3.5 px-3 transition-all truncate whitespace-nowrap text-[12px] ${
+                          isSelected 
+                            ? "bg-[#0066cc]/8 group-hover:bg-[#0066cc]/12 border-y border-[#0066cc]/25 text-slate-800 font-bold" 
+                            : "text-amber-800 font-semibold border-b border-slate-100 group-hover:bg-[#0071e3]/4"
+                        }`} title={exp.categoryName}>
+                          {exp.categoryName}
+                        </td>
+
+                        {/* Số tiền */}
+                        <td className={`py-3.5 px-3 text-right font-bold transition-all truncate whitespace-nowrap text-[13px] ${
+                          isSelected 
+                            ? "bg-[#0066cc]/8 group-hover:bg-[#0066cc]/12 border-y border-[#0066cc]/25 text-rose-600" 
+                            : "text-rose-600 border-b border-slate-100 group-hover:bg-[#0071e3]/4"
+                        }`}>
+                          -{Math.round(amt).toLocaleString("vi-VN")}đ
+                        </td>
+
+                        {/* Người lập (rounded-r-xl) */}
+                        <td className={`py-3.5 px-3 pr-4 transition-all whitespace-nowrap truncate text-[12px] ${
+                          isSelected 
+                            ? "bg-[#0066cc]/8 group-hover:bg-[#0066cc]/12 border-y border-r border-[#0066cc]/25 rounded-r-xl text-slate-700 font-semibold" 
+                            : "text-slate-500 border-b border-slate-100 group-hover:bg-[#0071e3]/4"
+                        }`} title={exp.createdByName || "Hệ thống"}>
+                          {exp.createdByName || "Hệ thống"}
+                        </td>
+                      </tr>
                     );
                   })}
-                </div>
-              </div>
-            </KinhPanel>
-          ) : (
-            /* Selected view: Show high-fidelity slip ticket and inline editor slip */
-            <KinhPanel className="shadow-sm p-4.5 space-y-4 relative transition-all duration-300" overflowVisible={true}>
-              
-              {/* Voucher header controls */}
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
-                <h3 className="text-[12px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
-                  {isEditing ? (
-                    <>
-                      <Edit2 size={13} className="text-[#0066cc]" />
-                      <span>Hiệu chỉnh chi phí</span>
-                    </>
+                </tbody>
+              </table>
+            </div>
+          </KinhPanel>
+        ) : (
+          <KinhPanel className="p-16 text-center shadow-sm">
+            <div className="w-12 h-12 rounded-xl bg-slate-100/60 flex items-center justify-center text-slate-400 mx-auto mb-3 border border-slate-200 shadow-inner">
+              <AlertCircle size={22} className="text-slate-500" />
+            </div>
+            <h5 className="text-[14px] font-bold text-slate-900">
+              {expensesList && expensesList.length > 0 
+                ? "Không tìm thấy khoản chi phí nào phù hợp" 
+                : "Chưa ghi nhận chi phí vận hành nào"}
+            </h5>
+            <p className="text-[12px] text-slate-500 mt-1.5 max-w-sm mx-auto leading-relaxed">
+              {expensesList && expensesList.length > 0 
+                ? "Vui lòng thử điều chỉnh lại bộ lọc danh mục hoặc khoảng thời gian để tìm kiếm." 
+                : "Nhấp nút \"Ghi nhận khoản chi\" để bắt đầu thiết lập dòng tiền chi phí ngoài mua hàng."}
+            </p>
+          </KinhPanel>
+        )}
+      </div>
+ 
+      {/* Expense Detail Dialog Modal */}
+      <Dialog
+        isOpen={selectedExpenseForDetail !== null}
+        onClose={() => {
+          setSelectedExpenseForDetail(null);
+          setIsEditing(false);
+        }}
+        title={isEditing ? "Hiệu chỉnh chi phí" : "Chi tiết phiếu chi"}
+        description={
+          isEditing 
+            ? "Thay đổi thông tin phiếu chi thủ công." 
+            : `Mã số chứng từ: ${selectedExpenseForDetail?.expenseNumber || ""}`
+        }
+        size="md"
+      >
+        {selectedExpenseForDetail && (
+          <div className="space-y-4 pt-2">
+            {isEditing ? (
+              /* Edit manual slip view */
+              <form onSubmit={handleUpdateSubmit} className="space-y-3.5">
+                {/* Category */}
+                <div className="space-y-1.5">
+                  <label className="text-[11.5px] font-semibold text-slate-500 uppercase pl-0.5 tracking-wide">
+                    Danh mục chi phí *
+                  </label>
+                  {categories && categories.length > 0 ? (
+                    <CustomSelect
+                      options={categories.map((c) => ({ value: c.id, label: c.name }))}
+                      value={editCategoryId}
+                      onChange={setEditCategoryId}
+                      dropdownWidth="full"
+                      size="sm"
+                    />
                   ) : (
-                    <>
-                      <Wallet size={13} className="text-[#0066cc]" />
-                      <span>Chi tiết phiếu chi</span>
-                    </>
+                    <div className="text-[13px] text-slate-400 pl-1 font-semibold">Đang tải danh mục...</div>
                   )}
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedExpenseForDetail(null);
-                    setIsEditing(false);
-                  }}
-                  className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-700 transition-all cursor-pointer"
-                  title="Đóng chi tiết"
-                >
-                  <X size={15} />
-                </button>
-              </div>
- 
-              {isEditing ? (
-                /* Edit manual slip view */
-                <form onSubmit={handleUpdateSubmit} className="space-y-3.5">
-                  {/* Category */}
-                  <div className="space-y-1.5">
-                    <label className="text-[11.5px] font-semibold text-slate-500 uppercase pl-0.5 tracking-wide">
-                      Danh mục chi phí *
-                    </label>
-                    {categories && categories.length > 0 ? (
-                      <CustomSelect
-                        options={categories.map((c) => ({ value: c.id, label: c.name }))}
-                        value={editCategoryId}
-                        onChange={setEditCategoryId}
-                        dropdownWidth="full"
-                        size="sm"
-                      />
-                    ) : (
-                      <div className="text-[13px] text-slate-400 pl-1 font-semibold">Đang tải danh mục...</div>
-                    )}
-                  </div>
- 
-                  {/* Amount */}
-                  <div className="space-y-1.5">
-                    <label className="text-[11.5px] font-semibold text-slate-500 uppercase pl-0.5 tracking-wide">
-                      Số tiền chi (VND) *
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={formatVNDInput(editAmount)}
-                        onChange={(e) => setEditAmount(e.target.value.replace(/\D/g, ""))}
-                        placeholder="0"
-                        className="w-full pl-3.5 pr-12 h-[40px] rounded-xl bg-white border border-[#e0e0e0] text-[14px] font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 focus:bg-white transition-all shadow-sm"
-                        required
-                      />
-                      <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">VNĐ</span>
-                    </div>
-                  </div>
- 
-                  {/* Date and Payment Method */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <label className="text-[11.5px] font-semibold text-slate-500 uppercase pl-0.5 tracking-wide">Ngày chi *</label>
-                      <CustomDatePicker
-                        value={editExpenseDate}
-                        onChange={setEditExpenseDate}
-                        size="sm"
-                        placeholder="Chọn ngày chi..."
-                        anchorDate="2026-05-30"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[11.5px] font-semibold text-slate-500 uppercase pl-0.5 tracking-wide">Thanh toán *</label>
-                      <CustomSelect
-                        options={[
-                          { value: "cash", label: "Tiền mặt" },
-                          { value: "bank_transfer", label: "Chuyển khoản" },
-                          { value: "card", label: "Thẻ ngân hàng" },
-                        ]}
-                        value={editPaymentMethod}
-                        onChange={setEditPaymentMethod}
-                        dropdownWidth="full"
-                        size="sm"
-                      />
-                    </div>
-                  </div>
- 
-                  {/* Description */}
-                  <div className="space-y-1.5">
-                    <label className="text-[11.5px] font-semibold text-slate-500 uppercase pl-0.5 tracking-wide">Diễn giải nội dung *</label>
-                    <textarea
-                      value={editDescription}
-                      onChange={(e) => setEditDescription(e.target.value)}
-                      placeholder="Nội dung diễn giải chi tiết..."
-                      className="w-full px-3 py-2 rounded-xl bg-white border border-[#e0e0e0] text-[13px] font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 focus:bg-white transition-all resize-none shadow-sm"
-                      rows={3}
+                </div>
+
+                {/* Amount */}
+                <div className="space-y-1.5">
+                  <label className="text-[11.5px] font-semibold text-slate-500 uppercase pl-0.5 tracking-wide">
+                    Số tiền chi (VND) *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={formatVNDInput(editAmount)}
+                      onChange={(e) => setEditAmount(e.target.value.replace(/\D/g, ""))}
+                      placeholder="0"
+                      className="w-full pl-3.5 pr-12 h-[40px] rounded-xl bg-white border border-[#e0e0e0] text-[14px] font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 focus:bg-white transition-all shadow-sm"
                       required
                     />
-                  </div>
- 
-                  {/* Submission triggers & Destructive control */}
-                  <div className="pt-3.5 border-t border-slate-100 space-y-2">
-                    <div className="flex gap-2 justify-end">
-                      <button
-                        type="button"
-                        onClick={() => setIsEditing(false)}
-                        className="px-4 h-[34px] bg-[#fafafc] hover:bg-[#f5f5f7] border border-[#e0e0e0] text-slate-700 rounded-full text-[12px] font-semibold transition-all cursor-pointer active:scale-95 duration-200"
-                      >
-                        Hủy
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={updateExpenseMutation.isPending}
-                        className="flex items-center justify-center gap-1.5 px-4.5 h-[34px] bg-[#0066cc] text-white hover:bg-blue-600 rounded-full text-[12px] font-semibold transition-all disabled:opacity-50 cursor-pointer active:scale-95 duration-200 shadow-sm"
-                      >
-                        {updateExpenseMutation.isPending ? "Đang lưu..." : "Lưu thay đổi"}
-                      </button>
-                    </div>
- 
-                    <button
-                      type="button"
-                      onClick={() => setExpenseToDelete(selectedExpenseForDetail)}
-                      className="w-full flex items-center justify-center gap-1.5 h-[34px] bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-full text-[12px] font-semibold transition-all border border-rose-200 cursor-pointer active:scale-95 duration-200"
-                    >
-                      <Trash2 size={13} /> Xóa khoản chi
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                /* High-fidelity Receipt Voucher Slip layout */
-                <div className="space-y-4">
-                  {/* Coupon layout voucher box */}
-                  <div className="bg-slate-50/70 border border-slate-200 rounded-xl p-3.5 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] relative overflow-hidden">
-                    <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                      <span className="text-[10px] font-bold text-slate-400 tracking-wider">TICKET VOUCHER</span>
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-extrabold bg-rose-600 text-white uppercase tracking-wider shadow-sm">
-                        Chi quỹ
-                      </span>
-                    </div>
- 
-                    {/* Big Amount Spot */}
-                    <div className="text-center py-4">
-                      <p className="text-[10.5px] font-semibold text-[#7a7a7a] uppercase tracking-wide leading-none">Số tiền hạch toán</p>
-                      <h2 className="text-[21px] font-bold mt-1.5 leading-none tracking-tight tabular-nums text-rose-600">
-                        -{formatPrice(selectedExpenseForDetail.amount)}
-                      </h2>
-                    </div>
- 
-                    {/* Serrated coupon dash lines with cutout circles */}
-                    <div className="relative my-2.5">
-                      <div className="border-t border-dashed border-slate-300" />
-                      <div className="absolute -left-[21.5px] top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-white border-r border-slate-200 z-10" />
-                      <div className="absolute -right-[21.5px] top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-white border-l border-slate-200 z-10" />
-                    </div>
- 
-                    {/* Attributes Grid */}
-                    <div className="space-y-2 text-[12.5px]">
-                      <div className="flex justify-between">
-                        <span className="font-medium text-slate-400">Mã số phiếu:</span>
-                        <span className="font-semibold text-slate-800 tracking-tight">{selectedExpenseForDetail.expenseNumber}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="font-medium text-slate-400">Ngày chi:</span>
-                        <span className="font-semibold text-slate-800">
-                          {formatToDDMMYYYY(selectedExpenseForDetail.expenseDate)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="font-medium text-slate-400">Danh mục chi:</span>
-                        <span className="font-semibold text-slate-800">
-                          {selectedExpenseForDetail.categoryName}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="font-medium text-slate-400">Thanh toán bằng:</span>
-                        <span className="font-semibold text-slate-800">
-                          {payMethods[selectedExpenseForDetail.paymentMethod] || selectedExpenseForDetail.paymentMethod}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="font-medium text-slate-400">Nhân viên ghi:</span>
-                        <span className="font-semibold text-slate-800">
-                          {selectedExpenseForDetail.createdByName || "Hệ thống"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
- 
-                  {/* Diễn giải chi tiết */}
-                  <div className="space-y-1.5">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Diễn giải nội dung chi:</span>
-                    <div className="p-3 bg-slate-50 border border-slate-200/50 rounded-xl leading-relaxed text-slate-700 italic text-[13px]">
-                      &ldquo;{selectedExpenseForDetail.description}&rdquo;
-                    </div>
-                  </div>
- 
-                  {/* Action buttons */}
-                  <div className="pt-3 border-t border-slate-100 flex gap-2 justify-end">
-                    <button
-                      type="button"
-                      onClick={() => handleStartEdit()}
-                      className="flex items-center gap-1.5 px-4 h-[34px] bg-[#0066cc] text-white hover:bg-blue-600 rounded-full text-[12px] font-semibold transition-all cursor-pointer active:scale-95 duration-200"
-                    >
-                      <Pencil size={12} /> Hiệu chỉnh
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setExpenseToDelete(selectedExpenseForDetail)}
-                      className="flex items-center gap-1.5 px-4 h-[34px] bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-full text-[12px] font-semibold transition-all border border-rose-100 cursor-pointer active:scale-95 duration-200"
-                    >
-                      <Trash2 size={12} /> Xóa phiếu
-                    </button>
+                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">VNĐ</span>
                   </div>
                 </div>
-              )}
-            </KinhPanel>
-          )}
-        </div>
-      </div>
+
+                {/* Date and Payment Method */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[11.5px] font-semibold text-slate-500 uppercase pl-0.5 tracking-wide">Ngày chi *</label>
+                    <CustomDatePicker
+                      value={editExpenseDate}
+                      onChange={setEditExpenseDate}
+                      size="sm"
+                      placeholder="Chọn ngày chi..."
+                      anchorDate="2026-05-30"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11.5px] font-semibold text-slate-500 uppercase pl-0.5 tracking-wide">Thanh toán *</label>
+                    <CustomSelect
+                      options={[
+                        { value: "cash", label: "Tiền mặt" },
+                        { value: "bank_transfer", label: "Chuyển khoản" },
+                        { value: "card", label: "Thẻ ngân hàng" },
+                      ]}
+                      value={editPaymentMethod}
+                      onChange={setEditPaymentMethod}
+                      dropdownWidth="full"
+                      size="sm"
+                    />
+                  </div>
+                </div>
+
+                {/* Description */}
+                <div className="space-y-1.5">
+                  <label className="text-[11.5px] font-semibold text-slate-500 uppercase pl-0.5 tracking-wide">Diễn giải nội dung *</label>
+                  <textarea
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    placeholder="Nội dung diễn giải chi tiết..."
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-[#e0e0e0] text-[13px] font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 focus:bg-white transition-all resize-none shadow-sm"
+                    rows={3}
+                    required
+                  />
+                </div>
+
+                {/* Submission triggers & Destructive control */}
+                <div className="pt-3.5 border-t border-slate-100 space-y-2">
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditing(false)}
+                      className="px-4 h-[34px] bg-[#fafafc] hover:bg-[#f5f5f7] border border-[#e0e0e0] text-slate-700 rounded-full text-[12px] font-semibold transition-all cursor-pointer active:scale-95 duration-200"
+                    >
+                      Hủy
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={updateExpenseMutation.isPending}
+                      className="flex items-center justify-center gap-1.5 px-4.5 h-[34px] bg-[#0066cc] text-white hover:bg-blue-600 rounded-full text-[12px] font-semibold transition-all disabled:opacity-50 cursor-pointer active:scale-95 duration-200 shadow-sm"
+                    >
+                      {updateExpenseMutation.isPending ? "Đang lưu..." : "Lưu thay đổi"}
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setExpenseToDelete(selectedExpenseForDetail);
+                    }}
+                    className="w-full flex items-center justify-center gap-1.5 h-[34px] bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-full text-[12px] font-semibold transition-all border border-rose-200 cursor-pointer active:scale-95 duration-200"
+                  >
+                    <Trash2 size={13} /> Xóa khoản chi
+                  </button>
+                </div>
+              </form>
+            ) : (
+              /* High-fidelity Receipt Voucher Slip layout */
+              <div className="space-y-4">
+                {/* Coupon layout voucher box */}
+                <div className="bg-slate-50/70 border border-slate-200 rounded-xl p-3.5 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] relative overflow-hidden">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                    <span className="text-[10px] font-bold text-slate-400 tracking-wider">TICKET VOUCHER</span>
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-extrabold bg-rose-600 text-white uppercase tracking-wider shadow-sm">
+                      Chi quỹ
+                    </span>
+                  </div>
+
+                  {/* Big Amount Spot */}
+                  <div className="text-center py-4">
+                    <p className="text-[10.5px] font-semibold text-[#7a7a7a] uppercase tracking-wide leading-none">Số tiền hạch toán</p>
+                    <h2 className="text-[21px] font-bold mt-1.5 leading-none tracking-tight tabular-nums text-rose-600">
+                      -{formatPrice(selectedExpenseForDetail.amount)}
+                    </h2>
+                  </div>
+
+                  {/* Serrated coupon dash lines with cutout circles */}
+                  <div className="relative my-2.5">
+                    <div className="border-t border-dashed border-slate-300" />
+                    <div className="absolute -left-[21.5px] top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-white border-r border-slate-200 z-10" />
+                    <div className="absolute -right-[21.5px] top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-white border-l border-slate-200 z-10" />
+                  </div>
+
+                  {/* Attributes Grid */}
+                  <div className="space-y-2 text-[12.5px]">
+                    <div className="flex justify-between">
+                      <span className="font-medium text-slate-400">Mã số phiếu:</span>
+                      <span className="font-semibold text-slate-800 tracking-tight">{selectedExpenseForDetail.expenseNumber}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium text-slate-400">Ngày chi:</span>
+                      <span className="font-semibold text-slate-800">
+                        {formatToDDMMYYYY(selectedExpenseForDetail.expenseDate)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium text-slate-400">Danh mục chi:</span>
+                      <span className="font-semibold text-slate-800">
+                        {selectedExpenseForDetail.categoryName}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium text-slate-400">Thanh toán bằng:</span>
+                      <span className="font-semibold text-slate-800">
+                        {payMethods[selectedExpenseForDetail.paymentMethod] || selectedExpenseForDetail.paymentMethod}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium text-slate-400">Nhân viên ghi:</span>
+                      <span className="font-semibold text-slate-800">
+                        {selectedExpenseForDetail.createdByName || "Hệ thống"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Diễn giải chi tiết */}
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Diễn giải nội dung chi:</span>
+                  <div className="p-3 bg-slate-50 border border-slate-200/50 rounded-xl leading-relaxed text-slate-700 italic text-[13px]">
+                    &ldquo;{selectedExpenseForDetail.description}&rdquo;
+                  </div>
+                </div>
+
+                {/* Action buttons */}
+                <div className="pt-3 border-t border-slate-100 flex gap-2 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => handleStartEdit()}
+                    className="flex items-center gap-1.5 px-4 h-[34px] bg-[#0066cc] text-white hover:bg-blue-600 rounded-full text-[12px] font-semibold transition-all cursor-pointer active:scale-95 duration-200"
+                  >
+                    <Pencil size={12} /> Hiệu chỉnh
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setExpenseToDelete(selectedExpenseForDetail);
+                    }}
+                    className="flex items-center gap-1.5 px-4 h-[34px] bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-full text-[12px] font-semibold transition-all border border-rose-100 cursor-pointer active:scale-95 duration-200"
+                  >
+                    <Trash2 size={12} /> Xóa phiếu
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </Dialog>
  
       {/* Elegant Add Expense Dialog Modal */}
       {isDialogOpen && (

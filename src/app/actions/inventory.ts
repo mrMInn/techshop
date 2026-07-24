@@ -26,7 +26,7 @@ import {
   accessoryItems
 } from "@/lib/db/schema";
 import { db, recalculateRunningBalances } from "@/lib/db";
-import { eq, desc, inArray, sql, and, or, like, ilike } from "drizzle-orm";
+import { eq, desc, inArray, sql, and, or, like, ilike, lte } from "drizzle-orm";
 import { syncHistoricalData } from "./accounting";
 import { after } from "next/server";
 
@@ -238,6 +238,113 @@ export async function getInventoryItems() {
 
   return itemsWithAccessories;
 }
+
+/**
+ * Lấy danh sách tồn kho quá hạn (trên 45 ngày) đã tối ưu cho Dashboard
+ */
+export async function getAgedInventoryItems(daysThreshold = 45) {
+  try {
+    const thresholdDate = new Date();
+    thresholdDate.setDate(thresholdDate.getDate() - daysThreshold);
+    const thresholdDateStr = thresholdDate.toISOString().split("T")[0];
+
+    const items = await db
+      .select({
+        id: inventoryItems.id,
+        productId: inventoryItems.productId,
+        productName: products.name,
+        productSpecs: products.specs,
+        brandName: brands.name,
+        categoryName: categories.name,
+        costPrice: inventoryItems.costPrice,
+        stockedDate: inventoryItems.stockedDate,
+      })
+      .from(inventoryItems)
+      .innerJoin(products, eq(inventoryItems.productId, products.id))
+      .innerJoin(brands, eq(products.brandId, brands.id))
+      .innerJoin(categories, eq(products.categoryId, categories.id))
+      .where(
+        and(
+          eq(inventoryItems.status, "in_stock"),
+          sql`${inventoryItems.stockedDate} IS NOT NULL`,
+          lte(inventoryItems.stockedDate, thresholdDateStr)
+        )
+      )
+      .orderBy(inventoryItems.stockedDate);
+
+    if (items.length === 0) {
+      return { agedItems: [], tongVonDong: 0, totalCount: 0 };
+    }
+
+    const productIds = Array.from(new Set(items.map(i => i.productId)));
+
+    const inStockStats = await db
+      .select({
+        productId: inventoryItems.productId,
+        count: sql<number>`cast(count(${inventoryItems.id}) as integer)`,
+        totalCost: sql<number>`cast(coalesce(sum(${inventoryItems.costPrice}), 0) as double precision)`,
+      })
+      .from(inventoryItems)
+      .where(
+        and(
+          eq(inventoryItems.status, "in_stock"),
+          inArray(inventoryItems.productId, productIds)
+        )
+      )
+      .groupBy(inventoryItems.productId);
+
+    const statsMap: Record<string, { count: number; totalCost: number }> = {};
+    inStockStats.forEach(s => {
+      statsMap[s.productId] = { count: Number(s.count || 0), totalCost: Number(s.totalCost || 0) };
+    });
+
+    const agedModelsMap: Record<string, any> = {};
+    const today = new Date();
+
+    items.forEach((item) => {
+      const stocked = new Date(item.stockedDate!);
+      const diffTime = today.getTime() - stocked.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      
+      const key = item.productId;
+      if (!agedModelsMap[key]) {
+        const stats = statsMap[key] || { count: 1, totalCost: Number(item.costPrice || 0) };
+        const avgCost = stats.count > 0 ? Math.round(stats.totalCost / stats.count) : 0;
+        agedModelsMap[key] = {
+          id: item.id,
+          productId: item.productId,
+          productName: item.productName,
+          productSpecs: item.productSpecs,
+          brandName: item.brandName,
+          categoryName: item.categoryName,
+          stockedDate: item.stockedDate,
+          diffDays,
+          stockQty: stats.count,
+          rowDongVon: stats.totalCost,
+          avgCost,
+        };
+      } else {
+        if (diffDays > agedModelsMap[key].diffDays) {
+          agedModelsMap[key].diffDays = diffDays;
+          agedModelsMap[key].stockedDate = item.stockedDate;
+        }
+      }
+    });
+
+    const agedItemsList = Object.values(agedModelsMap).sort((a: any, b: any) => b.diffDays - a.diffDays);
+    const tongVonDong = agedItemsList.reduce((sum: number, item: any) => sum + item.rowDongVon, 0);
+
+    return {
+      agedItems: agedItemsList,
+      tongVonDong,
+      totalCount: agedItemsList.length,
+    };
+  } catch (error) {
+    console.error("Lỗi lấy danh sách tồn kho quá hạn:", error);
+    return { agedItems: [], tongVonDong: 0, totalCount: 0 };
+  }
+}
+
 
 /**
  * Lấy danh sách thiết bị gom nhóm theo Model Sản phẩm (có phân trang và bộ lọc phía máy chủ)
@@ -1921,8 +2028,7 @@ export async function supplierRefundAction(
 }
 
 export async function supplierReturnWriteOffAction(itemId: string) {
-  // Legacy: giữ lại để tương thích ngược, nhưng khuyến khích dùng supplierReplaceAction
-  return { success: false, message: "Vui lòng sử dụng chức năng 'Đổi máy mới' với Serial mới" };
+  return supplierRefundAction(itemId, "0");
 }
 
 /**

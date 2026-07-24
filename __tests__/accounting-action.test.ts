@@ -268,6 +268,7 @@ describe('Accounting Server Actions', () => {
       expect(res.totalIncome).toBe(10000000);
       expect(res.totalExpense).toBe(2000000);
       expect(res.netProfit).toBe(2700000); // 5m + 1m + 0.2m - 2m - 1.5m = 2.7m
+      mockDb.then.mockImplementation((cb: any) => Promise.resolve([]).then(cb));
     });
 
     it('catch block', async () => {
@@ -279,12 +280,14 @@ describe('Accounting Server Actions', () => {
 
   describe('getCashBookEntries', () => {
     it('thành công không có filter', async () => {
+      mockDb.then.mockImplementationOnce((resolve) => resolve([{ count: 1 }]));
       mockDb.then.mockImplementationOnce((resolve) => resolve([{ id: 'cb-1' }]));
       const res = await getCashBookEntries();
       expect(res.list.length).toBe(1);
     });
 
     it('thành công có filter đầy đủ', async () => {
+      mockDb.then.mockImplementationOnce((resolve) => resolve([{ count: 1 }]));
       mockDb.then.mockImplementationOnce((resolve) => resolve([{ id: 'cb-1' }]));
       const res = await getCashBookEntries({
         type: 'income',

@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { getFinancialSummary, getDashboardBentoData } from "@/app/actions/accounting";
-import { getInventoryItems } from "@/app/actions/inventory";
+import { getAgedInventoryItems } from "@/app/actions/inventory";
 import {
   ChevronDown,
   ChevronLeft,
@@ -722,6 +722,7 @@ export default function DashboardHome() {
     queryKey: ["dashboard_bento_stats", thangDuocChon],
     queryFn: () => getDashboardBentoData(thangDuocChon),
     enabled: mounted,
+    staleTime: 5 * 60 * 1000,
   });
 
   const {
@@ -732,17 +733,19 @@ export default function DashboardHome() {
     queryKey: ["financial_summary"],
     queryFn: getFinancialSummary,
     enabled: mounted,
+    staleTime: 5 * 60 * 1000,
   });
 
   const {
-    data: inventoryItemsData,
+    data: agedInventoryData,
     isLoading: isInventoryLoading,
     isFetching: isInventoryFetching,
     refetch: refetchInventory,
   } = useQuery({
-    queryKey: ["inventory_items"],
-    queryFn: getInventoryItems,
+    queryKey: ["aged_inventory_items"],
+    queryFn: () => getAgedInventoryItems(45),
     enabled: mounted,
+    staleTime: 5 * 60 * 1000,
   });
 
   const isLoading = isBentoLoading || isSummaryLoading || isInventoryLoading;
@@ -763,60 +766,8 @@ export default function DashboardHome() {
     return options;
   }, []);
 
-  // Filter aging items (> 45 days) and group by product model
-  const agedItems = useMemo(() => {
-    const itemsInStock = (inventoryItemsData || []).filter((item: any) => item.status === "in_stock");
-    
-    const agedModelsMap: Record<string, any> = {};
-    
-    itemsInStock.forEach((item: any) => {
-      if (!item.stockedDate) return;
-      const stocked = new Date(item.stockedDate);
-      const today = new Date();
-      const diffTime = today.getTime() - stocked.getTime();
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-      
-      if (diffDays > 45) {
-        const key = item.productId || item.productName;
-        if (!agedModelsMap[key]) {
-          agedModelsMap[key] = {
-            ...item,
-            diffDays,
-          };
-        } else {
-          // Keep the oldest stocking date & max days in stock
-          if (diffDays > agedModelsMap[key].diffDays) {
-            agedModelsMap[key].diffDays = diffDays;
-            agedModelsMap[key].stockedDate = item.stockedDate;
-          }
-        }
-      }
-    });
-
-    return Object.values(agedModelsMap).sort((a: any, b: any) => b.diffDays - a.diffDays);
-  }, [inventoryItemsData]);
-
-  const tongVonDong = useMemo(() => {
-    return agedItems.reduce((sum: number, item: any) => {
-      const modelInStock = (inventoryItemsData || []).filter(
-        (i: any) => i.status === "in_stock" && (i.productId === item.productId || i.productName === item.productName)
-      );
-      const totalCost = modelInStock.reduce((s: number, i: any) => s + (Number(i.costPrice) || 0), 0);
-      return sum + totalCost;
-    }, 0);
-  }, [agedItems, inventoryItemsData]);
-
-  // Count in-stock quantity for each product model
-  const modelStockCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    (inventoryItemsData || []).forEach((item: any) => {
-      if (item.status === "in_stock") {
-        const key = item.productId || item.productName;
-        counts[key] = (counts[key] || 0) + 1;
-      }
-    });
-    return counts;
-  }, [inventoryItemsData]);
+  const agedItems = agedInventoryData?.agedItems || [];
+  const tongVonDong = agedInventoryData?.tongVonDong || 0;
 
   const { chartData = [], monthlyChartData = [] } = financialSummary || {};
 
@@ -1318,13 +1269,9 @@ export default function DashboardHome() {
                   )}
 
                   {agedItems.map((item: any, index: number) => {
-                    const modelInStock = (inventoryItemsData || []).filter(
-                      (i: any) => i.status === "in_stock" && (i.productId === item.productId || i.productName === item.productName)
-                    );
-                    const stockQty = modelInStock.length;
-                    const totalCost = modelInStock.reduce((s: number, i: any) => s + (Number(i.costPrice) || 0), 0);
-                    const avgCost = stockQty > 0 ? Math.round(totalCost / stockQty) : 0;
-                    const rowDongVon = avgCost * stockQty;
+                    const stockQty = item.stockQty;
+                    const avgCost = item.avgCost;
+                    const rowDongVon = item.rowDongVon;
                     return (
                       <div
                         key={item.id}
