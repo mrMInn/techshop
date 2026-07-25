@@ -25,6 +25,7 @@ import {
 } from "@/lib/db/schema";
 import { eq, desc, inArray, and, or, ilike, sql } from "drizzle-orm";
 import { sendTelegramNotification } from "@/lib/telegram/notifier";
+import { invalidateDashboardCache, serverCache } from "@/lib/cache";
 
 // 1. Lấy danh sách đơn hàng có phân trang và lọc từ Backend
 export async function getOrdersList(params?: {
@@ -117,17 +118,22 @@ export async function getOrdersList(params?: {
     const totalPages = Math.ceil(totalItems / limit);
 
     // C. Truy vấn thống kê nhanh toàn hệ thống (không bị ảnh hưởng bởi phân trang)
-    const statsResult = await db
-      .select({
-        completedCount: sql<number>`count(case when ${orders.status} = 'completed' then 1 end)`,
-        processingCount: sql<number>`count(case when ${orders.status} = 'processing' then 1 end)`,
-        cancelledCount: sql<number>`count(case when ${orders.status} = 'cancelled' then 1 end)`,
-        onlineCount: sql<number>`count(case when ${orders.saleChannel} = 'online' and ${orders.status} != 'cancelled' then 1 end)`,
-        unpaidCount: sql<number>`count(case when ${orders.paymentStatus} = 'unpaid' and ${orders.status} != 'cancelled' then 1 end)`,
-      })
-      .from(orders);
+    const statsCacheKey = "orders_overall_stats";
+    let stats = serverCache.get(statsCacheKey);
+    if (!stats) {
+      const statsResult = await db
+        .select({
+          completedCount: sql<number>`count(case when ${orders.status} = 'completed' then 1 end)`,
+          processingCount: sql<number>`count(case when ${orders.status} = 'processing' then 1 end)`,
+          cancelledCount: sql<number>`count(case when ${orders.status} = 'cancelled' then 1 end)`,
+          onlineCount: sql<number>`count(case when ${orders.saleChannel} = 'online' and ${orders.status} != 'cancelled' then 1 end)`,
+          unpaidCount: sql<number>`count(case when ${orders.paymentStatus} = 'unpaid' and ${orders.status} != 'cancelled' then 1 end)`,
+        })
+        .from(orders);
 
-    const stats = statsResult[0] || { completedCount: 0, processingCount: 0, cancelledCount: 0, onlineCount: 0, unpaidCount: 0 };
+      stats = statsResult[0] || { completedCount: 0, processingCount: 0, cancelledCount: 0, onlineCount: 0, unpaidCount: 0 };
+      serverCache.set(statsCacheKey, stats, 60); // Cache for 1 minute
+    }
 
     return {
       orders: list,
@@ -864,6 +870,12 @@ export async function createOrderAction(data: {
       });
     }
 
+    if (result.success) {
+      after(() => {
+        invalidateDashboardCache();
+      });
+    }
+
     return result;
   } catch (error: any) {
     console.error("Lỗi tạo đơn hàng:", error);
@@ -1010,6 +1022,12 @@ export async function cancelOrderAction(orderId: string) {
       });
     }
 
+    if (result.success) {
+      after(() => {
+        invalidateDashboardCache();
+      });
+    }
+
     return result;
   } catch (error: any) {
     console.error("Lỗi hủy đơn hàng:", error);
@@ -1102,7 +1120,11 @@ export async function recordPaymentAction(data: {
 
       await recalculateRunningBalances(tx);
 
-      return { success: true, message: "Ghi nhận thanh toán bổ sung thành công", payment: newPayment };
+      const result = { success: true, message: "Ghi nhận thanh toán bổ sung thành công", payment: newPayment };
+      after(() => {
+        invalidateDashboardCache();
+      });
+      return result;
     });
   } catch (error: any) {
     console.error("Lỗi ghi nhận thanh toán bổ sung:", error);
@@ -1260,6 +1282,12 @@ export async function completeOnlineOrderAction(data: {
           payment_method: payMethods[result.telegramData.paymentMethod] || result.telegramData.paymentMethod,
           items_list: result.telegramData.itemsList,
         }).catch((err) => console.error("Lỗi gửi thông báo Telegram đơn hàng hoàn tất:", err));
+      });
+    }
+
+    if (result.success) {
+      after(() => {
+        invalidateDashboardCache();
       });
     }
 

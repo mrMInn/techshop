@@ -197,6 +197,7 @@ export default function ReportsPage() {
     queryKey: ["income_statement", startDate, endDate],
     queryFn: () => getIncomeStatementReport(startDate, endDate),
     enabled: activeReportTab === "pl",
+    staleTime: 60000,
   });
 
   const { 
@@ -208,6 +209,7 @@ export default function ReportsPage() {
     queryKey: ["cashflow_statement", startDate, endDate],
     queryFn: () => getCashFlowStatementReport(startDate, endDate),
     enabled: activeReportTab === "cashflow",
+    staleTime: 60000,
   });
 
   const formatVND = (val: string | number) => {

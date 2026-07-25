@@ -210,13 +210,25 @@ export default function DashboardLayout({
   const settingsItem = isAdmin ? { href: "/settings", label: "Cấu hình hệ thống", icon: <Settings size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-[#8e8e93] to-[#636366]", match: (p: string) => p.startsWith("/settings") } : null;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50 antialiased font-sans">
+    <div className="flex h-screen overflow-hidden bg-[#f5f5f7] antialiased font-sans">
       
-      {/* Apple Premium Frosted Glass Sidebar */}
-      <aside className="w-64 bg-[#f5f5f7]/80 backdrop-blur-2xl border-r border-[#e0e0e0]/80 hidden md:flex flex-col p-5 justify-between z-40 select-none">
+      {/* Apple Premium Flat Minimalist Sidebar */}
+      <aside className="w-64 bg-white border-r border-[#e3e3e8] hidden md:flex flex-col p-5 justify-between z-40 select-none">
         
         <div className="space-y-6">
-
+          {/* Logo Brand Title */}
+          <Link 
+            href="/" 
+            className="flex items-center gap-2.5 px-2 hover:opacity-80 transition-opacity mb-4 cursor-pointer select-none active:scale-[0.98]"
+            scroll={false}
+          >
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-[#2997ff] via-[#a855f7] to-[#ec4899] flex items-center justify-center text-white font-extrabold text-[15px] shadow-[0_2px_10px_rgba(0,102,204,0.15)]">
+              T
+            </div>
+            <span className="text-[15px] font-bold text-slate-800 tracking-tight">
+              TechShop ERP
+            </span>
+          </Link>
 
           {/* Navigation Section */}
           <div className="space-y-2">
@@ -247,7 +259,7 @@ export default function DashboardLayout({
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 bg-white overflow-y-auto p-4 sm:p-6 lg:p-8 relative">
+      <main className="flex-1 bg-[#f5f5f7] overflow-y-auto p-4 sm:p-6 lg:p-8 relative">
         {/* Decorative Liquid Glass light beam background */}
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#0066cc]/2 blur-[100px] rounded-full pointer-events-none z-0" />
         

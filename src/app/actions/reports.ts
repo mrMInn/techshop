@@ -10,9 +10,16 @@ import {
   cashBookEntries 
 } from "@/lib/db/schema";
 import { eq, and, sql, or, gte, lte, lt } from "drizzle-orm";
+import { serverCache } from "@/lib/cache";
 
 // 1. Lấy Báo cáo Kết quả Kinh doanh (P&L - Profit & Loss)
 export async function getIncomeStatementReport(startDate: string, endDate: string) {
+  const cacheKey = `income_statement_${startDate}_${endDate}`;
+  const cached = serverCache.get(cacheKey);
+  if (cached) {
+    console.log(`CACHE HIT: getIncomeStatementReport (${startDate} - ${endDate})`);
+    return cached;
+  }
   try {
     // A. Doanh thu bán lẻ từ Đơn hàng hoàn thành
     const salesStats = await db
@@ -93,7 +100,7 @@ export async function getIncomeStatementReport(startDate: string, endDate: strin
     const netRevenue = salesRevenue + warrantyIncome - salesRefunds;
     const netProfit = netRevenue - costOfGoodsSold - totalOperatingExpenses;
 
-    return {
+    const result = {
       salesRevenue,
       costOfGoodsSold,
       salesGrossMargin,
@@ -104,6 +111,8 @@ export async function getIncomeStatementReport(startDate: string, endDate: strin
       totalOperatingExpenses,
       netProfit,
     };
+    serverCache.set(cacheKey, result, 120); // Cache for 2 minutes
+    return result;
   } catch (error) {
     console.error("Lỗi lấy báo cáo P&L:", error);
     return {
@@ -122,6 +131,12 @@ export async function getIncomeStatementReport(startDate: string, endDate: strin
 
 // 2. Lấy Báo cáo Lưu chuyển Tiền tệ (Cash Flow Statement)
 export async function getCashFlowStatementReport(startDate: string, endDate: string) {
+  const cacheKey = `cashflow_statement_${startDate}_${endDate}`;
+  const cached = serverCache.get(cacheKey);
+  if (cached) {
+    console.log(`CACHE HIT: getCashFlowStatementReport (${startDate} - ${endDate})`);
+    return cached;
+  }
   try {
     const entries = await db
       .select()
@@ -165,7 +180,7 @@ export async function getCashFlowStatementReport(startDate: string, endDate: str
     const netInvestingCashFlow = -investingOutflow;
     const netCashFlow = netOperatingCashFlow + netInvestingCashFlow;
 
-    return {
+    const result = {
       operatingInflow,
       operatingOutflow,
       netOperatingCashFlow,
@@ -178,6 +193,8 @@ export async function getCashFlowStatementReport(startDate: string, endDate: str
         expense: categoryStats[key].expense,
       })),
     };
+    serverCache.set(cacheKey, result, 120); // Cache for 2 minutes
+    return result;
   } catch (error) {
     console.error("Lỗi lấy báo cáo dòng tiền:", error);
     return {

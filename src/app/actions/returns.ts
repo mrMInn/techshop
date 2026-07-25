@@ -1,6 +1,8 @@
 "use server";
 
 import { db, recalculateRunningBalances } from "@/lib/db";
+import { after } from "next/server";
+import { invalidateDashboardCache } from "@/lib/cache";
 import { 
   returns, 
   returnItems, 
@@ -433,7 +435,11 @@ export async function createReturn(data: {
         await recalculateRunningBalances(tx);
       }
 
-      return { success: true, message: "Tạo phiếu Đổi/Trả thành công. Đã cập nhật kho & đơn hàng gốc.", return: newReturn };
+      const result = { success: true, message: "Tạo phiếu Đổi/Trả thành công. Đã cập nhật kho & đơn hàng gốc.", return: newReturn };
+      after(() => {
+        invalidateDashboardCache();
+      });
+      return result;
     });
   } catch (error: any) {
     console.error("Lỗi tạo phiếu Đổi/Trả:", error);
@@ -638,10 +644,14 @@ export async function deleteReturnAction(id: string) {
       // 8. Recalculate Cashbook balances
       await recalculateRunningBalances(tx);
 
-      return { 
+      const result = { 
         success: true, 
         message: `Đã xóa thành công phiếu đổi trả ${deletedReturn?.returnNumber} và hoàn tác kho hàng/sổ quỹ/đơn hàng gốc.` 
       };
+      after(() => {
+        invalidateDashboardCache();
+      });
+      return result;
     });
   } catch (error: any) {
     console.error("Lỗi xóa phiếu đổi trả:", error);

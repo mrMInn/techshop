@@ -16,6 +16,7 @@ import {
 } from "@/lib/db/schema";
 import { eq, desc, and } from "drizzle-orm";
 import { sendTelegramNotification } from "@/lib/telegram/notifier";
+import { invalidateDashboardCache } from "@/lib/cache";
 
 export async function getCompletedOrdersForSelect() {
   try {
@@ -308,6 +309,12 @@ export async function createWarrantyClaim(data: {
       });
     }
 
+    if (result.success) {
+      after(() => {
+        invalidateDashboardCache();
+      });
+    }
+
     return result;
   } catch (error: any) {
     console.error("Lỗi tạo phiếu bảo hành:", error);
@@ -532,7 +539,11 @@ export async function updateWarrantyStatus(data: {
         }
       }
 
-      return { success: true, message: "Cập nhật trạng thái thành công" };
+      const result = { success: true, message: "Cập nhật trạng thái thành công" };
+      after(() => {
+        invalidateDashboardCache();
+      });
+      return result;
     });
   } catch (error: any) {
     console.error("Lỗi cập nhật bảo hành:", error);
@@ -579,7 +590,11 @@ export async function deleteWarrantyClaim(claimId: string) {
       // 6. Tính toán lại số dư sổ quỹ
       await recalculateRunningBalances(tx);
 
-      return { success: true, message: "Xóa phiếu bảo hành thành công. Đã khôi phục trạng thái máy." };
+      const result = { success: true, message: "Xóa phiếu bảo hành thành công. Đã khôi phục trạng thái máy." };
+      after(() => {
+        invalidateDashboardCache();
+      });
+      return result;
     });
   } catch (error: any) {
     console.error("Lỗi xóa phiếu bảo hành:", error);

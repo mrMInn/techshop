@@ -100,6 +100,7 @@ function OrdersPageContent() {
       paymentStatus: selectedPaymentStatus,
       saleChannel: selectedChannel,
     }),
+    staleTime: 10000,
   });
 
   const ordersList = data?.orders || [];

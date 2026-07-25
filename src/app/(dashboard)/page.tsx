@@ -731,7 +731,7 @@ export default function DashboardHome() {
     isFetching: isSummaryFetching,
   } = useQuery({
     queryKey: ["financial_summary"],
-    queryFn: getFinancialSummary,
+    queryFn: () => getFinancialSummary(),
     enabled: mounted,
     staleTime: 5 * 60 * 1000,
   });
@@ -836,7 +836,17 @@ export default function DashboardHome() {
     return dataTheoThang;
   }, [activeTimeframe, dataTheoTuan, dataTheoThang, dataTheoNam, dataTieuChuanKhoangNgay, dataTieuChuanThangCuThe]);
 
-  if (!mounted || isLoading) {
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-[#f4f7f6]">
+        <div className="mx-auto max-w-[1450px] px-4 md:px-5 py-5 md:py-6">
+          <DashboardSkeleton />
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-[#f4f7f6]">
         <div className="mx-auto max-w-[1450px] px-4 md:px-5 py-5 md:py-6">

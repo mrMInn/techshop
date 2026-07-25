@@ -360,16 +360,19 @@ export default function ExpensesPage() {
   const { data: expensesList, isLoading: isLoadingExpenses, refetch, isFetching } = useQuery({
     queryKey: ["expenses"],
     queryFn: getExpenses,
+    staleTime: 60000,
   });
  
   const { data: categories, isLoading: isLoadingCategories } = useQuery({
     queryKey: ["expense_categories"],
     queryFn: getExpenseCategories,
+    staleTime: 60000,
   });
  
   const { data: warrantyClaimsSelect } = useQuery({
     queryKey: ["warranty_claims_select"],
     queryFn: getWarrantyClaimsForSelect,
+    staleTime: 60000,
   });
 
   // Cấu hình danh mục cho bộ lọc

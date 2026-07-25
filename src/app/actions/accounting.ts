@@ -21,8 +21,9 @@ import {
   purchaseOrders,
   accessoryItems
 } from "@/lib/db/schema";
-import { eq, desc, and, sql, or, like, gte, lte } from "drizzle-orm";
+import { eq, desc, and, sql, or, like, gte, lte, lt } from "drizzle-orm";
 import { sendTelegramNotification } from "@/lib/telegram/notifier";
+import { serverCache, invalidateDashboardCache } from "@/lib/cache";
 async function requireOwner() {
   // Bỏ qua kiểm tra quyền khi chạy ở chế độ không đăng nhập
   return;
@@ -430,6 +431,9 @@ export async function syncHistoricalData() {
 export async function syncHistoricalAccountingDataAction() {
   await requireOwner();
   await syncHistoricalData();
+  after(() => {
+    invalidateDashboardCache();
+  });
   return { success: true };
 }
 
@@ -442,6 +446,12 @@ export async function getFinancialSummary(filters?: {
 }) {
   console.log("SERVER: getFinancialSummary called with", filters);
   await requireOwner();
+  const cacheKey = `financial_summary_${JSON.stringify(filters || {})}`;
+  const cached = serverCache.get(cacheKey);
+  if (cached) {
+    console.log("CACHE HIT: getFinancialSummary");
+    return cached;
+  }
   try {
     const conditions = [];
 
@@ -615,7 +625,7 @@ export async function getFinancialSummary(filters?: {
       .sort()
       .map((key) => monthlyMap[key]);
 
-    return {
+    const result = {
       totalIncome,
       totalExpense,
       netProfit,
@@ -624,6 +634,8 @@ export async function getFinancialSummary(filters?: {
       chartData,
       monthlyChartData,
     };
+    serverCache.set(cacheKey, result, 300); // Cache for 5 minutes
+    return result;
   } catch (error) {
     console.error("Lỗi lấy tóm tắt tài chính:", error);
     return {
@@ -733,6 +745,12 @@ export async function getCashBookEntries(filters?: {
 // 4. Lấy danh sách Chi phí vận hành thực tế
 export async function getExpenses() {
   await requireOwner();
+  const cacheKey = "expenses_list";
+  const cached = serverCache.get(cacheKey);
+  if (cached) {
+    console.log("CACHE HIT: getExpenses");
+    return cached;
+  }
   try {
     const list = await db
       .select({
@@ -752,6 +770,7 @@ export async function getExpenses() {
       .leftJoin(profiles, eq(expenses.createdBy, profiles.id))
       .orderBy(desc(expenses.expenseDate), desc(expenses.createdAt));
 
+    serverCache.set(cacheKey, list, 120); // Cache for 2 minutes
     return list;
   } catch (error) {
     console.error("Lỗi lấy danh sách chi phí:", error);
@@ -778,8 +797,16 @@ export async function getExpenseById(id: string) {
 // 5. Lấy danh sách danh mục Chi phí
 export async function getExpenseCategories() {
   await requireOwner();
+  const cacheKey = "expense_categories";
+  const cached = serverCache.get(cacheKey);
+  if (cached) {
+    console.log("CACHE HIT: getExpenseCategories");
+    return cached;
+  }
   try {
-    return await db.select().from(expenseCategories).orderBy(expenseCategories.name);
+    const list = await db.select().from(expenseCategories).orderBy(expenseCategories.name);
+    serverCache.set(cacheKey, list, 600); // Cache for 10 minutes
+    return list;
   } catch (error) {
     console.error("Lỗi lấy danh mục chi phí:", error);
     return [];
@@ -913,6 +940,12 @@ export async function createExpense(data: {
           payment_method: payMethods[result.telegramData.paymentMethod] || result.telegramData.paymentMethod,
           description: result.telegramData.description,
         }).catch((err) => console.error("Lỗi gửi thông báo Telegram chi phí vận hành:", err));
+      });
+    }
+
+    if (result.success) {
+      after(() => {
+        invalidateDashboardCache();
       });
     }
 
@@ -1091,6 +1124,12 @@ export async function deleteIncomeCategory(id: string) {
 // 8. Lấy danh sách phiếu bảo hành cho dropdown chọn liên kết
 export async function getWarrantyClaimsForSelect() {
   await requireOwner();
+  const cacheKey = "warranty_claims_select";
+  const cached = serverCache.get(cacheKey);
+  if (cached) {
+    console.log("CACHE HIT: getWarrantyClaimsForSelect");
+    return cached;
+  }
   try {
     const list = await db
       .select({
@@ -1106,6 +1145,7 @@ export async function getWarrantyClaimsForSelect() {
       .innerJoin(products, eq(inventoryItems.productId, products.id))
       .orderBy(desc(warrantyClaims.createdAt));
     
+    serverCache.set(cacheKey, list, 300); // Cache for 5 minutes
     return list;
   } catch (error) {
     console.error("Lỗi lấy danh sách phiếu bảo hành cho select:", error);
@@ -1210,7 +1250,11 @@ export async function updateExpenseAction(data: {
       // 5. Tính toán lại số dư lũy kế của toàn bộ sổ quỹ
       await recalculateRunningBalances(tx);
 
-      return { success: true, message: "Cập nhật chi phí và sổ quỹ thành công" };
+      const result = { success: true, message: "Cập nhật chi phí và sổ quỹ thành công" };
+      after(() => {
+        invalidateDashboardCache();
+      });
+      return result;
     });
   } catch (error: any) {
     console.error("Lỗi cập nhật chi phí:", error);
@@ -1266,7 +1310,11 @@ export async function deleteExpenseAction(expenseId: string) {
       // 4. Tính toán lại số dư lũy kế của toàn bộ sổ quỹ
       await recalculateRunningBalances(tx);
 
-      return { success: true, message: "Xóa chi phí và hạch toán sổ quỹ thành công" };
+      const result = { success: true, message: "Xóa chi phí và hạch toán sổ quỹ thành công" };
+      after(() => {
+        invalidateDashboardCache();
+      });
+      return result;
     });
   } catch (error: any) {
     console.error("Lỗi xóa chi phí:", error);
@@ -1274,65 +1322,35 @@ export async function deleteExpenseAction(expenseId: string) {
   }
 }
 
-//         totalFee: sql<string>`sum(${returns.feeAmount})`
-//       })
-//       .from(returns)
-//       .where(eq(returns.status, "completed"));
-//     const returnsRefund = Number(returnsStats[0]?.totalRefund || 0);
-//     const returnServiceFees = Number(returnsStats[0]?.totalFee || 0);
-
-//     const netProfit = salesProfit + warrantyIncome + returnServiceFees - operationalExpenses - returnsRefund;
-
-//     return {
-//       success: true,
-//       todayCount,
-//       scheduledCount,
-//       allCount,
-//       flaggedCount,
-//       urgentCount,
-//       completedCount,
-//       totalIncome,
-//       totalExpense,
-//       netProfit,
-//       todayIncome,
-//       todayExpense,
-//       todayNetProfit,
-//       thisMonthIncome,
-//       thisMonthExpense,
-//       thisMonthNetProfit,
-//     };
-//   } catch (error) {
-//     console.error("Lỗi lấy thống kê kiểu Apple:", error);
-//     return {
-//       success: false,
-//       todayCount: 0,
-//       scheduledCount: 0,
-//       allCount: 0,
-//       flaggedCount: 0,
-//       urgentCount: 0,
-//       completedCount: 0,
-//       totalIncome: 0,
-//       totalExpense: 0,
-//       netProfit: 0,
-//       todayIncome: 0,
-//       todayExpense: 0,
-//       todayNetProfit: 0,
-//       thisMonthIncome: 0,
-//       thisMonthExpense: 0,
-//       thisMonthNetProfit: 0,
-//     };
-//   }
-// }
-
-// src/app/actions/accounting.ts
-// THAY THẾ HOÀN TOÀN HÀM getAppleDashboardStats CŨ BẰNG HÀM NÀY:
-
 export async function getDashboardBentoData(targetMonth: string) {
   console.log(`SERVER: getDashboardBentoData called for ${targetMonth}`);
   await requireOwner();
+  const cacheKey = `dashboard_bento_stats_${targetMonth || "current"}`;
+  const cached = serverCache.get(cacheKey);
+  if (cached) {
+    console.log(`CACHE HIT: getDashboardBentoData for ${targetMonth}`);
+    return cached;
+  }
   try {
     const todayStr = new Date().toISOString().split("T")[0]; // e.g. "2026-06-01"
     const currentMonthStr = targetMonth || todayStr.slice(0, 7); // e.g. "2026-06"
+
+    // Parse targetMonth (YYYY-MM)
+    const [yearPart, monthPart] = currentMonthStr.split("-").map(Number);
+    
+    // Month boundaries for timestamp (Date objects)
+    const monthStart = new Date(Date.UTC(yearPart, monthPart - 1, 1));
+    const monthEnd = new Date(Date.UTC(yearPart, monthPart, 1));
+
+    // Month boundaries for date column (strings YYYY-MM-DD)
+    const monthStartStr = `${currentMonthStr}-01`;
+    const nextMonthDate = new Date(Date.UTC(yearPart, monthPart, 1));
+    const monthEndStr = nextMonthDate.toISOString().split("T")[0];
+
+    // Today boundaries for timestamp (Date objects)
+    const [tYear, tMonth, tDay] = todayStr.split("-").map(Number);
+    const todayStart = new Date(Date.UTC(tYear, tMonth - 1, tDay));
+    const todayEnd = new Date(Date.UTC(tYear, tMonth - 1, tDay + 1));
 
     // ==========================================
     // 1. THỐNG KÊ SỐ LIỆU VẬN HÀNH (OPERATIONS)
@@ -1355,20 +1373,20 @@ export async function getDashboardBentoData(targetMonth: string) {
       recentOrdersList,
       monthReturnCount
     ] = await Promise.all([
-      db.select({ count: sql<number>`count(*)` }).from(orders).where(and(eq(orders.status, "completed"), sql`DATE(${orders.createdAt}) = ${todayStr}`)),
-      db.select({ count: sql<number>`count(*)` }).from(orders).where(and(eq(orders.status, "completed"), sql`to_char(${orders.createdAt}, 'YYYY-MM') = ${currentMonthStr}`)),
+      db.select({ count: sql<number>`count(*)` }).from(orders).where(and(eq(orders.status, "completed"), gte(orders.createdAt, todayStart), lt(orders.createdAt, todayEnd))),
+      db.select({ count: sql<number>`count(*)` }).from(orders).where(and(eq(orders.status, "completed"), gte(orders.createdAt, monthStart), lt(orders.createdAt, monthEnd))),
       db.select({ count: sql<number>`count(*)` }).from(quotations).where(or(eq(quotations.status, "draft"), eq(quotations.status, "sent"), eq(quotations.status, "viewed"))),
       db.select({ status: inventoryItems.status, count: sql<number>`count(*)` }).from(inventoryItems).groupBy(inventoryItems.status),
       db.select({ status: warrantyClaims.status, count: sql<number>`count(*)` }).from(warrantyClaims).groupBy(warrantyClaims.status),
-      db.select({ revenue: sql<string>`sum(${orders.totalAmount})`, cogs: sql<string>`sum(${orders.totalCost})` }).from(orders).where(and(eq(orders.status, "completed"), sql`to_char(${orders.createdAt}, 'YYYY-MM') = ${currentMonthStr}`)),
-      db.select({ total: sql<string>`sum(${expenses.amount})` }).from(expenses).where(sql`to_char(${expenses.expenseDate}, 'YYYY-MM') = ${currentMonthStr}`),
-      db.select({ refund: sql<string>`sum(${returns.refundAmount})`, fee: sql<string>`sum(${returns.feeAmount})` }).from(returns).where(and(eq(returns.status, "completed"), sql`to_char(${returns.createdAt}, 'YYYY-MM') = ${currentMonthStr}`)),
-      db.select({ total: sql<string>`sum(${warrantyClaims.repairCost})` }).from(warrantyClaims).where(and(eq(warrantyClaims.status, "completed"), sql`to_char(${warrantyClaims.createdAt}, 'YYYY-MM') = ${currentMonthStr}`)),
-      db.select({ revenue: sql<string>`sum(${orders.totalAmount})`, cogs: sql<string>`sum(${orders.totalCost})` }).from(orders).where(and(eq(orders.status, "completed"), sql`DATE(${orders.createdAt}) = ${todayStr}`)),
-      db.select({ total: sql<string>`sum(${expenses.amount})` }).from(expenses).where(sql`DATE(${expenses.expenseDate}) = ${todayStr}`),
-      db.select({ refund: sql<string>`sum(${returns.refundAmount})`, fee: sql<string>`sum(${returns.feeAmount})` }).from(returns).where(and(eq(returns.status, "completed"), sql`DATE(${returns.createdAt}) = ${todayStr}`)),
+      db.select({ revenue: sql<string>`sum(${orders.totalAmount})`, cogs: sql<string>`sum(${orders.totalCost})` }).from(orders).where(and(eq(orders.status, "completed"), gte(orders.createdAt, monthStart), lt(orders.createdAt, monthEnd))),
+      db.select({ total: sql<string>`sum(${expenses.amount})` }).from(expenses).where(and(gte(expenses.expenseDate, monthStartStr), lt(expenses.expenseDate, monthEndStr))),
+      db.select({ refund: sql<string>`sum(${returns.refundAmount})`, fee: sql<string>`sum(${returns.feeAmount})` }).from(returns).where(and(eq(returns.status, "completed"), gte(returns.createdAt, monthStart), lt(returns.createdAt, monthEnd))),
+      db.select({ total: sql<string>`sum(${warrantyClaims.repairCost})` }).from(warrantyClaims).where(and(eq(warrantyClaims.status, "completed"), gte(warrantyClaims.createdAt, monthStart), lt(warrantyClaims.createdAt, monthEnd))),
+      db.select({ revenue: sql<string>`sum(${orders.totalAmount})`, cogs: sql<string>`sum(${orders.totalCost})` }).from(orders).where(and(eq(orders.status, "completed"), gte(orders.createdAt, todayStart), lt(orders.createdAt, todayEnd))),
+      db.select({ total: sql<string>`sum(${expenses.amount})` }).from(expenses).where(eq(expenses.expenseDate, todayStr)),
+      db.select({ refund: sql<string>`sum(${returns.refundAmount})`, fee: sql<string>`sum(${returns.feeAmount})` }).from(returns).where(and(eq(returns.status, "completed"), gte(returns.createdAt, todayStart), lt(returns.createdAt, todayEnd))),
       db.select({ id: orders.id, orderNumber: orders.orderNumber, customerName: customers.fullName, totalAmount: orders.totalAmount, status: orders.status, createdAt: orders.createdAt }).from(orders).innerJoin(customers, eq(orders.customerId, customers.id)).orderBy(desc(orders.createdAt)).limit(5),
-      db.select({ count: sql<number>`count(*)` }).from(returns).where(and(eq(returns.status, "completed"), sql`to_char(${returns.createdAt}, 'YYYY-MM') = ${currentMonthStr}`))
+      db.select({ count: sql<number>`count(*)` }).from(returns).where(and(eq(returns.status, "completed"), gte(returns.createdAt, monthStart), lt(returns.createdAt, monthEnd)))
     ]);
 
 
@@ -1409,7 +1427,7 @@ export async function getDashboardBentoData(targetMonth: string) {
     const todayExpense = tCogs + tExp + tRef;
     const todayNetProfit = todayIncome - todayExpense;
 
-    return {
+    const result = {
       success: true,
       todayCount: Number(todayOrdersCount[0]?.count || 0),
       completedCount: Number(monthOrdersCount[0]?.count || 0),
@@ -1432,6 +1450,8 @@ export async function getDashboardBentoData(targetMonth: string) {
 
       recentOrders: recentOrdersList,
     };
+    serverCache.set(cacheKey, result, 120); // Cache for 2 minutes
+    return result;
   } catch (error) {
     console.error("Lỗi chí mạng hệ thống Dashboard Bento API:", error);
     throw error;
@@ -1553,6 +1573,12 @@ export async function createManualIncome(data: {
       });
     }
 
+    if (result.success) {
+      after(() => {
+        invalidateDashboardCache();
+      });
+    }
+
     return result;
   } catch (error: any) {
     console.error("Lỗi tạo phiếu thu:", error);
@@ -1652,7 +1678,11 @@ export async function updateManualIncome(data: {
       // 3. Tính toán lại số dư sổ quỹ
       await recalculateRunningBalances(tx);
 
-      return { success: true, message: "Cập nhật phiếu thu thành công" };
+      const result = { success: true, message: "Cập nhật phiếu thu thành công" };
+      after(() => {
+        invalidateDashboardCache();
+      });
+      return result;
     });
   } catch (error: any) {
     console.error("Lỗi cập nhật phiếu thu:", error);
@@ -1701,7 +1731,11 @@ export async function deleteManualIncome(id: string) {
       // 3. Tính toán lại số dư lũy kế
       await recalculateRunningBalances(tx);
 
-      return { success: true, message: "Xóa phiếu thu thành công" };
+      const result = { success: true, message: "Xóa phiếu thu thành công" };
+      after(() => {
+        invalidateDashboardCache();
+      });
+      return result;
     });
   } catch (error: any) {
     console.error("Lỗi xóa phiếu thu:", error);

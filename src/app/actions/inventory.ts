@@ -29,6 +29,7 @@ import { db, recalculateRunningBalances } from "@/lib/db";
 import { eq, desc, inArray, sql, and, or, like, ilike, lte } from "drizzle-orm";
 import { syncHistoricalData } from "./accounting";
 import { after } from "next/server";
+import { serverCache } from "@/lib/cache";
 
 // Helper function: Đồng bộ số lượng thực nhận và trạng thái của Đơn nhập hàng (Purchase Order)
 export async function syncPurchaseOrderStatus(tx: any, purchaseOrderId: string) {
@@ -243,6 +244,12 @@ export async function getInventoryItems() {
  * Lấy danh sách tồn kho quá hạn (trên 45 ngày) đã tối ưu cho Dashboard
  */
 export async function getAgedInventoryItems(daysThreshold = 45) {
+  const cacheKey = `aged_inventory_items_${daysThreshold}`;
+  const cached = serverCache.get(cacheKey);
+  if (cached) {
+    console.log(`CACHE HIT: getAgedInventoryItems (${daysThreshold})`);
+    return cached;
+  }
   try {
     const thresholdDate = new Date();
     thresholdDate.setDate(thresholdDate.getDate() - daysThreshold);
@@ -334,11 +341,13 @@ export async function getAgedInventoryItems(daysThreshold = 45) {
     const agedItemsList = Object.values(agedModelsMap).sort((a: any, b: any) => b.diffDays - a.diffDays);
     const tongVonDong = agedItemsList.reduce((sum: number, item: any) => sum + item.rowDongVon, 0);
 
-    return {
+    const result = {
       agedItems: agedItemsList,
       tongVonDong,
       totalCount: agedItemsList.length,
     };
+    serverCache.set(cacheKey, result, 300); // 5 minutes cache
+    return result;
   } catch (error) {
     console.error("Lỗi lấy danh sách tồn kho quá hạn:", error);
     return { agedItems: [], tongVonDong: 0, totalCount: 0 };
