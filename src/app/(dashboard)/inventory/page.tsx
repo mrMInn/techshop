@@ -910,9 +910,7 @@ function InventoryPageContent() {
                       {activeTab === "active" ? "Đang về" : "Trạng thái"}
                     </th>
                   )}
-                  {activeTab === "active" && (
-                    <th className="px-6 py-3 text-center border-b border-[#e0e0e0] whitespace-nowrap">Đang lỗi</th>
-                  )}
+
                   <th className="px-6 py-3 text-right border-b border-[#e0e0e0] whitespace-nowrap">Giá vốn trung bình</th>
                 </tr>
               </thead>
@@ -1011,13 +1009,7 @@ function InventoryPageContent() {
                           )}
                         </td>
                       )}
-                      {activeTab === "active" && (
-                        <td className={`px-6 py-3 text-center ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
-                          <span className="text-[13px] font-semibold text-red-600">
-                            {group.defectiveTotalCount} máy
-                          </span>
-                        </td>
-                      )}
+
                       <td className={`px-6 py-3 text-right font-semibold text-[#1d1d1f] ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
                         {formatPrice(avgCost.toFixed(0))}
                       </td>

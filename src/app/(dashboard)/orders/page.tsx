@@ -390,121 +390,134 @@ function OrdersPageContent() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[850px] text-left border-collapse">
+            <table className="w-full min-w-[850px] text-left border-separate border-spacing-0">
               <thead>
-                <tr className="border-b border-[#e0e0e0] bg-[#f5f5f7]/50 text-[12px] font-semibold text-[#7a7a7a] uppercase tracking-wider">
-                  <th className="px-3 py-3 w-10 text-center whitespace-nowrap">STT</th>
-                  <th className="px-4 py-3 whitespace-nowrap">Đơn hàng</th>
-                  <th className="px-4 py-3 whitespace-nowrap">Khách hàng</th>
-                  <th className="px-4 py-3 whitespace-nowrap">Kênh bán</th>
-                  <th className="px-4 py-3 text-center whitespace-nowrap">Trạng thái</th>
-                  <th className="px-4 py-3 text-right whitespace-nowrap">Tổng cộng</th>
-                  <th className="px-4 py-3 text-right whitespace-nowrap">Lợi nhuận</th>
-                  <th className="px-3 py-3 w-28 text-center whitespace-nowrap">Tác vụ</th>
+                <tr className="bg-[#f5f5f7]/50 text-[12px] font-semibold text-[#7a7a7a] uppercase tracking-wider whitespace-nowrap">
+                  <th className="px-3 py-3 w-10 text-center border-b border-[#e0e0e0]">STT</th>
+                  <th className="px-4 py-3 border-b border-[#e0e0e0]">Đơn hàng</th>
+                  <th className="px-4 py-3 border-b border-[#e0e0e0]">Khách hàng</th>
+                  <th className="px-4 py-3 border-b border-[#e0e0e0]">Kênh bán</th>
+                  <th className="px-4 py-3 text-center border-b border-[#e0e0e0]">Trạng thái</th>
+                  <th className="px-4 py-3 text-right border-b border-[#e0e0e0]">Tổng cộng</th>
+                  <th className="px-4 py-3 text-right border-b border-[#e0e0e0]">Lợi nhuận</th>
+                  <th className="px-3 py-3 w-28 text-center border-b border-[#e0e0e0]">Tác vụ</th>
                 </tr>
               </thead>
               <tbody className="text-[15px] text-[#1d1d1f]">
-                {filteredOrders?.map((order, index) => (
-                  <tr 
-                    key={order.id} 
-                    className="border-b border-[#e0e0e0] last:border-0 hover:bg-[#f5f5f7]/60 transition-colors"
-                  >
-                    {/* STT */}
-                    <td className="px-3 py-4 w-10 text-center font-semibold text-[#7a7a7a] text-[13px] whitespace-nowrap">
-                      {index + 1}
-                    </td>
+                {filteredOrders?.map((order, index) => {
+                  const isLast = index === filteredOrders.length - 1;
+                  return (
+                    <tr 
+                      key={order.id} 
+                      className="group cursor-pointer"
+                      onClick={() => setSelectedOrderIdForDetails(order.id)}
+                    >
+                      {/* STT */}
+                      <td className={`px-3 py-4 w-10 text-center font-semibold text-[#7a7a7a] text-[13px] whitespace-nowrap ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                        {index + 1}
+                      </td>
 
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <div>
-                        <p className="font-semibold text-[#0066cc] tracking-tight hover:underline cursor-pointer whitespace-nowrap" onClick={() => setSelectedOrderIdForDetails(order.id)} title={order.orderNumber}>
-                          {order.orderNumber}
-                        </p>
-                        <p className="text-[12px] text-[#7a7a7a] font-normal mt-0.5">{formatToDDMMYYYY(order.createdAt)}</p>
-                        {order.trackingNumber && (
-                          <div className="mt-1 max-w-[160px] truncate" title={`${order.shippingCarrier ? `${order.shippingCarrier}: ` : ""}${order.trackingNumber}`}>
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#f5f5f7] border border-[#e0e0e0] font-mono text-[11px] text-[#1d1d1f] truncate w-full">
-                              🚚 {order.shippingCarrier ? `${order.shippingCarrier}: ` : ""}{order.trackingNumber}
+                      <td className={`px-4 py-4 whitespace-nowrap ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                        <div>
+                          <p className="font-semibold text-[#0066cc] tracking-tight group-hover:underline whitespace-nowrap" title={order.orderNumber}>
+                            {order.orderNumber}
+                          </p>
+                          <p className="text-[12px] text-[#7a7a7a] font-normal mt-0.5">{formatToDDMMYYYY(order.createdAt)}</p>
+                          {order.trackingNumber && (
+                            <div className="mt-1 max-w-[160px] truncate" title={`${order.shippingCarrier ? `${order.shippingCarrier}: ` : ""}${order.trackingNumber}`}>
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#f5f5f7] border border-[#e0e0e0] font-mono text-[11px] text-[#1d1d1f] truncate w-full">
+                                🚚 {order.shippingCarrier ? `${order.shippingCarrier}: ` : ""}{order.trackingNumber}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Khách hàng */}
+                      <td className={`px-4 py-4 whitespace-nowrap ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                        <div className="max-w-[150px] truncate" title={order.customerName}>
+                          <p className="font-semibold text-[#1d1d1f] tracking-tight truncate">{order.customerName}</p>
+                          <p className="text-[12px] text-[#7a7a7a] mt-0.5 truncate">{order.customerPhone}</p>
+                        </div>
+                      </td>
+
+                      {/* Kênh bán */}
+                      <td className={`px-4 py-4 whitespace-nowrap ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                        <span className="capitalize text-[14px] text-[#1d1d1f] font-medium">{order.saleChannel}</span>
+                        {order.leadSourceName && (
+                          <span className="block text-[11px] text-[#7a7a7a] mt-0.5 truncate max-w-[120px]" title={`Nguồn: ${order.leadSourceName}`}>
+                            Nguồn: {order.leadSourceName}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Trạng thái đơn */}
+                      <td className={`px-4 py-4 text-center whitespace-nowrap ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                        {renderOrderStatus(order.status)}
+                      </td>
+
+                      {/* Doanh thu */}
+                      <td className={`px-4 py-4 text-right whitespace-nowrap ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                        {order.status === "cancelled" ? (
+                          <span className="text-slate-400 font-medium line-through text-[14px]">
+                            {formatPrice(order.totalAmount)}
+                          </span>
+                        ) : (
+                          <span className="font-bold text-[#0071e3] text-[15.5px] tracking-tight">
+                            {formatPrice(order.totalAmount)}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Lợi nhuận */}
+                      <td className={`px-4 py-4 text-right font-semibold whitespace-nowrap ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                        {order.status === "cancelled" ? (
+                          <span className="text-gray-400 font-medium">—</span>
+                        ) : (
+                          <div className="space-y-0.5">
+                            <span className={`block font-bold ${Number(order.profit) >= 0 ? "text-green-600" : "text-red-600"}`}>
+                              {Number(order.profit) >= 0 ? "+" : ""}{formatPrice(order.profit)}
+                            </span>
+                            <span className={`block text-[11px] font-semibold ${Number(order.profit) >= 0 ? "text-green-500" : "text-red-500"}`}>
+                              ({Number(order.profitMargin).toFixed(1)}%)
                             </span>
                           </div>
                         )}
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* Khách hàng */}
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <div className="max-w-[150px] truncate" title={order.customerName}>
-                        <p className="font-semibold text-[#1d1d1f] tracking-tight truncate">{order.customerName}</p>
-                        <p className="text-[12px] text-[#7a7a7a] mt-0.5 truncate">{order.customerPhone}</p>
-                      </div>
-                    </td>
-
-                    {/* Kênh bán */}
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <span className="capitalize text-[14px] text-[#1d1d1f] font-medium">{order.saleChannel}</span>
-                      {order.leadSourceName && (
-                        <span className="block text-[11px] text-[#7a7a7a] mt-0.5 truncate max-w-[120px]" title={`Nguồn: ${order.leadSourceName}`}>
-                          Nguồn: {order.leadSourceName}
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Trạng thái đơn */}
-                    <td className="px-4 py-4 text-center whitespace-nowrap">
-                      {renderOrderStatus(order.status)}
-                    </td>
-
-
-
-                    {/* Doanh thu */}
-                    <td className="px-4 py-4 text-right font-semibold text-[#1d1d1f] whitespace-nowrap">
-                      {formatPrice(order.totalAmount)}
-                    </td>
-
-                    {/* Lợi nhuận */}
-                    <td className="px-4 py-4 text-right font-semibold whitespace-nowrap">
-                      {order.status === "cancelled" ? (
-                        <span className="text-gray-400 font-medium">—</span>
-                      ) : (
-                        <div className="space-y-0.5">
-                          <span className={`block font-bold ${Number(order.profit) >= 0 ? "text-green-600" : "text-red-600"}`}>
-                            {Number(order.profit) >= 0 ? "+" : ""}{formatPrice(order.profit)}
-                          </span>
-                          <span className={`block text-[11px] font-semibold ${Number(order.profit) >= 0 ? "text-green-500" : "text-red-500"}`}>
-                            ({Number(order.profitMargin).toFixed(1)}%)
-                          </span>
+                      {/* Tác vụ */}
+                      <td 
+                        className={`px-3 py-4 text-center w-28 whitespace-nowrap ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="flex items-center justify-center gap-1.5">
+                          {/* Hủy đơn */}
+                          {order.status !== "cancelled" ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOrderToCancel(order);
+                              }}
+                              className="w-10 h-10 bg-red-50 hover:bg-[#ff3b30] border border-red-100 hover:border-[#ff3b30] rounded-2xl text-[#ff3b30] hover:text-white flex items-center justify-center shadow-[0_2px_8px_rgba(255,59,48,0.08)] hover:shadow-[0_4px_12px_rgba(255,59,48,0.2)] transition-all duration-200 cursor-pointer active:scale-95 shrink-0"
+                              title="Hủy giao dịch"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          ) : (
+                            <button
+                              disabled
+                              className="w-10 h-10 rounded-2xl bg-[#f5f5f7]/50 border border-[#e0e0e0] text-slate-400 flex items-center justify-center cursor-not-allowed shrink-0"
+                              title="Đơn đã hủy"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          )}
                         </div>
-                      )}
-                    </td>
-
-                    {/* Tác vụ */}
-                    <td className="px-3 py-4 text-center w-28 whitespace-nowrap">
-                      <div className="flex items-center justify-center gap-1.5">
-                        {/* Hủy đơn */}
-                        {order.status !== "cancelled" ? (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setOrderToCancel(order);
-                            }}
-                            className="w-10 h-10 bg-red-50 hover:bg-[#ff3b30] border border-red-100 hover:border-[#ff3b30] rounded-2xl text-[#ff3b30] hover:text-white flex items-center justify-center shadow-[0_2px_8px_rgba(255,59,48,0.08)] hover:shadow-[0_4px_12px_rgba(255,59,48,0.2)] transition-all duration-200 cursor-pointer active:scale-95 shrink-0"
-                            title="Hủy giao dịch"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        ) : (
-                          <button
-                            disabled
-                            className="w-10 h-10 rounded-2xl bg-[#f5f5f7]/50 border border-[#e0e0e0] text-slate-400 flex items-center justify-center cursor-not-allowed shrink-0"
-                            title="Đơn đã hủy"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
