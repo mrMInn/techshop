@@ -545,7 +545,7 @@ export async function convertQuotationToOrder(
         let selectedItem;
 
         if (item.inventoryItemId) {
-          // Nếu báo giá chọn đích danh chiếc máy (theo Serial)
+          // Nếu báo giá chỉ đích danh chiếc máy (Serial)
           const invQuery = await tx
             .select()
             .from(inventoryItems)
@@ -555,7 +555,8 @@ export async function convertQuotationToOrder(
                 eq(inventoryItems.status, "in_stock")
               )
             )
-            .limit(1);
+            .limit(1)
+            .for('update');
 
           if (invQuery.length === 0) {
             // Tìm serial bị thiếu
@@ -574,7 +575,8 @@ export async function convertQuotationToOrder(
                 eq(inventoryItems.status, "in_stock")
               )
             )
-            .limit(1);
+            .limit(1)
+            .for('update');
 
           if (invQuery.length === 0) {
             const prodDetails = await tx.select().from(products).where(eq(products.id, item.productId)).limit(1);

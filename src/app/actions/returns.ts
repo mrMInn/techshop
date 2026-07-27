@@ -14,7 +14,9 @@ import {
   inventoryMovements,
   cashBookEntries,
   orderItems,
-  accessoryItems
+  accessoryItems,
+  warrantyClaims,
+  warrantyLogs
 } from "@/lib/db/schema";
 import { eq, desc, and, sql, inArray } from "drizzle-orm";
 
@@ -75,6 +77,15 @@ export async function createReturn(data: {
 }) {
   try {
     return await db.transaction(async (tx) => {
+      // 0. Kiểm tra ngày tháng so với đơn hàng gốc
+      const orderData = await tx.select().from(orders).where(eq(orders.id, data.orderId)).limit(1);
+      if (!orderData.length) throw new Error("Không tìm thấy đơn hàng gốc");
+      const orderDateStr = orderData[0].createdAt.toISOString().split("T")[0];
+      const todayStr = new Date().toISOString().split("T")[0];
+      if (todayStr < orderDateStr) {
+        throw new Error(`Ngày đổi trả (${todayStr}) không thể trước ngày mua hàng (${orderDateStr})`);
+      }
+
       // 1. Tạo returnNumber duy nhất
       const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
       const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -100,8 +111,42 @@ export async function createReturn(data: {
           throw new Error(`Không tìm thấy sản phẩm cần trả (ID: ${item.inventoryItemId})`);
         }
 
-        if (oldMachine[0].status !== 'sold') {
-          throw new Error(`Sản phẩm (SN: ${oldMachine[0].serialNumber}) không ở trạng thái đã bán, không thể đổi trả`);
+        if (oldMachine[0].status !== 'sold' && oldMachine[0].status !== 'warranty_repair') {
+          throw new Error(`Sản phẩm (SN: ${oldMachine[0].serialNumber}) không ở trạng thái đã bán hoặc bảo hành, không thể đổi trả`);
+        }
+
+        // Tự động đóng các phiếu bảo hành đang chạy của sản phẩm này
+        if (oldMachine[0].status === 'warranty_repair') {
+          const activeClaims = await tx
+            .select()
+            .from(warrantyClaims)
+            .where(
+              and(
+                eq(warrantyClaims.inventoryItemId, item.inventoryItemId),
+                inArray(warrantyClaims.status, ['pending', 'inspecting', 'repairing', 'waiting_parts'])
+              )
+            );
+
+          for (const claim of activeClaims) {
+            await tx
+              .update(warrantyClaims)
+              .set({
+                status: 'replaced',
+                resolution: `Đóng tự động do khách hàng đổi trả hàng/hoàn tiền theo phiếu ${returnNumber}`,
+                actualReturnDate: new Date().toISOString().split('T')[0],
+                updatedAt: new Date(),
+              })
+              .where(eq(warrantyClaims.id, claim.id));
+
+            await tx.insert(warrantyLogs).values({
+              warrantyClaimId: claim.id,
+              action: 'Đóng do trả hàng',
+              description: `Phiếu bảo hành được đóng tự động do thiết bị được hoàn trả theo phiếu đổi trả ${returnNumber}`,
+              oldStatus: claim.status,
+              newStatus: 'replaced',
+              createdBy: processedById,
+            });
+          }
         }
 
         if (data.type === 'exchange' && item.newInventoryItemId) {

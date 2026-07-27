@@ -5,7 +5,7 @@ import { getWarrantyClaims, createWarrantyClaim, deleteWarrantyClaim } from "@/a
 import { GlassCard } from "@/components/ui/glass-card";
 import { 
   Search, Plus, ShieldAlert, Wrench, PackageCheck, AlertCircle,
-  Eye, Pencil, Trash2, RefreshCw
+  Pencil, Trash2, RefreshCw
 } from "lucide-react";
 import { useState, useMemo, Suspense } from "react";
 import { toast } from "sonner";
@@ -23,17 +23,17 @@ import {
 
 const getStatusBadge = (status: string) => {
   const map: Record<string, { label: string, className: string }> = {
-    pending: { label: "Đã tiếp nhận", className: "bg-blue-600 text-white border-blue-700 shadow-sm" },
-    inspecting: { label: "Đang kiểm tra", className: "bg-indigo-600 text-white border-indigo-700 shadow-sm" },
-    waiting_parts: { label: "Chờ linh kiện", className: "bg-amber-500 text-white border-amber-600 shadow-sm" },
-    repairing: { label: "Đang sửa chữa", className: "bg-orange-500 text-white border-orange-600 shadow-sm animate-pulse" },
-    completed: { label: "Đã hoàn thành", className: "bg-emerald-600 text-white border-emerald-700 shadow-sm" },
-    rejected: { label: "Từ chối", className: "bg-rose-600 text-white border-rose-700 shadow-sm" },
-    replaced: { label: "Đổi máy mới", className: "bg-cyan-600 text-white border-cyan-700 shadow-sm" },
+    pending: { label: "Đã tiếp nhận", className: "text-blue-600" },
+    inspecting: { label: "Đang kiểm tra", className: "text-indigo-600" },
+    waiting_parts: { label: "Chờ linh kiện", className: "text-amber-600" },
+    repairing: { label: "Đang sửa chữa", className: "text-orange-600" },
+    completed: { label: "Đã hoàn thành", className: "text-emerald-600" },
+    rejected: { label: "Từ chối", className: "text-rose-600" },
+    replaced: { label: "Đổi máy mới", className: "text-cyan-600" },
   };
-  const item = map[status] || { label: status, className: "bg-gray-500 text-white border-gray-600 shadow-sm" };
+  const item = map[status] || { label: status, className: "text-slate-600" };
   return (
-    <span className={`px-3 py-1 text-[11px] font-bold rounded-full border shadow-sm ${item.className}`}>
+    <span className={`text-[13.5px] font-semibold ${item.className}`}>
       {item.label}
     </span>
   );
@@ -218,69 +218,77 @@ function WarrantyPageContent() {
       {/* Main Table */}
       <GlassCard className="p-0 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-separate border-spacing-0">
             <thead>
-              <tr className="border-b border-[#e0e0e0] bg-[#f5f5f7]/50 text-[12px] font-semibold text-[#7a7a7a] uppercase tracking-wider">
-                <th className="px-6 py-4 w-12 text-center">STT</th>
-                <th className="px-6 py-4">Mã Phiếu</th>
-                <th className="px-6 py-4">Sản Phẩm & Serial</th>
-                <th className="px-6 py-4">Khách Hàng</th>
-                <th className="px-6 py-4">Ngày Nhận</th>
-                <th className="px-6 py-4">Trạng Thái</th>
-                <th className="px-6 py-4 w-[160px] text-center">Tác vụ</th>
+              <tr className="bg-[#f5f5f7]/50 text-[12px] font-semibold text-[#7a7a7a] uppercase tracking-wider whitespace-nowrap">
+                <th className="px-6 py-4 w-12 text-center border-b border-[#e0e0e0]">STT</th>
+                <th className="px-6 py-4 border-b border-[#e0e0e0]">Mã Phiếu</th>
+                <th className="px-6 py-4 border-b border-[#e0e0e0]">Sản Phẩm & Serial</th>
+                <th className="px-6 py-4 border-b border-[#e0e0e0]">Khách Hàng</th>
+                <th className="px-6 py-4 border-b border-[#e0e0e0]">Ngày Nhận</th>
+                <th className="px-6 py-4 border-b border-[#e0e0e0]">Trạng Thái</th>
+                <th className="px-6 py-4 w-[160px] text-center border-b border-[#e0e0e0]">Tác vụ</th>
               </tr>
             </thead>
             <tbody className="text-[14px] text-[#1d1d1f]">
-              {filteredWarranties?.map((w, index) => (
-                <tr key={w.id} className="border-b border-[#e0e0e0] last:border-0 hover:bg-[#f5f5f7]/60 transition-colors">
-                  <td className="px-6 py-5 text-center font-semibold text-[#7a7a7a]">{index + 1}</td>
-                  <td className="px-6 py-5 font-semibold text-[#0066cc]">{w.claimNumber}</td>
-                  <td className="px-6 py-5">
-                    <p className="font-semibold">{w.productName}</p>
-                    <span className="font-mono text-[12px] text-[#7a7a7a] bg-[#f5f5f7] px-2 rounded border">{w.serialNumber}</span>
-                  </td>
-                  <td className="px-6 py-5">
-                    <p className="font-semibold">{w.customerName}</p>
-                    <p className="text-[12px] text-[#7a7a7a]">{w.customerPhone}</p>
-                  </td>
-                  <td className="px-6 py-5">{formatToDDMMYYYY(w.receivedDate)}</td>
-                  <td className="px-6 py-5">
-                    {getStatusBadge(w.status)}
-                  </td>
-                  
-                  {/* Cột Tác vụ Apple Premium */}
-                  <td className="px-6 py-5 text-center whitespace-nowrap w-[160px]">
-                    <div className="flex items-center justify-center gap-2.5">
-                      {/* Xem chi tiết */}
-                      <button
-                        onClick={() => setDetailClaimId(w.id)}
-                        className="w-10 h-10 bg-white hover:bg-[#f5f5f7] border border-[#e5e5ea] hover:border-[#d1d1d6] rounded-2xl text-[#48484a] hover:text-[#1c1c1e] flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-all duration-200 cursor-pointer active:scale-95 shrink-0"
-                        title="Xem chi tiết"
-                      >
-                        <Eye size={18} />
-                      </button>
+              {filteredWarranties?.map((w, index) => {
+                const isLast = index === filteredWarranties.length - 1;
+                return (
+                  <tr 
+                    key={w.id} 
+                    className="group cursor-pointer"
+                    onClick={() => setDetailClaimId(w.id)}
+                  >
+                    <td className={`px-6 py-5 text-center font-semibold text-[#7a7a7a] ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                      {index + 1}
+                    </td>
+                    <td className={`px-6 py-5 font-semibold ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                      <span className="text-[#0066cc] group-hover:underline font-semibold">
+                        {w.claimNumber}
+                      </span>
+                    </td>
+                    <td className={`px-6 py-5 ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                      <p className="font-semibold">{w.productName}</p>
+                      <span className="text-[12.5px] text-[#7a7a7a] block mt-0.5">{w.serialNumber}</span>
+                    </td>
+                    <td className={`px-6 py-5 ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                      <p className="font-semibold">{w.customerName}</p>
+                      <p className="text-[12px] text-[#7a7a7a]">{w.customerPhone}</p>
+                    </td>
+                    <td className={`px-6 py-5 ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                      {formatToDDMMYYYY(w.receivedDate)}
+                    </td>
+                    <td className={`px-6 py-5 ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                      {getStatusBadge(w.status)}
+                    </td>
+                    
+                    <td 
+                      className={`px-6 py-5 text-center whitespace-nowrap w-[160px] ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center justify-center gap-2.5">
+                        {/* Chỉnh sửa/Cập nhật */}
+                        <button
+                          onClick={() => setDetailClaimId(w.id)}
+                          className="w-10 h-10 bg-white hover:bg-[#f5f5f7] border border-[#e5e5ea] hover:border-[#d1d1d6] rounded-2xl text-[#48484a] hover:text-[#1c1c1e] flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-all duration-200 cursor-pointer active:scale-95 shrink-0"
+                          title="Cập nhật tiến độ & Sửa"
+                        >
+                          <Pencil size={18} />
+                        </button>
 
-                      {/* Chỉnh sửa/Cập nhật */}
-                      <button
-                        onClick={() => setDetailClaimId(w.id)}
-                        className="w-10 h-10 bg-white hover:bg-[#f5f5f7] border border-[#e5e5ea] hover:border-[#d1d1d6] rounded-2xl text-[#48484a] hover:text-[#1c1c1e] flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-all duration-200 cursor-pointer active:scale-95 shrink-0"
-                        title="Cập nhật tiến độ & Sửa"
-                      >
-                        <Pencil size={18} />
-                      </button>
-
-                      {/* Xóa phiếu */}
-                      <button
-                        onClick={() => setClaimToDelete(w)}
-                        className="w-10 h-10 bg-white hover:bg-[#f5f5f7] border border-[#e5e5ea] hover:border-[#d1d1d6] rounded-2xl text-[#48484a] hover:text-[#1c1c1e] flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-all duration-200 cursor-pointer active:scale-95 shrink-0"
-                        title="Xóa phiếu vĩnh viễn"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        {/* Xóa phiếu */}
+                        <button
+                          onClick={() => setClaimToDelete(w)}
+                          className="w-10 h-10 bg-red-50 hover:bg-[#ff3b30] border border-red-100 hover:border-[#ff3b30] rounded-2xl text-[#ff3b30] hover:text-white flex items-center justify-center shadow-[0_2px_8px_rgba(255,59,48,0.08)] hover:shadow-[0_4px_12px_rgba(255,59,48,0.2)] transition-all duration-200 cursor-pointer active:scale-95 shrink-0"
+                          title="Xóa phiếu vĩnh viễn"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
               {filteredWarranties?.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-6 py-10 text-center text-[#7a7a7a]">Không tìm thấy phiếu bảo hành nào.</td>

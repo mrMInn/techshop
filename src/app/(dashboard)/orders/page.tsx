@@ -9,7 +9,7 @@ import {
 import { GlassCard } from "@/components/ui/glass-card";
 import { 
   Search, Plus, RefreshCw, ShoppingCart, DollarSign, 
-  TrendingUp, AlertCircle, Eye, Trash2, 
+  TrendingUp, AlertCircle, Trash2, 
   Banknote, FileSpreadsheet
 } from "lucide-react";
 import * as XLSX from "xlsx";
@@ -184,17 +184,17 @@ function OrdersPageContent() {
 
   // Render Status Badge Đơn hàng - Apple style & color-coded matching inventory
   const renderOrderStatus = (status: string) => {
-    const configs: Record<string, { bg: string; text: string; label: string }> = {
-      draft: { bg: "bg-[#f5f5f7] border-[#e0e0e0]", text: "text-[#7a7a7a]", label: "Nháp" },
-      confirmed: { bg: "bg-[#e0f2fe]/60 border-[#bae6fd]", text: "text-[#0369a1]", label: "Đang xử lý" },
-      processing: { bg: "bg-[#fef3c7]/60 border-[#fde68a]", text: "text-[#b45309]", label: "Đang giao" },
-      completed: { bg: "bg-green-50 border-green-200", text: "text-green-700", label: "Đã hoàn thành" },
-      cancelled: { bg: "bg-[#fee2e2]/60 border-[#fecaca]", text: "text-[#b91c1c]", label: "Đã hủy" },
-      refunded: { bg: "bg-[#f3e8ff] border-[#e9d5ff]", text: "text-[#6b21a8]", label: "Hoàn tiền" },
+    const configs: Record<string, { text: string; label: string }> = {
+      draft: { text: "text-[#7a7a7a]", label: "Nháp" },
+      confirmed: { text: "text-[#0369a1]", label: "Đang xử lý" },
+      processing: { text: "text-[#b45309]", label: "Đang giao" },
+      completed: { text: "text-green-600", label: "Đã hoàn thành" },
+      cancelled: { text: "text-[#b91c1c]", label: "Đã hủy" },
+      refunded: { text: "text-[#6b21a8]", label: "Hoàn tiền" },
     };
-    const c = configs[status] || { bg: "bg-[#f5f5f7] border-[#e0e0e0]", text: "text-[#1d1d1f]", label: status };
+    const c = configs[status] || { text: "text-[#1d1d1f]", label: status };
     return (
-      <span className={`inline-flex items-center px-3 py-1 rounded-full text-[12px] font-semibold border ${c.bg} ${c.text}`}>
+      <span className={`text-[13px] font-semibold ${c.text}`}>
         {c.label}
       </span>
     );
@@ -479,19 +479,6 @@ function OrdersPageContent() {
                     {/* Tác vụ */}
                     <td className="px-3 py-4 text-center w-28 whitespace-nowrap">
                       <div className="flex items-center justify-center gap-1.5">
-                        {/* Chi tiết */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedOrderIdForDetails(order.id);
-                          }}
-                          className="w-8 h-8 rounded-lg bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#0066cc] hover:text-[#0071e3] flex items-center justify-center cursor-pointer transition-all active:scale-95 duration-150 border border-[#e0e0e0]"
-                          title="Chi tiết đơn hàng"
-                        >
-                          <Eye size={14} />
-                        </button>
-
                         {/* Hủy đơn */}
                         {order.status !== "cancelled" ? (
                           <button
@@ -500,18 +487,18 @@ function OrdersPageContent() {
                               e.stopPropagation();
                               setOrderToCancel(order);
                             }}
-                            className="w-8 h-8 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 flex items-center justify-center cursor-pointer transition-all active:scale-95 duration-150 border border-red-200/50"
+                            className="w-10 h-10 bg-red-50 hover:bg-[#ff3b30] border border-red-100 hover:border-[#ff3b30] rounded-2xl text-[#ff3b30] hover:text-white flex items-center justify-center shadow-[0_2px_8px_rgba(255,59,48,0.08)] hover:shadow-[0_4px_12px_rgba(255,59,48,0.2)] transition-all duration-200 cursor-pointer active:scale-95 shrink-0"
                             title="Hủy giao dịch"
                           >
-                            <Trash2 size={14} />
+                            <Trash2 size={18} />
                           </button>
                         ) : (
                           <button
                             disabled
-                            className="w-8 h-8 rounded-lg bg-[#f5f5f7]/50 text-slate-400 flex items-center justify-center cursor-not-allowed border border-[#e0e0e0]"
+                            className="w-10 h-10 rounded-2xl bg-[#f5f5f7]/50 border border-[#e0e0e0] text-slate-400 flex items-center justify-center cursor-not-allowed shrink-0"
                             title="Đơn đã hủy"
                           >
-                            <Trash2 size={14} className="text-slate-400" />
+                            <Trash2 size={18} />
                           </button>
                         )}
                       </div>
@@ -534,7 +521,7 @@ function OrdersPageContent() {
                 type="button"
                 disabled={page === 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="px-4 h-[36px] rounded-full border border-[#e0e0e0] bg-white text-[#1d1d1f] hover:bg-[#f5f5f7] transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed text-[13px] font-medium active:scale-95 duration-150"
+                className="px-5 py-2 rounded-full bg-transparent border border-[#0071e3] text-[#0071e3] text-[13px] font-medium hover:bg-[#0071e3] hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-all duration-200 cursor-pointer shadow-sm active:scale-95"
               >
                 Trước
               </button>
@@ -558,8 +545,8 @@ function OrdersPageContent() {
                       onClick={() => setPage(p)}
                       className={`w-[36px] h-[36px] rounded-full text-[13px] font-semibold transition-all cursor-pointer ${
                         p === page
-                          ? "bg-[#0066cc] text-white shadow-sm"
-                          : "hover:bg-[#f5f5f7] text-[#1d1d1f]"
+                          ? "bg-[#0071e3] text-white shadow-sm"
+                          : "bg-transparent text-slate-600 hover:bg-slate-100"
                       }`}
                     >
                       {p}
@@ -571,7 +558,7 @@ function OrdersPageContent() {
                 type="button"
                 disabled={page === pagination.totalPages}
                 onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
-                className="px-4 h-[36px] rounded-full border border-[#e0e0e0] bg-white text-[#1d1d1f] hover:bg-[#f5f5f7] transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed text-[13px] font-medium active:scale-95 duration-150"
+                className="px-5 py-2 rounded-full bg-transparent border border-[#0071e3] text-[#0071e3] text-[13px] font-medium hover:bg-[#0071e3] hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-all duration-200 cursor-pointer shadow-sm active:scale-95"
               >
                 Sau
               </button>

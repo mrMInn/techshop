@@ -14,7 +14,7 @@ import {
   orderItems,
   cashBookEntries
 } from "@/lib/db/schema";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, asc } from "drizzle-orm";
 import { sendTelegramNotification } from "@/lib/telegram/notifier";
 import { invalidateDashboardCache } from "@/lib/cache";
 
@@ -171,7 +171,7 @@ export async function getWarrantyClaimDetail(id: string) {
       .from(warrantyLogs)
       .leftJoin(profiles, eq(warrantyLogs.createdBy, profiles.id))
       .where(eq(warrantyLogs.warrantyClaimId, id))
-      .orderBy(desc(warrantyLogs.createdAt));
+      .orderBy(asc(warrantyLogs.createdAt));
 
     return { claim: claim[0], logs };
   } catch (error) {
@@ -200,6 +200,11 @@ export async function createWarrantyClaim(data: {
       const orderData = await tx.select().from(orders).where(eq(orders.id, data.orderId)).limit(1);
       if (!orderData.length) throw new Error("Không tìm thấy đơn hàng gốc");
       const purchaseDate = new Date(orderData[0].createdAt);
+      const purchaseDateStr = orderData[0].createdAt.toISOString().split("T")[0];
+
+      if (data.receivedDate < purchaseDateStr) {
+        throw new Error(`Ngày tiếp nhận bảo hành (${data.receivedDate}) không thể trước ngày mua hàng (${purchaseDateStr})`);
+      }
 
       const warrantyEndDateObj = new Date(purchaseDate);
       warrantyEndDateObj.setMonth(warrantyEndDateObj.getMonth() + warrantyMonths);

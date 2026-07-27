@@ -277,7 +277,8 @@ export async function getAgedInventoryItems(daysThreshold = 45) {
           lte(inventoryItems.stockedDate, thresholdDateStr)
         )
       )
-      .orderBy(inventoryItems.stockedDate);
+      .orderBy(inventoryItems.stockedDate)
+      .limit(500);
 
     if (items.length === 0) {
       return { agedItems: [], tongVonDong: 0, totalCount: 0 };
@@ -1535,6 +1536,7 @@ export async function getInventoryItemLifecycle(serialNumber: string) {
           actualReturnDate: warrantyClaims.actualReturnDate,
           technicianNotes: warrantyClaims.diagnosis,
           customerName: customers.fullName,
+          customerPhone: customers.phone,
         })
         .from(warrantyClaims)
         .innerJoin(customers, eq(warrantyClaims.customerId, customers.id))
@@ -1554,6 +1556,7 @@ export async function getInventoryItemLifecycle(serialNumber: string) {
           refundPrice: returnItems.refundPrice,
           createdAt: returns.createdAt,
           customerName: customers.fullName,
+          customerPhone: customers.phone,
         })
         .from(returnItems)
         .innerJoin(returns, eq(returnItems.returnId, returns.id))
@@ -1570,6 +1573,7 @@ export async function getInventoryItemLifecycle(serialNumber: string) {
           reason: returnItems.returnReason,
           createdAt: returns.createdAt,
           customerName: customers.fullName,
+          customerPhone: customers.phone,
           oldItemSerial: sql<string>`(SELECT serial_number FROM inventory_items WHERE id = ${returnItems.inventoryItemId})`,
         })
         .from(returnItems)
@@ -1614,6 +1618,7 @@ export async function getInventoryItemLifecycle(serialNumber: string) {
         meta: {
           orderNumber: s.orderNumber,
           customerName: s.customerName,
+          customerPhone: s.customerPhone,
           sellingPrice: s.sellingPrice,
           status: s.status
         }
@@ -1636,7 +1641,8 @@ export async function getInventoryItemLifecycle(serialNumber: string) {
           returnNumber: r.returnNumber,
           refundPrice: r.refundPrice,
           isDefective: r.isDefective,
-          defectDescription: r.defectDescription
+          defectDescription: r.defectDescription,
+          customerPhone: r.customerPhone
         }
       });
     });
@@ -1650,7 +1656,8 @@ export async function getInventoryItemLifecycle(serialNumber: string) {
         description: `Xuất thiết bị này để đổi thế cho máy lỗi (Serial cũ: ${r.oldItemSerial}) của khách hàng ${r.customerName} theo Phiếu đổi trả ${r.returnNumber}.`,
         meta: {
           returnNumber: r.returnNumber,
-          oldItemSerial: r.oldItemSerial
+          oldItemSerial: r.oldItemSerial,
+          customerPhone: r.customerPhone
         }
       });
     });
@@ -1666,7 +1673,8 @@ export async function getInventoryItemLifecycle(serialNumber: string) {
           claimNumber: w.claimNumber,
           status: w.status,
           repairCost: w.repairCost,
-          actualReturnDate: w.actualReturnDate
+          actualReturnDate: w.actualReturnDate,
+          customerPhone: w.customerPhone
         }
       });
     });

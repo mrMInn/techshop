@@ -511,24 +511,30 @@ export async function getFinancialSummary(filters?: {
     twelveMonthsAgo.setDate(1);
     const twelveMonthsAgoStr = twelveMonthsAgo.toISOString().split("T")[0];
 
+    // Batch 1: Core aggregations (4 queries max concurrent)
     const [
       totals,
       catStats,
-      ordersStats,
-      warrantyStats,
-      expensesStats,
-      returnsStats,
       daysData,
       monthlyData
     ] = await Promise.all([
       totalsQuery,
       catStatsQuery,
+      db.select({ date: cashBookEntries.entryDate, type: cashBookEntries.type, totalAmount: sql<string>`sum(${cashBookEntries.amount})` }).from(cashBookEntries).where(gte(cashBookEntries.entryDate, sevenDaysAgoStr)).groupBy(cashBookEntries.entryDate, cashBookEntries.type).orderBy(cashBookEntries.entryDate),
+      db.select({ month: sql<string>`to_char(${cashBookEntries.entryDate}, 'YYYY-MM')`, type: cashBookEntries.type, sum: sql<string>`sum(${cashBookEntries.amount})` }).from(cashBookEntries).where(gte(cashBookEntries.entryDate, twelveMonthsAgoStr)).groupBy(sql`to_char(${cashBookEntries.entryDate}, 'YYYY-MM')`, cashBookEntries.type)
+    ]);
+
+    // Batch 2: Supplementary stats (4 queries max concurrent)
+    const [
+      ordersStats,
+      warrantyStats,
+      expensesStats,
+      returnsStats
+    ] = await Promise.all([
       db.select({ totalProfit: sql<string>`sum(${orders.profit})` }).from(orders).where(eq(orders.status, "completed")),
       db.select({ totalWarrantyCost: sql<string>`sum(${warrantyClaims.repairCost})` }).from(warrantyClaims),
       db.select({ totalExpense: sql<string>`sum(${expenses.amount})` }).from(expenses),
-      db.select({ totalRefund: sql<string>`sum(${returns.refundAmount})`, totalFee: sql<string>`sum(${returns.feeAmount})` }).from(returns).where(eq(returns.status, "completed")),
-      db.select({ date: cashBookEntries.entryDate, type: cashBookEntries.type, totalAmount: sql<string>`sum(${cashBookEntries.amount})` }).from(cashBookEntries).where(gte(cashBookEntries.entryDate, sevenDaysAgoStr)).groupBy(cashBookEntries.entryDate, cashBookEntries.type).orderBy(cashBookEntries.entryDate),
-      db.select({ month: sql<string>`to_char(${cashBookEntries.entryDate}, 'YYYY-MM')`, type: cashBookEntries.type, sum: sql<string>`sum(${cashBookEntries.amount})` }).from(cashBookEntries).where(gte(cashBookEntries.entryDate, twelveMonthsAgoStr)).groupBy(sql`to_char(${cashBookEntries.entryDate}, 'YYYY-MM')`, cashBookEntries.type)
+      db.select({ totalRefund: sql<string>`sum(${returns.refundAmount})`, totalFee: sql<string>`sum(${returns.feeAmount})` }).from(returns).where(eq(returns.status, "completed"))
     ]);
 
     let totalIncome = 0;
@@ -1352,41 +1358,47 @@ export async function getDashboardBentoData(targetMonth: string) {
     const todayStart = new Date(Date.UTC(tYear, tMonth - 1, tDay));
     const todayEnd = new Date(Date.UTC(tYear, tMonth - 1, tDay + 1));
 
-    // ==========================================
-    // 1. THỐNG KÊ SỐ LIỆU VẬN HÀNH (OPERATIONS)
-    // ==========================================
-    
-    // Đơn hàng hoàn thành (Hôm nay vs Tháng này), báo giá, kho hàng, bảo hành, tài chính, đơn hàng gần nhất, và phiếu hoàn trả tháng này
+    // Batch 1: Count queries — fast lookups (5 queries max concurrent)
     const [
       todayOrdersCount,
       monthOrdersCount,
       activeQuotes,
       inventoryStatusStats,
-      warrantyStatusStats,
-      monthSales,
-      monthExpenses,
-      monthReturns,
-      monthWarrantyIncome,
-      todaySales,
-      todayExpenses,
-      todayReturns,
-      recentOrdersList,
-      monthReturnCount
+      warrantyStatusStats
     ] = await Promise.all([
       db.select({ count: sql<number>`count(*)` }).from(orders).where(and(eq(orders.status, "completed"), gte(orders.createdAt, todayStart), lt(orders.createdAt, todayEnd))),
       db.select({ count: sql<number>`count(*)` }).from(orders).where(and(eq(orders.status, "completed"), gte(orders.createdAt, monthStart), lt(orders.createdAt, monthEnd))),
       db.select({ count: sql<number>`count(*)` }).from(quotations).where(or(eq(quotations.status, "draft"), eq(quotations.status, "sent"), eq(quotations.status, "viewed"))),
       db.select({ status: inventoryItems.status, count: sql<number>`count(*)` }).from(inventoryItems).groupBy(inventoryItems.status),
-      db.select({ status: warrantyClaims.status, count: sql<number>`count(*)` }).from(warrantyClaims).groupBy(warrantyClaims.status),
+      db.select({ status: warrantyClaims.status, count: sql<number>`count(*)` }).from(warrantyClaims).groupBy(warrantyClaims.status)
+    ]);
+
+    // Batch 2: Month financial aggregations (5 queries max concurrent)
+    const [
+      monthSales,
+      monthExpenses,
+      monthReturns,
+      monthWarrantyIncome,
+      monthReturnCount
+    ] = await Promise.all([
       db.select({ revenue: sql<string>`sum(${orders.totalAmount})`, cogs: sql<string>`sum(${orders.totalCost})` }).from(orders).where(and(eq(orders.status, "completed"), gte(orders.createdAt, monthStart), lt(orders.createdAt, monthEnd))),
       db.select({ total: sql<string>`sum(${expenses.amount})` }).from(expenses).where(and(gte(expenses.expenseDate, monthStartStr), lt(expenses.expenseDate, monthEndStr))),
       db.select({ refund: sql<string>`sum(${returns.refundAmount})`, fee: sql<string>`sum(${returns.feeAmount})` }).from(returns).where(and(eq(returns.status, "completed"), gte(returns.createdAt, monthStart), lt(returns.createdAt, monthEnd))),
       db.select({ total: sql<string>`sum(${warrantyClaims.repairCost})` }).from(warrantyClaims).where(and(eq(warrantyClaims.status, "completed"), gte(warrantyClaims.createdAt, monthStart), lt(warrantyClaims.createdAt, monthEnd))),
+      db.select({ count: sql<number>`count(*)` }).from(returns).where(and(eq(returns.status, "completed"), gte(returns.createdAt, monthStart), lt(returns.createdAt, monthEnd)))
+    ]);
+
+    // Batch 3: Today data + recent orders (4 queries max concurrent)
+    const [
+      todaySales,
+      todayExpenses,
+      todayReturns,
+      recentOrdersList
+    ] = await Promise.all([
       db.select({ revenue: sql<string>`sum(${orders.totalAmount})`, cogs: sql<string>`sum(${orders.totalCost})` }).from(orders).where(and(eq(orders.status, "completed"), gte(orders.createdAt, todayStart), lt(orders.createdAt, todayEnd))),
       db.select({ total: sql<string>`sum(${expenses.amount})` }).from(expenses).where(eq(expenses.expenseDate, todayStr)),
       db.select({ refund: sql<string>`sum(${returns.refundAmount})`, fee: sql<string>`sum(${returns.feeAmount})` }).from(returns).where(and(eq(returns.status, "completed"), gte(returns.createdAt, todayStart), lt(returns.createdAt, todayEnd))),
-      db.select({ id: orders.id, orderNumber: orders.orderNumber, customerName: customers.fullName, totalAmount: orders.totalAmount, status: orders.status, createdAt: orders.createdAt }).from(orders).innerJoin(customers, eq(orders.customerId, customers.id)).orderBy(desc(orders.createdAt)).limit(5),
-      db.select({ count: sql<number>`count(*)` }).from(returns).where(and(eq(returns.status, "completed"), gte(returns.createdAt, monthStart), lt(returns.createdAt, monthEnd)))
+      db.select({ id: orders.id, orderNumber: orders.orderNumber, customerName: customers.fullName, totalAmount: orders.totalAmount, status: orders.status, createdAt: orders.createdAt }).from(orders).innerJoin(customers, eq(orders.customerId, customers.id)).orderBy(desc(orders.createdAt)).limit(5)
     ]);
 
 

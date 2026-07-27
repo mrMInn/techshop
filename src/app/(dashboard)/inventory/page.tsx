@@ -1038,9 +1038,9 @@ function InventoryPageContent() {
                   type="button"
                   disabled={currentPage === 1}
                   onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                  className="px-3.5 py-1.5 rounded-full bg-white border border-[#e0e0e0] text-[12px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none transition-all cursor-pointer shadow-sm active:scale-95"
+                  className="px-5 py-2 rounded-full bg-transparent border border-[#0071e3] text-[#0071e3] text-[13px] font-medium hover:bg-[#0071e3] hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-all duration-200 cursor-pointer shadow-sm active:scale-95"
                 >
-                  Trang trước
+                  Trước
                 </button>
                 <div className="flex items-center gap-1">
                   {Array.from({ length: totalPages }).map((_, i) => {
@@ -1051,9 +1051,9 @@ function InventoryPageContent() {
                         key={pageNum}
                         type="button"
                         onClick={() => setCurrentPage(pageNum)}
-                        className={`w-7.5 h-7.5 rounded-full text-[12px] font-bold flex items-center justify-center transition-all cursor-pointer ${
+                        className={`w-8 h-8 rounded-full text-[13px] font-semibold flex items-center justify-center transition-all cursor-pointer ${
                           isCurrent
-                            ? "bg-[#0066cc] text-white shadow-sm"
+                            ? "bg-[#0071e3] text-white shadow-sm"
                             : "bg-transparent text-slate-600 hover:bg-slate-100"
                         }`}
                       >
@@ -1066,9 +1066,9 @@ function InventoryPageContent() {
                   type="button"
                   disabled={currentPage === totalPages}
                   onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                  className="px-3.5 py-1.5 rounded-full bg-white border border-[#e0e0e0] text-[12px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none transition-all cursor-pointer shadow-sm active:scale-95"
+                  className="px-5 py-2 rounded-full bg-transparent border border-[#0071e3] text-[#0071e3] text-[13px] font-medium hover:bg-[#0071e3] hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-all duration-200 cursor-pointer shadow-sm active:scale-95"
                 >
-                  Trang sau
+                  Sau
                 </button>
               </div>
             </div>

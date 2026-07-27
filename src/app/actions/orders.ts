@@ -493,7 +493,8 @@ export async function createOrderAction(data: {
         dbMachines = await tx
           .select()
           .from(inventoryItems)
-          .where(inArray(inventoryItems.id, inputMachineIds));
+          .where(inArray(inventoryItems.id, inputMachineIds))
+          .for('update');
           
         if (dbMachines.length !== inputMachineIds.length) {
           throw new Error("Một số sản phẩm máy không tồn tại trong kho");
@@ -508,7 +509,8 @@ export async function createOrderAction(data: {
         dbAccessories = await tx
           .select()
           .from(accessoryItems)
-          .where(inArray(accessoryItems.id, inputAccessoryIds));
+          .where(inArray(accessoryItems.id, inputAccessoryIds))
+          .for('update');
 
         if (dbAccessories.length !== inputAccessoryIds.length) {
           throw new Error("Một số phụ kiện không tồn tại trong kho");
