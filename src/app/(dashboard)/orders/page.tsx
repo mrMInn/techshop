@@ -39,6 +39,10 @@ function OrdersPageContent() {
   useRealtimeSubscription("orders", [["orders"]]);
 
   const [search, setSearch] = useState("");
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   const selectedStatus = searchParams.get("status") || "all";
   const [selectedPaymentStatus, setSelectedPaymentStatus] = useState<string>("all");
   const selectedChannel = searchParams.get("channel") || "all";
@@ -169,6 +173,7 @@ function OrdersPageContent() {
   };
 
   const formatToDDMMYYYY = (dateString: string | Date | null) => {
+    if (!mounted) return "";
     if (!dateString) return "N/A";
     try {
       const d = new Date(dateString);

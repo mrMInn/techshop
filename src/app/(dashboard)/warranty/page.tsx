@@ -7,7 +7,7 @@ import {
   Search, Plus, ShieldAlert, Wrench, PackageCheck, AlertCircle,
   Pencil, Trash2, RefreshCw
 } from "lucide-react";
-import { useState, useMemo, Suspense } from "react";
+import { useState, useEffect, useMemo, Suspense } from "react";
 import { toast } from "sonner";
 import { Dialog } from "@/components/ui/dialog";
 import { WarrantyForm } from "@/components/warranty/warranty-form";
@@ -22,18 +22,18 @@ import {
 } from "@/components/ui/apple-icons";
 
 const getStatusBadge = (status: string) => {
-  const map: Record<string, { label: string, className: string }> = {
-    pending: { label: "Đã tiếp nhận", className: "text-blue-600" },
-    inspecting: { label: "Đang kiểm tra", className: "text-indigo-600" },
-    waiting_parts: { label: "Chờ linh kiện", className: "text-amber-600" },
-    repairing: { label: "Đang sửa chữa", className: "text-orange-600" },
-    completed: { label: "Đã hoàn thành", className: "text-emerald-600" },
-    rejected: { label: "Từ chối", className: "text-rose-600" },
-    replaced: { label: "Đổi máy mới", className: "text-cyan-600" },
+  const map: Record<string, { label: string }> = {
+    pending: { label: "Đã tiếp nhận" },
+    inspecting: { label: "Đang kiểm tra" },
+    waiting_parts: { label: "Chờ linh kiện" },
+    repairing: { label: "Đang sửa chữa" },
+    completed: { label: "Đã hoàn thành" },
+    rejected: { label: "Từ chối" },
+    replaced: { label: "Đổi máy mới" },
   };
-  const item = map[status] || { label: status, className: "text-slate-600" };
+  const item = map[status] || { label: status };
   return (
-    <span className={`text-[13.5px] font-semibold ${item.className}`}>
+    <span className="text-[13.5px] font-semibold text-[#1d1d1f]">
       {item.label}
     </span>
   );
@@ -58,6 +58,10 @@ function WarrantyPageContent() {
   const pathname = usePathname();
 
   const [search, setSearch] = useState("");
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   const selectedStatus = searchParams.get("status") || "all";
 
   const setSelectedStatus = (status: string) => {
@@ -148,6 +152,7 @@ function WarrantyPageContent() {
   }, [selectedStatus]);
 
   const formatToDDMMYYYY = (dateString: string | Date | null) => {
+    if (!mounted) return "";
     if (!dateString) return "N/A";
     try {
       const d = new Date(dateString);
@@ -225,7 +230,6 @@ function WarrantyPageContent() {
                 <th className="px-6 py-4 border-b border-[#e0e0e0]">Mã Phiếu</th>
                 <th className="px-6 py-4 border-b border-[#e0e0e0]">Sản Phẩm & Serial</th>
                 <th className="px-6 py-4 border-b border-[#e0e0e0]">Khách Hàng</th>
-                <th className="px-6 py-4 border-b border-[#e0e0e0]">Ngày Nhận</th>
                 <th className="px-6 py-4 border-b border-[#e0e0e0]">Trạng Thái</th>
                 <th className="px-6 py-4 w-[160px] text-center border-b border-[#e0e0e0]">Tác vụ</th>
               </tr>
@@ -243,8 +247,11 @@ function WarrantyPageContent() {
                       {index + 1}
                     </td>
                     <td className={`px-6 py-5 font-semibold ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
-                      <span className="text-[#0066cc] group-hover:underline font-semibold">
+                      <span className="text-[#0066cc] group-hover:underline font-semibold block">
                         {w.claimNumber}
+                      </span>
+                      <span className="text-[12px] text-[#7a7a7a] block mt-0.5 font-normal whitespace-nowrap">
+                        Ngày nhận: {formatToDDMMYYYY(w.receivedDate)}
                       </span>
                     </td>
                     <td className={`px-6 py-5 ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
@@ -254,9 +261,6 @@ function WarrantyPageContent() {
                     <td className={`px-6 py-5 ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
                       <p className="font-semibold">{w.customerName}</p>
                       <p className="text-[12px] text-[#7a7a7a]">{w.customerPhone}</p>
-                    </td>
-                    <td className={`px-6 py-5 ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
-                      {formatToDDMMYYYY(w.receivedDate)}
                     </td>
                     <td className={`px-6 py-5 ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
                       {getStatusBadge(w.status)}
@@ -291,7 +295,7 @@ function WarrantyPageContent() {
               })}
               {filteredWarranties?.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-6 py-10 text-center text-[#7a7a7a]">Không tìm thấy phiếu bảo hành nào.</td>
+                  <td colSpan={6} className="px-6 py-10 text-center text-[#7a7a7a]">Không tìm thấy phiếu bảo hành nào.</td>
                 </tr>
               )}
             </tbody>

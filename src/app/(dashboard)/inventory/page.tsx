@@ -32,7 +32,7 @@ import {
   SFSymbolMemoryChip,
   SFSymbolInternalDrive,
   SFSymbolActivity,
-  SFSymbolExclamationTriangle,
+  SFSymbolExclamationCircle,
   SFSymbolWrench,
   SFSymbolDollarSign,
   SFSymbolArrowRightLeft,
@@ -1404,9 +1404,9 @@ function InventoryPageContent() {
                                             setDefectiveItem(item);
                                             setDefectiveActionType("report");
                                           }}
-                                          className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-amber-50 border border-slate-200/50 hover:border-amber-200/80 text-slate-500 hover:text-amber-600 cursor-pointer transition-all duration-150 active:scale-95 hover:scale-110 hover:-translate-y-0.5 hover:shadow-md hover:shadow-amber-200/40"
+                                          className="w-9 h-9 rounded-xl flex items-center justify-center bg-amber-50 hover:bg-[#d97706] border border-amber-100 hover:border-[#d97706] text-[#d97706] hover:text-white cursor-pointer transition-all duration-200 active:scale-95 shadow-[0_2px_8px_rgba(217,119,6,0.05)] hover:shadow-[0_4px_12px_rgba(217,119,6,0.2)]"
                                         >
-                                          <SFSymbolExclamationTriangle size={14} />
+                                          <SFSymbolExclamationCircle size={14} />
                                         </button>
                                         <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2.5 py-1 bg-[#1d1d1f] text-white text-[10px] font-bold rounded-md opacity-0 pointer-events-none group-hover/tooltip:opacity-100 scale-95 group-hover/tooltip:scale-100 transition-all duration-150 shadow-md whitespace-nowrap z-50">
                                           Báo máy lỗi
@@ -1416,7 +1416,7 @@ function InventoryPageContent() {
                                     <div className="relative group/tooltip">
                                       <Link
                                         href={`/lookup?serial=${item.serialNumber}`}
-                                        className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-blue-50 border border-slate-200/50 hover:border-blue-200/80 text-slate-500 hover:text-[#0066cc] cursor-pointer transition-all duration-150 active:scale-95 hover:scale-110 hover:-translate-y-0.5 hover:shadow-md hover:shadow-blue-200/40"
+                                        className="w-9 h-9 rounded-xl flex items-center justify-center bg-white hover:bg-[#f5f5f7] border border-[#e5e5ea] hover:border-[#d1d1d6] text-[#48484a] hover:text-[#0066cc] cursor-pointer transition-all duration-200 active:scale-95 shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)]"
                                       >
                                         <SFSymbolActivity size={14} />
                                       </Link>
@@ -1427,7 +1427,7 @@ function InventoryPageContent() {
                                     <div className="relative group/tooltip">
                                       <button
                                         onClick={() => handleOpenEditDialog(item)}
-                                        className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-slate-100 border border-slate-200/50 hover:border-slate-300 text-slate-500 hover:text-slate-800 cursor-pointer transition-all duration-150 active:scale-95 hover:scale-110 hover:-translate-y-0.5 hover:shadow-md hover:shadow-slate-300/40"
+                                        className="w-9 h-9 rounded-xl flex items-center justify-center bg-white hover:bg-[#f5f5f7] border border-[#e5e5ea] hover:border-[#d1d1d6] text-[#48484a] hover:text-[#1c1c1e] cursor-pointer transition-all duration-200 active:scale-95 shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)]"
                                       >
                                         <SFSymbolSquareAndPencil size={14} />
                                       </button>
@@ -1438,7 +1438,7 @@ function InventoryPageContent() {
                                     <div className="relative group/tooltip">
                                       <button
                                         onClick={() => handleDeleteClick(item)}
-                                        className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-red-50 border border-slate-200/50 hover:border-red-200/80 text-slate-500 hover:text-red-600 cursor-pointer transition-all duration-150 active:scale-95 hover:scale-110 hover:-translate-y-0.5 hover:shadow-md hover:shadow-red-200/40"
+                                        className="w-9 h-9 rounded-xl flex items-center justify-center bg-red-50 hover:bg-[#ff3b30] border border-red-100 hover:border-[#ff3b30] text-[#ff3b30] hover:text-white cursor-pointer transition-all duration-200 active:scale-95 shadow-[0_2px_8px_rgba(255,59,48,0.08)] hover:shadow-[0_4px_12px_rgba(255,59,48,0.2)]"
                                       >
                                         <SFSymbolTrash size={14} />
                                       </button>
@@ -1456,7 +1456,7 @@ function InventoryPageContent() {
                                             setDefectiveItem(item);
                                             setDefectiveActionType("repair");
                                           }}
-                                          className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-blue-50 border border-slate-200/50 hover:border-blue-200/80 text-slate-500 hover:text-[#0066cc] cursor-pointer transition-all duration-150 active:scale-95 hover:scale-110 hover:-translate-y-0.5 hover:shadow-md hover:shadow-blue-200/40"
+                                          className="w-9 h-9 rounded-xl flex items-center justify-center bg-blue-50 hover:bg-[#0066cc] border border-blue-100 hover:border-[#0066cc] text-[#0066cc] hover:text-white cursor-pointer transition-all duration-200 active:scale-95 shadow-[0_2px_8px_rgba(0,102,204,0.08)] hover:shadow-[0_4px_12px_rgba(0,102,204,0.2)]"
                                         >
                                           <SFSymbolWrench size={14} />
                                         </button>
@@ -1472,7 +1472,7 @@ function InventoryPageContent() {
                                             setDefectiveItem(item);
                                             setDefectiveActionType("complete");
                                           }}
-                                          className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-emerald-50 border border-slate-200/50 hover:border-emerald-200/80 text-slate-500 hover:text-emerald-600 cursor-pointer transition-all duration-150 active:scale-95 hover:scale-110 hover:-translate-y-0.5 hover:shadow-md hover:shadow-emerald-200/40"
+                                          className="w-9 h-9 rounded-xl flex items-center justify-center bg-emerald-50 hover:bg-[#34c759] border border-emerald-100 hover:border-[#34c759] text-[#34c759] hover:text-white cursor-pointer transition-all duration-200 active:scale-95 shadow-[0_2px_8px_rgba(52,199,89,0.08)] hover:shadow-[0_4px_12px_rgba(52,199,89,0.2)]"
                                         >
                                           <SFSymbolCheckmarkCircle size={14} />
                                         </button>
@@ -1488,7 +1488,7 @@ function InventoryPageContent() {
                                             setDefectiveItem(item);
                                             setDefectiveActionType("refund");
                                           }}
-                                          className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-green-50 border border-slate-200/50 hover:border-green-200/80 text-slate-500 hover:text-green-600 cursor-pointer transition-all duration-150 active:scale-95 hover:scale-110 hover:-translate-y-0.5 hover:shadow-md hover:shadow-green-200/40"
+                                          className="w-9 h-9 rounded-xl flex items-center justify-center bg-emerald-50 hover:bg-[#34c759] border border-emerald-100 hover:border-[#34c759] text-[#34c759] hover:text-white cursor-pointer transition-all duration-200 active:scale-95 shadow-[0_2px_8px_rgba(52,199,89,0.08)] hover:shadow-[0_4px_12px_rgba(52,199,89,0.2)]"
                                         >
                                           <SFSymbolDollarSign size={14} />
                                         </button>
@@ -1504,7 +1504,7 @@ function InventoryPageContent() {
                                             setDefectiveItem(item);
                                             setDefectiveActionType("writeoff");
                                           }}
-                                          className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-purple-50 border border-slate-200/50 hover:border-purple-200/80 text-slate-500 hover:text-purple-600 cursor-pointer transition-all duration-150 active:scale-95 hover:scale-110 hover:-translate-y-0.5 hover:shadow-md hover:shadow-purple-200/40"
+                                          className="w-9 h-9 rounded-xl flex items-center justify-center bg-purple-50 hover:bg-[#af52de] border border-purple-100 hover:border-[#af52de] text-[#af52de] hover:text-white cursor-pointer transition-all duration-200 active:scale-95 shadow-[0_2px_8px_rgba(175,82,222,0.08)] hover:shadow-[0_4px_12px_rgba(175,82,222,0.2)]"
                                         >
                                           <SFSymbolArrowRightLeft size={14} />
                                         </button>
@@ -1516,7 +1516,7 @@ function InventoryPageContent() {
                                     <div className="relative group/tooltip">
                                       <Link
                                         href={`/lookup?serial=${item.serialNumber}`}
-                                        className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-blue-50 border border-slate-200/50 hover:border-blue-200/80 text-slate-500 hover:text-[#0066cc] cursor-pointer transition-all duration-150 active:scale-95 hover:scale-110 hover:-translate-y-0.5 hover:shadow-md hover:shadow-blue-200/40"
+                                        className="w-9 h-9 rounded-xl flex items-center justify-center bg-white hover:bg-[#f5f5f7] border border-[#e5e5ea] hover:border-[#d1d1d6] text-[#48484a] hover:text-[#0066cc] cursor-pointer transition-all duration-200 active:scale-95 shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)]"
                                       >
                                         <SFSymbolActivity size={14} />
                                       </Link>
@@ -1527,7 +1527,7 @@ function InventoryPageContent() {
                                     <div className="relative group/tooltip">
                                       <button
                                         onClick={() => handleDeleteClick(item)}
-                                        className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-red-50 border border-slate-200/50 hover:border-red-200/80 text-slate-500 hover:text-red-600 cursor-pointer transition-all duration-150 active:scale-95 hover:scale-110 hover:-translate-y-0.5 hover:shadow-md hover:shadow-red-200/40"
+                                        className="w-9 h-9 rounded-xl flex items-center justify-center bg-red-50 hover:bg-[#ff3b30] border border-red-100 hover:border-[#ff3b30] text-[#ff3b30] hover:text-white cursor-pointer transition-all duration-200 active:scale-95 shadow-[0_2px_8px_rgba(255,59,48,0.08)] hover:shadow-[0_4px_12px_rgba(255,59,48,0.2)]"
                                       >
                                         <SFSymbolTrash size={14} />
                                       </button>
@@ -1541,7 +1541,7 @@ function InventoryPageContent() {
                                     <div className="relative group/tooltip">
                                       <Link
                                         href={`/lookup?serial=${item.serialNumber}`}
-                                        className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-blue-50 border border-slate-200/50 hover:border-blue-200/80 text-slate-500 hover:text-[#0066cc] cursor-pointer transition-all duration-150 active:scale-95 hover:scale-110 hover:-translate-y-0.5 hover:shadow-md hover:shadow-blue-200/40"
+                                        className="w-9 h-9 rounded-xl flex items-center justify-center bg-white hover:bg-[#f5f5f7] border border-[#e5e5ea] hover:border-[#d1d1d6] text-[#48484a] hover:text-[#0066cc] cursor-pointer transition-all duration-200 active:scale-95 shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)]"
                                       >
                                         <SFSymbolActivity size={14} />
                                       </Link>
@@ -1553,7 +1553,7 @@ function InventoryPageContent() {
                                     <div className="relative group/tooltip">
                                       <button
                                         onClick={() => handleDeleteClick(item)}
-                                        className="w-8.5 h-8.5 rounded-full flex items-center justify-center bg-slate-50 hover:bg-red-50 border border-slate-200/50 hover:border-red-200/80 text-slate-500 hover:text-red-600 cursor-pointer transition-all duration-150 active:scale-95 hover:scale-110 hover:-translate-y-0.5 hover:shadow-md hover:shadow-red-200/40"
+                                        className="w-9 h-9 rounded-xl flex items-center justify-center bg-red-50 hover:bg-[#ff3b30] border border-red-100 hover:border-[#ff3b30] text-[#ff3b30] hover:text-white cursor-pointer transition-all duration-200 active:scale-95 shadow-[0_2px_8px_rgba(255,59,48,0.08)] hover:shadow-[0_4px_12px_rgba(255,59,48,0.2)]"
                                       >
                                         <SFSymbolTrash size={14} />
                                       </button>

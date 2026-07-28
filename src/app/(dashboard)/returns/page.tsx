@@ -4,9 +4,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getReturnsList, createReturn, deleteReturnAction, getReturnDetailAction } from "@/app/actions/returns";
 import { GlassCard } from "@/components/ui/glass-card";
 import { 
-  Search, Plus, RefreshCcw, Eye, Pencil, Trash2
+  Search, Plus, RefreshCcw, Pencil, Trash2
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Dialog } from "@/components/ui/dialog";
 import { ReturnForm } from "@/components/returns/return-form";
@@ -15,6 +15,10 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 export default function ReturnsPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   
   // Modals
   const [isReturnOpen, setIsReturnOpen] = useState(false);
@@ -102,6 +106,7 @@ export default function ReturnsPage() {
   );
 
   const formatToDDMMYYYY = (dateString: string | Date | null) => {
+    if (!mounted) return "";
     if (!dateString) return "N/A";
     try {
       const d = new Date(dateString);
@@ -120,6 +125,16 @@ export default function ReturnsPage() {
       style: "currency",
       currency: "VND",
     }).format(Number(price) || 0);
+  };
+
+  const getReturnReasonLabel = (reason: string) => {
+    const mapping: Record<string, string> = {
+      defective: "Lỗi nhà sản xuất",
+      changed_mind: "Khách đổi ý / Nâng cấp",
+      wrong_item: "Giao sai hàng",
+      other: "Lý do khác",
+    };
+    return mapping[reason] || reason.replace("_", " ");
   };
 
 
@@ -150,73 +165,82 @@ export default function ReturnsPage() {
 
 
 
-      {/* Main Table */}
       <GlassCard className="p-0 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-separate border-spacing-0">
             <thead>
-              <tr className="border-b border-[#e0e0e0] bg-[#f5f5f7]/50 text-[12px] font-semibold text-[#7a7a7a] uppercase tracking-wider">
-                <th className="px-6 py-4 w-12 text-center">STT</th>
-                <th className="px-6 py-4">Mã Phiếu</th>
-                <th className="px-6 py-4">Đơn Gốc</th>
-                <th className="px-6 py-4">Khách Hàng</th>
-                <th className="px-6 py-4">Loại Phiếu</th>
-                <th className="px-6 py-4">Lý do</th>
-                <th className="px-6 py-4 text-right">Tiền Hoàn</th>
-                <th className="px-6 py-4 w-44 text-center">Tác vụ</th>
+              <tr className="bg-[#f5f5f7]/50 text-[12px] font-semibold text-[#7a7a7a] uppercase tracking-wider whitespace-nowrap">
+                <th className="px-6 py-4 w-12 text-center border-b border-[#e0e0e0]">STT</th>
+                <th className="px-6 py-4 border-b border-[#e0e0e0]">Mã Phiếu</th>
+                <th className="px-6 py-4 border-b border-[#e0e0e0]">Đơn Gốc</th>
+                <th className="px-6 py-4 border-b border-[#e0e0e0]">Khách Hàng</th>
+                <th className="px-6 py-4 border-b border-[#e0e0e0]">Loại Phiếu</th>
+                <th className="px-6 py-4 border-b border-[#e0e0e0]">Lý do</th>
+                <th className="px-6 py-4 text-right border-b border-[#e0e0e0]">Tiền Hoàn</th>
+                <th className="px-6 py-4 w-44 text-center border-b border-[#e0e0e0]">Tác vụ</th>
               </tr>
             </thead>
             <tbody className="text-[14px] text-[#1d1d1f]">
-              {filteredReturns?.map((r, index) => (
-                <tr key={r.id} className="border-b border-[#e0e0e0] last:border-0 hover:bg-[#f5f5f7]/60 transition-colors">
-                  <td className="px-6 py-5 text-center font-semibold text-[#7a7a7a]">{index + 1}</td>
-                  <td className="px-6 py-5 font-semibold text-[#dc2626] cursor-pointer hover:underline" onClick={() => handleViewDetail(r.id)}>{r.returnNumber}</td>
-                  <td className="px-6 py-5 font-semibold">{r.orderNumber}</td>
-                  <td className="px-6 py-5">
-                    <p className="font-semibold">{r.customerName}</p>
-                    <p className="text-[12px] text-[#7a7a7a]">{r.customerPhone}</p>
-                  </td>
-                  <td className="px-6 py-5">
-                    <span className={`px-2.5 py-1 text-[11px] font-semibold rounded-md capitalize ${r.type === 'exchange' ? 'bg-blue-50 text-blue-700' : 'bg-red-50 text-red-700'}`}>
-                      {r.type === 'exchange' ? 'Đổi Hàng' : 'Trả Hàng'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-5 text-[#7a7a7a] text-[13px] capitalize">{r.reason.replace("_", " ")}</td>
-                  <td className="px-6 py-5 text-right font-semibold text-[#1d1d1f]">
-                    {formatPrice(r.refundAmount || 0)}
-                  </td>
-                  <td className="px-6 py-5">
-                    <div className="flex items-center justify-center gap-2">
-                      {/* Xem */}
-                      <button
-                        onClick={() => handleViewDetail(r.id)}
-                        className="w-9 h-9 bg-white hover:bg-slate-50 border border-[#e0e0e0] hover:border-slate-300 rounded-xl text-slate-500 hover:text-[#0066cc] flex items-center justify-center shadow-[0_2px_4px_rgba(0,0,0,0.03)] hover:shadow-[0_4px_10px_rgba(0,0,0,0.06)] transition-all duration-200 cursor-pointer active:scale-95 shrink-0"
-                        title="Xem chi tiết"
-                      >
-                        <Eye size={15} />
-                      </button>
+              {filteredReturns?.map((r, index) => {
+                const isLast = index === filteredReturns.length - 1;
+                return (
+                  <tr 
+                    key={r.id} 
+                    className="group cursor-pointer"
+                    onClick={() => handleViewDetail(r.id)}
+                  >
+                    <td className={`px-6 py-5 text-center font-semibold text-[#7a7a7a] text-[13px] ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                      {index + 1}
+                    </td>
+                    <td className={`px-6 py-5 font-semibold text-[#dc2626] group-hover:underline ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                      <span className="block">{r.returnNumber}</span>
+                      <span className="text-[12px] text-[#7a7a7a] block mt-0.5 font-normal whitespace-nowrap">Ngày tạo: {formatToDDMMYYYY(r.createdAt)}</span>
+                    </td>
+                    <td className={`px-6 py-5 font-semibold ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                      {r.orderNumber}
+                    </td>
+                    <td className={`px-6 py-5 ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                      <p className="font-semibold">{r.customerName}</p>
+                      <p className="text-[12px] text-[#7a7a7a]">{r.customerPhone}</p>
+                    </td>
+                    <td className={`px-6 py-5 ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                      <span className={`font-semibold ${r.type === 'exchange' ? 'text-blue-600' : 'text-[#ff3b30]'}`}>
+                        {r.type === 'exchange' ? 'Đổi hàng' : 'Trả hàng'}
+                      </span>
+                    </td>
+                    <td className={`px-6 py-5 text-[#7a7a7a] text-[13px] capitalize ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                      {getReturnReasonLabel(r.reason)}
+                    </td>
+                    <td className={`px-6 py-5 text-right font-semibold text-[#1d1d1f] ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                      {formatPrice(r.refundAmount || 0)}
+                    </td>
+                    <td 
+                      className={`px-6 py-5 ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center justify-center gap-2.5">
+                        {/* Sửa */}
+                        <button
+                          onClick={() => handleEditReturn(r.returnNumber)}
+                          className="w-10 h-10 bg-white hover:bg-[#f5f5f7] border border-[#e5e5ea] hover:border-[#d1d1d6] rounded-2xl text-[#48484a] hover:text-[#1c1c1e] flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-all duration-200 cursor-pointer active:scale-95 shrink-0"
+                          title="Chỉnh sửa"
+                        >
+                          <Pencil size={18} />
+                        </button>
 
-                      {/* Sửa */}
-                      <button
-                        onClick={() => handleEditReturn(r.returnNumber)}
-                        className="w-9 h-9 bg-white hover:bg-slate-50 border border-[#e0e0e0] hover:border-slate-300 rounded-xl text-slate-500 hover:text-amber-600 flex items-center justify-center shadow-[0_2px_4px_rgba(0,0,0,0.03)] hover:shadow-[0_4px_10px_rgba(0,0,0,0.06)] transition-all duration-200 cursor-pointer active:scale-95 shrink-0"
-                        title="Chỉnh sửa"
-                      >
-                        <Pencil size={15} />
-                      </button>
-
-                      {/* Xóa */}
-                      <button
-                        onClick={() => setReturnToDelete(r)}
-                        className="w-9 h-9 bg-white hover:bg-slate-50 border border-[#e0e0e0] hover:border-slate-300 rounded-xl text-slate-500 hover:text-red-600 flex items-center justify-center shadow-[0_2px_4px_rgba(0,0,0,0.03)] hover:shadow-[0_4px_10px_rgba(0,0,0,0.06)] transition-all duration-200 cursor-pointer active:scale-95 shrink-0"
-                        title="Xóa phiếu"
-                      >
-                        <Trash2 size={15} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        {/* Xóa */}
+                        <button
+                          onClick={() => setReturnToDelete(r)}
+                          className="w-10 h-10 bg-red-50 hover:bg-[#ff3b30] border border-red-100 hover:border-[#ff3b30] rounded-2xl text-[#ff3b30] hover:text-white flex items-center justify-center shadow-[0_2px_8px_rgba(255,59,48,0.08)] hover:shadow-[0_4px_12px_rgba(255,59,48,0.2)] transition-all duration-200 cursor-pointer active:scale-95 shrink-0"
+                          title="Xóa phiếu"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
               {filteredReturns?.length === 0 && (
                 <tr>
                   <td colSpan={8} className="px-6 py-10 text-center text-[#7a7a7a]">Không tìm thấy phiếu đổi trả nào.</td>
@@ -274,8 +298,8 @@ export default function ReturnsPage() {
               <div>
                 <span className="text-slate-500">Phân loại đổi trả:</span>
                 <p className="mt-0.5">
-                  <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
-                    returnDetail.returnData.type === "exchange" ? "bg-blue-100 text-blue-800" : "bg-red-100 text-red-800"
+                  <span className={`font-semibold ${
+                    returnDetail.returnData.type === "exchange" ? "text-blue-600" : "text-[#ff3b30]"
                   }`}>
                     {returnDetail.returnData.type === "exchange" ? "Đổi hàng" : "Trả hàng"}
                   </span>
@@ -283,8 +307,8 @@ export default function ReturnsPage() {
               </div>
               <div>
                 <span className="text-slate-500">Lý do chính:</span>
-                <p className="font-semibold text-slate-800 mt-0.5 capitalize">
-                  {returnDetail.returnData.reason.replace("_", " ")}
+                <p className="font-semibold text-slate-800 mt-0.5">
+                  {getReturnReasonLabel(returnDetail.returnData.reason)}
                 </p>
               </div>
               <div className="col-span-2">
