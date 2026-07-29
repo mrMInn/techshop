@@ -79,6 +79,13 @@ function WarrantyPageContent() {
   const [detailClaimId, setDetailClaimId] = useState<string | null>(null);
   const [claimToDelete, setClaimToDelete] = useState<any | null>(null);
 
+  const [page, setPage] = useState(1);
+  const limit = 20;
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, selectedStatus]);
+
   // Queries
   const { data: warranties, isLoading: isLoadingWarranties } = useQuery({
     queryKey: ["warranty_claims"],
@@ -142,6 +149,13 @@ function WarrantyPageContent() {
     
     return true;
   });
+
+  const totalItems = filteredWarranties?.length || 0;
+  const totalPages = Math.ceil(totalItems / limit) || 1;
+  const paginatedWarranties = useMemo(() => {
+    const offset = (page - 1) * limit;
+    return filteredWarranties?.slice(offset, offset + limit) || [];
+  }, [filteredWarranties, page, limit]);
 
   const activeSegmentIndex = useMemo(() => {
     if (selectedStatus === "all") return 0;
@@ -235,8 +249,8 @@ function WarrantyPageContent() {
               </tr>
             </thead>
             <tbody className="text-[14px] text-[#1d1d1f]">
-              {filteredWarranties?.map((w, index) => {
-                const isLast = index === filteredWarranties.length - 1;
+              {paginatedWarranties?.map((w, index) => {
+                const isLast = index === paginatedWarranties.length - 1;
                 return (
                   <tr 
                     key={w.id} 
@@ -244,7 +258,7 @@ function WarrantyPageContent() {
                     onClick={() => setDetailClaimId(w.id)}
                   >
                     <td className={`px-6 py-5 text-center font-semibold text-[#7a7a7a] ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
-                      {index + 1}
+                      {(page - 1) * limit + index + 1}
                     </td>
                     <td className={`px-6 py-5 font-semibold ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
                       <span className="text-[#0066cc] group-hover:underline font-semibold block">
@@ -293,7 +307,7 @@ function WarrantyPageContent() {
                   </tr>
                 );
               })}
-              {filteredWarranties?.length === 0 && (
+              {totalItems === 0 && (
                 <tr>
                   <td colSpan={6} className="px-6 py-10 text-center text-[#7a7a7a]">Không tìm thấy phiếu bảo hành nào.</td>
                 </tr>
@@ -301,6 +315,61 @@ function WarrantyPageContent() {
             </tbody>
           </table>
         </div>
+
+        {/* Bộ điều khiển phân trang */}
+        {totalPages > 1 && (
+          <div className="px-6 py-4 border-t border-[#e0e0e0] flex flex-col sm:flex-row items-center justify-between gap-4 bg-white text-[14px] select-none">
+            <div className="text-[#7a7a7a]">
+              Hiển thị dòng <b>{(page - 1) * limit + 1}</b> - <b>{Math.min(page * limit, totalItems)}</b> trong tổng số <b>{totalItems}</b> phiếu bảo hành
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={page === 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="px-3.5 py-1.5 rounded-lg bg-white border border-slate-200 text-[12px] font-semibold text-slate-700 hover:border-[#0071e3] hover:text-[#0071e3] hover:bg-blue-50/30 disabled:opacity-40 disabled:pointer-events-none transition-all duration-200 cursor-pointer shadow-sm active:scale-95"
+              >
+                Trước
+              </button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => {
+                  if (
+                    totalPages > 5 &&
+                    Math.abs(p - page) > 2 &&
+                    p !== 1 &&
+                    p !== totalPages
+                  ) {
+                    if (p === 2 && page > 4) return <span key="dots-1" className="px-1.5 text-slate-400 font-bold">...</span>;
+                    if (p === totalPages - 1 && page < totalPages - 3) return <span key="dots-2" className="px-1.5 text-slate-400 font-bold">...</span>;
+                    return null;
+                  }
+                  return (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setPage(p)}
+                      className={`w-7.5 h-7.5 rounded-lg text-[12px] font-bold transition-all cursor-pointer flex items-center justify-center active:scale-90 ${
+                        p === page
+                          ? "bg-[#0071e3] text-white shadow-md shadow-blue-500/20"
+                          : "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                type="button"
+                disabled={page === totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                className="px-3.5 py-1.5 rounded-lg bg-white border border-slate-200 text-[12px] font-semibold text-slate-700 hover:border-[#0071e3] hover:text-[#0071e3] hover:bg-blue-50/30 disabled:opacity-40 disabled:pointer-events-none transition-all duration-200 cursor-pointer shadow-sm active:scale-95"
+              >
+                Sau
+              </button>
+            </div>
+          </div>
+        )}
       </GlassCard>
 
       {/* Dialogs */}

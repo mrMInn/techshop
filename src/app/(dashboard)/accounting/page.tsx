@@ -1461,9 +1461,9 @@ export default function CashBookPage() {
                     type="button"
                     disabled={currentPage === 1}
                     onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                    className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none transition-all cursor-pointer shadow-sm active:scale-95"
+                    className="px-3.5 py-1.5 rounded-lg bg-white border border-slate-200 text-[12px] font-semibold text-slate-700 hover:border-[#0071e3] hover:text-[#0071e3] hover:bg-blue-50/30 disabled:opacity-40 disabled:pointer-events-none transition-all cursor-pointer shadow-sm active:scale-95"
                   >
-                    Trang trước
+                    Trước
                   </button>
                   <div className="flex items-center gap-1">
                     {Array.from({ length: totalPages }).map((_, i) => {
@@ -1489,9 +1489,9 @@ export default function CashBookPage() {
                     type="button"
                     disabled={currentPage === totalPages}
                     onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                    className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none transition-all cursor-pointer shadow-sm active:scale-95"
+                    className="px-3.5 py-1.5 rounded-lg bg-white border border-slate-200 text-[12px] font-semibold text-slate-700 hover:border-[#0071e3] hover:text-[#0071e3] hover:bg-blue-50/30 disabled:opacity-40 disabled:pointer-events-none transition-all cursor-pointer shadow-sm active:scale-95"
                   >
-                    Trang sau
+                    Sau
                   </button>
                 </div>
               </div>

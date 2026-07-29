@@ -966,7 +966,7 @@ export default function ExpensesPage() {
                         </td>
 
                         {/* Mã chứng từ */}
-                        <td className={`py-3.5 px-3 font-mono text-[12px] transition-all truncate whitespace-nowrap ${
+                        <td className={`py-3.5 px-3 text-[12px] transition-all truncate whitespace-nowrap ${
                           isSelected 
                             ? "text-[#0066cc] bg-[#0066cc]/8 group-hover:bg-[#0066cc]/12 border-y border-[#0066cc]/25" 
                             : "text-slate-500 border-b border-slate-100 group-hover:bg-[#0071e3]/4"

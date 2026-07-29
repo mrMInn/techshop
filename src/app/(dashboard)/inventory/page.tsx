@@ -88,20 +88,6 @@ function InventoryPageContent() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBulkDeleteConfirmOpen, setIsBulkDeleteConfirmOpen] = useState(false);
 
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const popoverRef = useRef<HTMLDivElement>(null);
-
-  // Click outside listener to close advanced filters
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
-        setIsFilterOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
   // Sync activeTab with URL query param 'tab'
   const tabParam = searchParams.get("tab");
   const activeTab = (tabParam === "defective" || tabParam === "returned" || tabParam === "purchase_orders" || tabParam === "accessories" ? tabParam : "active") as "active" | "defective" | "returned" | "purchase_orders" | "accessories";
@@ -685,52 +671,30 @@ function InventoryPageContent() {
                 </>
               )}
 
-              {/* Advanced Filter Popover Button (for other tabs) */}
+              {/* Direct Filters for other Tabs (Category & Brand) */}
               {activeTab !== "purchase_orders" && (
-                <div className="relative" ref={popoverRef}>
-                  <button 
-                    onClick={() => setIsFilterOpen(!isFilterOpen)}
-                    className={`h-[40px] px-4 rounded-full border transition-all flex items-center gap-1.5 text-[13px] font-medium cursor-pointer ${
-                      selectedCategory !== "all" || selectedBrand !== "all"
-                        ? "border-[#0066cc] bg-[#0066cc]/5 text-[#0066cc]"
-                        : "border-[#e0e0e0] bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#7a7a7a] hover:text-[#1d1d1f]"
-                    }`}
-                    title="Bộ lọc nâng cao"
-                  >
-                    <Filter size={14} />
-                    <span>Bộ lọc</span>
-                    {(selectedCategory !== "all" || selectedBrand !== "all") && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#0066cc]" />
-                    )}
-                  </button>
-                  
-                  {isFilterOpen && (
-                    <div className="absolute top-[calc(100%+6px)] left-0 w-[240px] bg-white rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.15)] border border-[#e0e0e0] p-3.5 z-[99] space-y-3">
-                      <div className="space-y-1">
-                        <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Danh mục</label>
-                        <CustomSelect
-                          options={categoryOptions}
-                          value={selectedCategory}
-                          onChange={setSelectedCategory}
-                          size="sm"
-                          rounded="full"
-                          dropdownWidth="full"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Thương hiệu</label>
-                        <CustomSelect
-                          options={brandOptions}
-                          value={selectedBrand}
-                          onChange={setSelectedBrand}
-                          size="sm"
-                          rounded="full"
-                          dropdownWidth="full"
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <>
+                  <div className="w-[160px] sm:w-[180px] shrink-0">
+                    <CustomSelect
+                      options={categoryOptions}
+                      value={selectedCategory}
+                      onChange={setSelectedCategory}
+                      size="sm"
+                      rounded="full"
+                      dropdownWidth="full"
+                    />
+                  </div>
+                  <div className="w-[170px] sm:w-[190px] shrink-0">
+                    <CustomSelect
+                      options={brandOptions}
+                      value={selectedBrand}
+                      onChange={setSelectedBrand}
+                      size="sm"
+                      rounded="full"
+                      dropdownWidth="full"
+                    />
+                  </div>
+                </>
               )}
 
               {/* Reset Button */}
@@ -927,7 +891,7 @@ function InventoryPageContent() {
                       onMouseEnter={() => prefetchDrawerItems(group.productId)}
                     >
                       <td className={`px-6 py-3 text-center font-semibold text-[#7a7a7a] text-[13px] ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
-                        {index + 1}
+                        {(currentPage - 1) * itemsPerPage + index + 1}
                       </td>
                       <td className={`px-6 py-3 ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
                         <div className="flex items-center gap-4">
@@ -1030,7 +994,7 @@ function InventoryPageContent() {
                   type="button"
                   disabled={currentPage === 1}
                   onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                  className="px-5 py-2 rounded-full bg-transparent border border-[#0071e3] text-[#0071e3] text-[13px] font-medium hover:bg-[#0071e3] hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-all duration-200 cursor-pointer shadow-sm active:scale-95"
+                  className="px-3.5 py-1.5 rounded-lg bg-white border border-slate-200 text-[12px] font-semibold text-slate-700 hover:border-[#0071e3] hover:text-[#0071e3] hover:bg-blue-50/30 disabled:opacity-40 disabled:pointer-events-none transition-all duration-200 cursor-pointer shadow-sm active:scale-95"
                 >
                   Trước
                 </button>
@@ -1043,10 +1007,10 @@ function InventoryPageContent() {
                         key={pageNum}
                         type="button"
                         onClick={() => setCurrentPage(pageNum)}
-                        className={`w-8 h-8 rounded-full text-[13px] font-semibold flex items-center justify-center transition-all cursor-pointer ${
+                        className={`w-7.5 h-7.5 rounded-lg text-[12px] font-bold transition-all cursor-pointer flex items-center justify-center active:scale-90 ${
                           isCurrent
-                            ? "bg-[#0071e3] text-white shadow-sm"
-                            : "bg-transparent text-slate-600 hover:bg-slate-100"
+                            ? "bg-[#0071e3] text-white shadow-md shadow-blue-500/20"
+                            : "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200"
                         }`}
                       >
                         {pageNum}
@@ -1058,7 +1022,7 @@ function InventoryPageContent() {
                   type="button"
                   disabled={currentPage === totalPages}
                   onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                  className="px-5 py-2 rounded-full bg-transparent border border-[#0071e3] text-[#0071e3] text-[13px] font-medium hover:bg-[#0071e3] hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-all duration-200 cursor-pointer shadow-sm active:scale-95"
+                  className="px-3.5 py-1.5 rounded-lg bg-white border border-slate-200 text-[12px] font-semibold text-slate-700 hover:border-[#0071e3] hover:text-[#0071e3] hover:bg-blue-50/30 disabled:opacity-40 disabled:pointer-events-none transition-all duration-200 cursor-pointer shadow-sm active:scale-95"
                 >
                   Sau
                 </button>

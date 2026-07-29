@@ -486,6 +486,11 @@ function DashboardChartInner({ chartData, monthlyChartData, isLoading, onMonthCh
   // Unified chart controllers
   const [activeMetric, setActiveMetric] = useState<"revenue" | "expense" | "profit">("revenue");
   const [activeTimeframe, setActiveTimeframe] = useState<"weekly" | "monthly" | "yearly" | "custom" | "month-select">("monthly");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Custom range and specific month selector states
   const [customStartDate, setCustomStartDate] = useState<string>(() => {
@@ -578,6 +583,7 @@ function DashboardChartInner({ chartData, monthlyChartData, isLoading, onMonthCh
 
   // Dynamic Chart Picker based on parameters
   const renderBieuDo = () => {
+    if (!mounted) return null;
     if (activeMetric === "revenue") {
       if (activeTimeframe === "yearly") {
         return (
@@ -846,7 +852,7 @@ function DashboardChartInner({ chartData, monthlyChartData, isLoading, onMonthCh
         </div>
       </div>
 
-      <div className="mt-4 h-[310px] rounded-[24px] border border-white/70 bg-white/20 backdrop-blur-md p-3.5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]">
+      <div className="mt-4 w-full h-[310px] rounded-[24px] border border-white/70 bg-white/20 backdrop-blur-md p-3.5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]">
         {renderBieuDo()}
       </div>
     </KinhPanel>

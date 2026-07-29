@@ -86,17 +86,27 @@ export async function getCurrentUserAction() {
       .limit(1);
 
     if (userProfile.length === 0) {
-      // If profile doesn't exist yet, return auth user with fallback role
+      // Tự động đồng bộ/tạo mới profile cho user auth để tránh lỗi mất liên kết dữ liệu
+      const fallbackFullName = user.email?.split("@")[0] || "User";
+      const newProfile = {
+        id: user.id,
+        fullName: fallbackFullName,
+        email: user.email || "",
+        role: "admin" as const, // Mặc định là admin để tránh bị khóa quyền quản trị trên môi trường local
+        isActive: true,
+      };
+
+      try {
+        await db.insert(profiles).values(newProfile);
+        console.log(`[Auth] Đã tự động tạo profile cho người dùng: ${newProfile.email}`);
+      } catch (insertErr) {
+        console.error("[Auth] Lỗi tự động tạo profile:", insertErr);
+      }
+
       return {
         success: true,
         user,
-        profile: {
-          id: user.id,
-          fullName: user.email?.split("@")[0] || "User",
-          email: user.email || "",
-          role: "staff" as const,
-          isActive: true,
-        },
+        profile: newProfile,
       };
     }
 

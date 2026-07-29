@@ -1,6 +1,7 @@
 "use server";
 
 import { db, recalculateRunningBalances } from "@/lib/db";
+import { logAndNotify } from "@/lib/db/audit";
 import { after } from "next/server";
 
 import { 
@@ -810,6 +811,9 @@ export async function createOrderAction(data: {
         await recalculateRunningBalances(tx);
       }
 
+      // Ghi audit log
+      await logAndNotify("CREATE", "orders", newOrder.id, null, newOrder, tx);
+
       // 10. Lấy danh sách thiết bị và tên sản phẩm để gửi Telegram
       const soldItemsDetails = await tx
         .select({
@@ -994,6 +998,9 @@ export async function cancelOrderAction(orderId: string) {
       // 7. Tính toán lại số dư sổ quỹ
       await recalculateRunningBalances(tx);
 
+      // Ghi audit log
+      await logAndNotify("UPDATE", "orders", orderId, order[0], updatedOrder, tx);
+
       // 8. Lấy thông tin khách hàng để gửi Telegram hủy đơn
       let customerName = "Khách hàng";
       if (customer && customer.length > 0) {
@@ -1122,6 +1129,10 @@ export async function recordPaymentAction(data: {
 
       await recalculateRunningBalances(tx);
 
+      // Ghi audit log
+      const updatedOrder = await tx.select().from(orders).where(eq(orders.id, data.orderId)).limit(1);
+      await logAndNotify("UPDATE", "orders", data.orderId, orderData, updatedOrder[0], tx);
+
       const result = { success: true, message: "Ghi nhận thanh toán bổ sung thành công", payment: newPayment };
       after(() => {
         invalidateDashboardCache();
@@ -1221,6 +1232,9 @@ export async function completeOnlineOrderAction(data: {
 
       // Tính lại balances sổ quỹ
       await recalculateRunningBalances(tx);
+
+      // Ghi audit log
+      await logAndNotify("UPDATE", "orders", data.orderId, orderData, updatedOrder, tx);
 
       // Lấy danh sách thiết bị để gửi thông báo hoàn tất
       const soldItemsDetails = await tx

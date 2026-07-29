@@ -93,7 +93,6 @@ function OrdersPageContent() {
     setPage(1);
   }, [search, selectedStatus, selectedPaymentStatus, selectedChannel]);
 
-  // 1. Fetch danh sách đơn hàng với bộ lọc từ server
   const { data, isLoading, error } = useQuery({
     queryKey: ["orders", page, search, selectedStatus, selectedPaymentStatus, selectedChannel],
     queryFn: () => getOrdersList({
@@ -104,6 +103,7 @@ function OrdersPageContent() {
       paymentStatus: selectedPaymentStatus,
       saleChannel: selectedChannel,
     }),
+    placeholderData: (prev: any) => prev,
     staleTime: 10000,
   });
 
@@ -419,7 +419,7 @@ function OrdersPageContent() {
                     >
                       {/* STT */}
                       <td className={`px-3 py-4 w-10 text-center font-semibold text-[#7a7a7a] text-[13px] whitespace-nowrap ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
-                        {index + 1}
+                        {(page - 1) * limit + index + 1}
                       </td>
 
                       <td className={`px-4 py-4 whitespace-nowrap ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
@@ -539,7 +539,7 @@ function OrdersPageContent() {
                 type="button"
                 disabled={page === 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="px-5 py-2 rounded-full bg-transparent border border-[#0071e3] text-[#0071e3] text-[13px] font-medium hover:bg-[#0071e3] hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-all duration-200 cursor-pointer shadow-sm active:scale-95"
+                className="px-3.5 py-1.5 rounded-lg bg-white border border-slate-200 text-[12px] font-semibold text-slate-700 hover:border-[#0071e3] hover:text-[#0071e3] hover:bg-blue-50/30 disabled:opacity-40 disabled:pointer-events-none transition-all duration-200 cursor-pointer shadow-sm active:scale-95"
               >
                 Trước
               </button>
@@ -561,10 +561,10 @@ function OrdersPageContent() {
                       key={p}
                       type="button"
                       onClick={() => setPage(p)}
-                      className={`w-[36px] h-[36px] rounded-full text-[13px] font-semibold transition-all cursor-pointer ${
+                      className={`w-7.5 h-7.5 rounded-lg text-[12px] font-bold transition-all cursor-pointer flex items-center justify-center active:scale-90 ${
                         p === page
-                          ? "bg-[#0071e3] text-white shadow-sm"
-                          : "bg-transparent text-slate-600 hover:bg-slate-100"
+                          ? "bg-[#0071e3] text-white shadow-md shadow-blue-500/20"
+                          : "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200"
                       }`}
                     >
                       {p}
@@ -576,7 +576,7 @@ function OrdersPageContent() {
                 type="button"
                 disabled={page === pagination.totalPages}
                 onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
-                className="px-5 py-2 rounded-full bg-transparent border border-[#0071e3] text-[#0071e3] text-[13px] font-medium hover:bg-[#0071e3] hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-all duration-200 cursor-pointer shadow-sm active:scale-95"
+                className="px-3.5 py-1.5 rounded-lg bg-white border border-slate-200 text-[12px] font-semibold text-slate-700 hover:border-[#0071e3] hover:text-[#0071e3] hover:bg-blue-50/30 disabled:opacity-40 disabled:pointer-events-none transition-all duration-200 cursor-pointer shadow-sm active:scale-95"
               >
                 Sau
               </button>
