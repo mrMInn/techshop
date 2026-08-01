@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Dialog } from "@/components/ui/dialog";
 import { CustomSelect } from "@/components/ui/custom-select";
 import { getOrderDetail, completeOnlineOrderAction, cancelOrderAction } from "@/app/actions/orders";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Calendar, Tag, ShieldCheck, DollarSign, FileText, User, RefreshCw, ShoppingBag, Pencil, Printer, Download } from "lucide-react";
-import { toPng } from "html-to-image";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -63,7 +63,6 @@ export function OrderDetailDialog({ isOpen, onClose, orderId }: OrderDetailDialo
   const [isConfirmCancelOpen, setIsConfirmCancelOpen] = useState(false);
   const [isConfirmDeliverOpen, setIsConfirmDeliverOpen] = useState(false);
   const [isEditShippingOpen, setIsEditShippingOpen] = useState(false);
-  const [downloadingImage, setDownloadingImage] = useState(false);
 
   const payMethodOptions = [
     { value: "bank_transfer", label: "Chuyển khoản" },
@@ -157,39 +156,54 @@ export function OrderDetailDialog({ isOpen, onClose, orderId }: OrderDetailDialo
     }
   };
 
-  const renderDetailOrderStatus = (status: string) => {
-    const configs: Record<string, { bg: string; label: string }> = {
-      draft: { bg: "bg-[#7a8a99]/10 text-[#7a8a99] border-[#7a8a99]/20", label: "Nháp" },
-      confirmed: { bg: "bg-[#0066cc]/10 text-[#0066cc] border-[#0066cc]/20", label: "Đang xử lý" },
-      processing: { bg: "bg-[#f59e0b]/10 text-[#d97706] border-[#f59e0b]/20", label: "Đang giao hàng" },
-      completed: { bg: "bg-[#009b72]/10 text-[#009b72] border-[#009b72]/20", label: "Đã hoàn thành" },
-      cancelled: { bg: "bg-[#df2935]/10 text-[#df2935] border-[#df2935]/20", label: "Đã hủy" },
-      refunded: { bg: "bg-[#6366f1]/10 text-[#6366f1] border-[#6366f1]/20", label: "Hoàn tiền" },
-    };
-    const c = configs[status] || { bg: "bg-gray-100 text-gray-700 border-gray-200", label: status };
-    return (
-      <span className={`inline-flex items-center px-3 py-1 rounded-full text-[12px] font-bold border ${c.bg}`}>
-        {c.label}
-      </span>
-    );
+
+
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  const handleDownloadPdf = async () => {
+    if (!order) return;
+    const element = document.getElementById("print-invoice-area");
+    if (!element) {
+      toast.error("Không tìm thấy mẫu hóa đơn để xuất PDF.");
+      return;
+    }
+
+    setDownloadingPdf(true);
+    const toastId = toast.loading("Đang tạo hóa đơn PDF...");
+
+    try {
+      // 1. Wait a tiny bit to ensure DOM is fully ready
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      const { toPng } = await import("html-to-image");
+      const { jsPDF } = await import("jspdf");
+
+      // 2. Generate high-quality image from element
+      const dataUrl = await toPng(element, {
+        pixelRatio: 2, // Double resolution for crystal-clear prints
+        backgroundColor: "#ffffff",
+        style: {
+          transform: "scale(1)",
+          transformOrigin: "top left",
+        }
+      });
+
+      // 3. Create PDF
+      const pdf = new jsPDF("p", "mm", "a4");
+      const imgWidth = 210; // A4 width in mm
+      const imgHeight = 297; // A4 height in mm
+
+      pdf.addImage(dataUrl, "PNG", 0, 0, imgWidth, imgHeight, undefined, "FAST");
+      pdf.save(`HoaDon_${order.orderNumber}.pdf`);
+
+      toast.success("Đã tải hóa đơn PDF thành công!", { id: toastId });
+    } catch (error) {
+      console.error("PDF generation failed:", error);
+      toast.error("Gặp lỗi khi tạo file PDF hóa đơn.", { id: toastId });
+    } finally {
+      setDownloadingPdf(false);
+    }
   };
-
-  const renderDetailPaymentStatus = (status: string) => {
-    const configs: Record<string, { bg: string; label: string }> = {
-      unpaid: { bg: "bg-[#df2935]/10 text-[#df2935] border-[#df2935]/20", label: "Chờ thanh toán" },
-      partial: { bg: "bg-[#f4a261]/10 text-[#d97706] border-[#f4a261]/20", label: "Trả một phần" },
-      paid: { bg: "bg-[#4f46e5]/10 text-[#4f46e5] border-[#4f46e5]/20", label: "Đã thanh toán" },
-      refunded: { bg: "bg-[#7a8a99]/10 text-[#7a7a7a] border-[#7a8a99]/20", label: "Đã hoàn tiền" },
-    };
-    const c = configs[status] || { bg: "bg-gray-100 text-gray-700 border-gray-200", label: status };
-    return (
-      <span className={`inline-flex items-center px-3 py-1 rounded-full text-[12px] font-bold border ${c.bg}`}>
-        {c.label}
-      </span>
-    );
-  };
-
-
 
   if (!isOpen || !orderId) return null;
 
@@ -297,211 +311,36 @@ export function OrderDetailDialog({ isOpen, onClose, orderId }: OrderDetailDialo
     return map[method] || method;
   };
 
-  // Hàm tải ảnh hóa đơn PNG độ nét cao gửi khách qua điện thoại
-  const handleDownloadReceiptImage = async () => {
-    const node = document.getElementById(`receipt-image-${order.id}`);
-    if (!node) return;
-    try {
-      setDownloadingImage(true);
-      // Kết xuất hình ảnh với pixelRatio: 3 để đạt độ nét Retina cực đại
-      const dataUrl = await toPng(node, {
-        pixelRatio: 3,
-        style: {
-          transform: 'scale(1)',
-          transformOrigin: 'top left',
-          width: '420px',
-        }
-      });
-      const link = document.createElement("a");
-      link.download = `HD_${order.orderNumber}.png`;
-      link.href = dataUrl;
-      link.click();
-      toast.success("Đã tải xuống ảnh hóa đơn gửi khách thành công!");
-    } catch (error) {
-      console.error("Lỗi khi tạo ảnh hóa đơn:", error);
-      toast.error("Không thể tạo ảnh hóa đơn, vui lòng thử lại!");
-    } finally {
-      setDownloadingImage(false);
-    }
-  };
-
-  // Hàm xử lý in hóa đơn bán hàng (K80 nhiệt chuẩn Apple Store)
-
-  // Hàm xử lý in hóa đơn bán hàng (K80 nhiệt chuẩn Apple Store)
-  const handlePrintReceipt = () => {
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Hóa đơn #${order.orderNumber}</title>
-          <style>
-            @page { size: auto; margin: 4mm; }
-            body { font-family: system-ui, -apple-system, sans-serif; font-size: 11px; color: #000; margin: 0; padding: 0; }
-            .container { width: 80mm; max-width: 100%; margin: 0 auto; padding: 4px; }
-            .header { text-align: center; margin-bottom: 12px; }
-            .title { font-size: 15px; font-weight: bold; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
-            .subtitle { font-size: 10px; margin-bottom: 4px; color: #333; }
-            .info-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; border-bottom: 1px dashed #000; padding-bottom: 8px; }
-            .info-table td { padding: 2px 0; font-size: 10px; vertical-align: top; }
-            .info-label { color: #555; width: 75px; }
-            .items-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
-            .items-table th { border-bottom: 1px dashed #000; padding: 4px 2px; font-size: 9px; font-weight: bold; text-align: left; text-transform: uppercase; }
-            .items-table td { border-bottom: 1px dashed #eee; padding: 5px 2px; font-size: 10px; vertical-align: top; }
-            .text-right { text-align: right; }
-            .text-center { text-align: center; }
-            .totals-section { width: 100%; border-collapse: collapse; margin-top: 5px; margin-bottom: 12px; border-top: 1px dashed #000; padding-top: 5px; }
-            .totals-section td { padding: 2.5px 0; font-size: 10px; }
-            .totals-label { text-align: left; }
-            .totals-val { text-align: right; font-weight: bold; }
-            .total-bold { font-size: 11px; font-weight: 800; border-top: 1px dashed #000; padding-top: 4px; }
-            .footer { text-align: center; font-size: 9px; margin-top: 15px; border-top: 1px dashed #000; padding-top: 8px; color: #444; }
-            .specs { font-size: 9px; color: #555; margin-top: 1px; }
-            .sn { font-size: 9px; color: #555; margin-top: 1px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <div class="title">TECH SHOP</div>
-              <div class="subtitle">Điện thoại - Laptop - Phụ kiện uy tín</div>
-              <div class="subtitle">Hotline: 0987.654.321 • techshop.vn</div>
-              <div style="margin-top: 8px; font-weight: bold; font-size: 12px; text-transform: uppercase;">HÓA ĐƠN BÁN HÀNG</div>
-              <div style="font-size: 9px; color: #555; margin-top: 1px;">Số HD: #${order.orderNumber}</div>
-            </div>
-            
-            <table class="info-table">
-              <tr>
-                <td class="info-label">Khách hàng:</td>
-                <td style="font-weight: bold;">${order.customerName}</td>
-              </tr>
-              <tr>
-                <td class="info-label">Điện thoại:</td>
-                <td>${order.customerPhone}</td>
-              </tr>
-              ${order.customerAddress ? `
-              <tr>
-                <td class="info-label">Địa chỉ:</td>
-                <td>${order.customerAddress}</td>
-              </tr>` : ""}
-              <tr>
-                <td class="info-label">Ngày bán:</td>
-                <td>${formatDateTime(order.createdAt)}</td>
-              </tr>
-              <tr>
-                <td class="info-label">Kênh bán:</td>
-                <td style="text-transform: capitalize;">${order.saleChannel}</td>
-              </tr>
-              <tr>
-                <td class="info-label">Hình thức TT:</td>
-                <td>${getPaymentMethodName(order.paymentMethod)}</td>
-              </tr>
-            </table>
-            
-            <table class="items-table">
-              <thead>
-                <tr>
-                  <th>Sản phẩm / BH</th>
-                  <th class="text-right" style="width: 25px;">SL</th>
-                  <th class="text-right" style="width: 70px;">Thành tiền</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${items.map((item: any) => {
-                  const finalPrice = Math.max(0, Number(item.sellingPrice) - Number(item.discount));
-                  const specsText = item.productSpecs ? formatSpecs(item.productSpecs) : "";
-                  return `
-                    <tr>
-                      <td>
-                        <div style="font-weight: bold;">
-                          ${item.productName} 
-                          ${item.isGift ? '<span style="font-size: 8px; font-weight: normal; border: 0.5px solid #000; padding: 0 2px; border-radius: 2px; margin-left: 2px;">TẶNG</span>' : ''}
-                        </div>
-                        ${specsText ? `<div class="specs">${specsText}</div>` : ""}
-                        ${item.serialNumber ? `<div class="sn">S/N: ${item.serialNumber}</div>` : ""}
-                        <div style="font-size: 8px; color: #666; margin-top: 1.5px;">Bảo hành: ${item.warrantyMonths} tháng ${item.warrantyMonths > 0 ? `(${formatWarrantyRange(order.createdAt, item.warrantyMonths)})` : ""}</div>
-                      </td>
-                      <td class="text-right" style="vertical-align: middle;">1</td>
-                      <td class="text-right" style="vertical-align: middle; font-weight: bold;">
-                        ${formatPrice(finalPrice)}
-                      </td>
-                    </tr>
-                  `;
-                }).join("")}
-              </tbody>
-            </table>
-            
-            <table class="totals-section">
-              <tr>
-                <td class="totals-label">Cộng tiền hàng:</td>
-                <td class="totals-val">${formatPrice(order.subtotal)}</td>
-              </tr>
-              ${Number(order.discountAmount) > 0 ? `
-              <tr>
-                <td class="totals-label">Giảm giá:</td>
-                <td class="totals-val" style="color: red;">-${formatPrice(order.discountAmount)}</td>
-              </tr>` : ""}
-              ${Number(order.taxAmount) > 0 ? `
-              <tr>
-                <td class="totals-label">Thuế GTGT:</td>
-                <td class="totals-val">${formatPrice(order.taxAmount)}</td>
-              </tr>` : ""}
-              <tr class="total-bold">
-                <td class="totals-label" style="font-size: 11px;">TỔNG CẦN THANH TOÁN:</td>
-                <td class="totals-val" style="font-size: 11px; font-weight: 800;">${formatPrice(order.totalAmount)}</td>
-              </tr>
-              <tr>
-                <td class="totals-label">Đã thanh toán:</td>
-                <td class="totals-val" style="color: green;">${formatPrice(totalPaid)}</td>
-              </tr>
-              ${remainingAmount > 0 ? `
-              <tr>
-                <td class="totals-label" style="font-weight: bold;">Còn lại cần thu (COD):</td>
-                <td class="totals-val" style="color: #d97706;">${formatPrice(remainingAmount)}</td>
-              </tr>` : ""}
-            </table>
-            
-            ${order.notes ? `
-            <div style="font-size: 9px; border: 0.5px solid #000; padding: 5px; border-radius: 4px; margin-bottom: 10px; background: #fafafa; line-height: 1.3;">
-              <div style="font-weight: bold; margin-bottom: 2px; text-transform: uppercase; font-size: 8px; color: #555;">Ghi chú đơn hàng:</div>
-              <div>${order.notes}</div>
-            </div>` : ""}
-            
-            <div class="footer">
-              <div>Cảm ơn Quý khách đã mua sắm tại TECH SHOP!</div>
-              <div style="margin-top: 3px;">Vui lòng giữ hóa đơn này để được hỗ trợ bảo hành tốt nhất.</div>
-              <div style="margin-top: 4px; font-weight: bold;">Hẹn gặp lại Quý khách!</div>
-            </div>
-          </div>
-          <script>
-            window.onload = function() {
-              window.print();
-              setTimeout(function() { window.close(); }, 500);
-            };
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-  };
-
 
   return (
     <Dialog
       isOpen={isOpen}
       onClose={onClose}
-      title="Chi tiết đơn hàng"
+      title={<span className="text-[#0066cc]">Chi tiết đơn hàng</span>}
       description={
         order ? (
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span>Mã đơn: <span className="font-semibold text-[#1d1d1f]">{order.orderNumber}</span></span>
+            <span>Mã đơn: <span className="font-semibold text-[#0066cc]">{order.orderNumber}</span></span>
             <span className="text-[#e0e0e0]">•</span>
-            <span>Ngày lập: <span className="font-semibold text-[#1d1d1f]">{formatDate(order.createdAt)}</span></span>
+            <span>Ngày lập: <span className="font-semibold text-[#0066cc]">{formatDate(order.createdAt)}</span></span>
             <span className="text-[#e0e0e0]">•</span>
-            <span className="flex items-center gap-1.5 ml-1 select-none">
-              {renderDetailOrderStatus(order.status)}
-              {renderDetailPaymentStatus(order.paymentStatus)}
-            </span>
+            <span>Trạng thái đơn: <span className="font-semibold text-[#0066cc]">{getOrderStatusName(order.status)}</span></span>
+            <span className="text-[#e0e0e0]">•</span>
+            <span>Trạng thái thanh toán: <span className="font-semibold text-[#0066cc]">{getPaymentStatusName(order.paymentStatus)}</span></span>
+            <span className="text-[#e0e0e0]">•</span>
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={downloadingPdf}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white border border-[#0066cc] text-[#0066cc] text-[12px] font-semibold hover:bg-[#0066cc] hover:text-white transition-all cursor-pointer active:scale-95 duration-100 ml-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {downloadingPdf ? (
+                <RefreshCw size={13} className="animate-spin shrink-0" />
+              ) : (
+                <Download size={13} className="shrink-0" />
+              )}
+              <span>Tải PDF hóa đơn & BH</span>
+            </button>
           </div>
         ) : (
           "Đang truy xuất thông tin..."
@@ -516,112 +355,92 @@ export function OrderDetailDialog({ isOpen, onClose, orderId }: OrderDetailDialo
             <p className="text-[16px]">Đang truy xuất thông tin giao dịch...</p>
           </div>
         ) : (
-          <div className="space-y-6 pt-2">
-            {/* Action Bar: In & Tải hóa đơn */}
-            <div className="flex justify-end gap-3 pb-1">
-              <button
-                type="button"
-                disabled={downloadingImage}
-                onClick={handleDownloadReceiptImage}
-                className="h-[36px] px-4 bg-[#0066cc] hover:bg-[#0071e3] disabled:opacity-50 text-white text-[13px] font-semibold rounded-full flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 duration-150 shadow-sm"
-              >
-                {downloadingImage ? (
-                  <RefreshCw size={14} className="animate-spin" />
-                ) : (
-                  <Download size={14} />
-                )}
-                <span>Tải ảnh gửi khách</span>
-              </button>
-              <button
-                type="button"
-                onClick={handlePrintReceipt}
-                className="h-[36px] px-4 bg-white border border-[#e0e0e0] hover:bg-[#f5f5f7] text-[#1d1d1f] text-[13px] font-semibold rounded-full flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 duration-150 shadow-sm"
-              >
-                <Printer size={14} />
-                <span>In nhiệt K80</span>
-              </button>
-            </div>
-
-            {/* Metadata Section: Apple Minimalist 3-column grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              
-              {/* COLUMN 1: Trạng thái & Khách hàng */}
-              <div className="flex flex-col gap-4 h-full">
+          <div className="space-y-4 pt-1">
+            {/* Metadata Section: Apple Minimalist Unified 3-Column Card */}
+            <div className="bg-[#f5f5f7] rounded-[20px] p-4">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 divide-y lg:divide-y-0 lg:divide-x divide-[#e0e0e0]/60">
                 
-
-                {/* 1.2 Customer & Transaction Card */}
-                <div className="bg-[#f5f5f7] rounded-[24px] p-6 space-y-4 flex-1 flex flex-col justify-between">
-                  <div className="flex items-center justify-between pb-2 border-b border-[#e0e0e0]/50">
+                {/* Column 1: Customer & Transaction */}
+                <div className="space-y-2 lg:pr-4">
+                  <div className="flex items-center justify-between pb-1.5 border-b border-[#e0e0e0]/50">
                     <span className="text-[11px] font-bold text-[#86868b] uppercase tracking-wider">Khách hàng & Giao dịch</span>
-                    <button
-                      type="button"
-                      onClick={() => setIsEditShippingOpen(true)}
-                      className="text-[12px] font-semibold text-[#0066cc] hover:text-[#0071e3] transition-colors flex items-center gap-1 cursor-pointer"
-                    >
-                      <Pencil size={12} />
-                      <span>Cập nhật vận đơn</span>
-                    </button>
                   </div>
-                  <div className="space-y-4 text-[14px] flex-1 flex flex-col justify-between">
-                    {/* Customer Section */}
-                    <div className="space-y-1.5">
-                      <span className="text-[10px] font-bold text-[#86868b] uppercase tracking-wider block">Khách hàng</span>
-                      <p className="text-[15px] text-[#1d1d1f] font-bold leading-tight">{order.customerName}</p>
-                      <p className="text-[#515154] font-medium text-[13px]">SĐT: <span className="text-[#1d1d1f]">{order.customerPhone}</span></p>
+                  
+                  <div className="space-y-2 text-[13px]">
+                    {/* Customer Details */}
+                    <div className="space-y-1">
+                      <p className="font-bold text-[#0066cc] text-[14px]">
+                        {order.customerName}
+                        {order.customerPhone && (
+                          <span className="text-[#86868b] font-normal text-[12px] ml-1.5">
+                            ({order.customerPhone})
+                          </span>
+                        )}
+                      </p>
                       {order.customerAddress && (
-                        <p className="text-[#515154] text-[13px] leading-relaxed">Địa chỉ: <span className="text-[#1d1d1f]">{order.customerAddress}</span></p>
+                        <p className="text-[#515154] leading-tight text-[12px]">Địa chỉ: <span className="text-[#0066cc]">{order.customerAddress}</span></p>
                       )}
                       {order.shippingAddress && (
-                        <p className="text-[#515154] text-[13px] leading-relaxed">Giao tới: <span className="text-[#1d1d1f]">{order.shippingAddress}</span></p>
+                        <p className="text-[#515154] leading-tight text-[12px]">Giao tới: <span className="text-[#0066cc]">{order.shippingAddress}</span></p>
                       )}
-                      {order.leadSourceName && (
-                        <p className="text-[#515154] text-[13px]">Nguồn khách: <span className="text-[#1d1d1f]">{order.leadSourceName}</span></p>
+                      {order.leadSourceName && !order.customerPhone && (
+                        <p className="text-[#515154] text-[12px]">Nguồn khách: <span className="text-[#0066cc]">{order.leadSourceName}</span></p>
                       )}
-                      {order.shippingCarrier && (
-                        <p className="text-[#515154] text-[13px] mt-1">
-                          Vận chuyển: <span className="text-[#1d1d1f] font-semibold">{order.shippingCarrier}</span>
-                        </p>
-                      )}
-                      {order.trackingNumber && (
-                        <p className="text-[#515154] text-[13px] mt-1">
-                          Vận đơn: <span className="bg-white border border-[#e0e0e0] px-1.5 py-0.5 rounded text-[12px] text-[#1d1d1f] font-semibold">{order.trackingNumber}</span>
-                        </p>
-                      )}
-                      {order.packingVideoUrl && (
-                        <p className="text-[#515154] text-[13px] mt-1">
-                          🎥 Video đóng gói: <a href={order.packingVideoUrl} target="_blank" rel="noopener noreferrer" className="text-[#0066cc] hover:underline font-semibold">Xem video</a>
-                        </p>
+                      {(order.shippingCarrier || order.trackingNumber || order.packingVideoUrl) && (
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[#86868b] pt-0.5">
+                          {order.shippingCarrier && (
+                            <span>Vận chuyển: <span className="text-[#0066cc] font-medium">{order.shippingCarrier}</span></span>
+                          )}
+                          {order.shippingCarrier && order.trackingNumber && <span>•</span>}
+                          {order.trackingNumber && (
+                            <span>Mã vận đơn: <span className="text-[#0066cc] font-medium">{order.trackingNumber}</span></span>
+                          )}
+                          {order.packingVideoUrl && (
+                            <>
+                              <span>•</span>
+                              <a href={order.packingVideoUrl} target="_blank" rel="noopener noreferrer" className="text-[#0066cc] hover:underline font-medium">🎥 Video đóng gói</a>
+                            </>
+                          )}
+                        </div>
                       )}
                     </div>
 
-                    <div className="border-t border-[#e0e0e0]/50 my-2"></div>
+                    <div className="border-t border-[#e0e0e0]/40 my-1.5"></div>
 
-                    {/* Transaction Section */}
-                    <div className="space-y-1.5">
-                      <span className="text-[10px] font-bold text-[#86868b] uppercase tracking-wider block">Giao dịch</span>
-                      <p className="text-[#515154] text-[13px]">Nhân viên: <span className="font-semibold text-[#1d1d1f]">{order.soldByName || "Hệ thống"}</span></p>
-                      <p className="text-[#515154] text-[13px]">Kênh bán: <span className="capitalize font-semibold text-[#1d1d1f]">{order.saleChannel}</span></p>
-                      <p className="text-[#515154] text-[13px]">Thanh toán: <span className="font-semibold text-[#1d1d1f]">{getPaymentMethodName(order.paymentMethod)}</span></p>
+                    {/* Transaction Details */}
+                    <div className="space-y-1">
+                      <p className="text-[#515154] text-[12px] leading-relaxed">
+                        Nhân viên: <span className="text-[#0066cc] font-semibold">{order.soldByName || "Hệ thống"}</span>
+                      </p>
+                      <p className="text-[#515154] text-[12px] leading-relaxed">
+                        Kênh: <span className="text-[#0066cc] font-semibold capitalize">{order.saleChannel}</span>
+                        <span className="text-[#e0e0e0] mx-1.5">•</span>
+                        Thanh toán: <span className="text-[#0066cc] font-semibold">{getPaymentMethodName(order.paymentMethod)}</span>
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setIsEditShippingOpen(true)}
+                        className="text-[11px] font-semibold text-[#0066cc] hover:text-[#0071e3] transition-colors flex items-center gap-1 cursor-pointer pt-0.5"
+                      >
+                        <Pencil size={11} />
+                        <span>Cập nhật vận đơn</span>
+                      </button>
                     </div>
                   </div>
                 </div>
 
-              </div>
-
-              {/* COLUMN 2: Chi tiết tài chính & Ghi chú */}
-              <div className="flex flex-col gap-4 h-full">
-                
-                {/* 2.1 Chi tiết tài chính */}
-                <div className="bg-[#f5f5f7] rounded-[24px] p-6 space-y-4 flex-1 flex flex-col justify-between">
-                  <div className="flex items-center gap-2 pb-2 border-b border-[#e0e0e0]/50">
+                {/* Column 2: Financial details */}
+                <div className="space-y-2 lg:px-4 pt-3 lg:pt-0">
+                  <div className="pb-1.5 border-b border-[#e0e0e0]/50">
                     <span className="text-[11px] font-bold text-[#86868b] uppercase tracking-wider">Chi tiết tài chính</span>
                   </div>
-                  <div className="space-y-4 text-[14px] flex-1 flex flex-col justify-between">
+
+                  <div className="space-y-2 text-[13px]">
                     {/* Revenue Summary */}
-                    <div className="space-y-2.5">
+                    <div className="space-y-1">
                       <div className="flex justify-between text-[#86868b]">
                         <span>Cộng tiền hàng:</span>
-                        <span className="font-semibold text-[#1d1d1f]">{formatPrice(order.subtotal)}</span>
+                        <span className="font-semibold text-[#0066cc]">{formatPrice(order.subtotal)}</span>
                       </div>
                       {Number(order.discountAmount) > 0 && (
                         <div className="flex justify-between text-[#df2935] font-medium">
@@ -632,114 +451,111 @@ export function OrderDetailDialog({ isOpen, onClose, orderId }: OrderDetailDialo
                       {Number(order.taxAmount) > 0 && (
                         <div className="flex justify-between text-[#86868b]">
                           <span>Thuế phát sinh:</span>
-                          <span className="font-semibold text-[#1d1d1f]">{formatPrice(order.taxAmount)}</span>
+                          <span className="font-semibold text-[#0066cc]">{formatPrice(order.taxAmount)}</span>
                         </div>
                       )}
-                      <div className="border-t border-[#e0e0e0]/50 pt-2 flex justify-between text-[16px] font-black text-[#1d1d1f]">
+                      <div className="border-t border-[#e0e0e0]/50 pt-1 flex justify-between text-[14px] font-black text-[#0066cc]">
                         <span>Tổng thanh toán:</span>
-                        <span className="text-[#0066cc]">{formatPrice(order.totalAmount)}</span>
+                        <span>{formatPrice(order.totalAmount)}</span>
                       </div>
-                      <div className="flex justify-between text-[13px] text-[#009b72] font-bold">
+                      <div className="flex justify-between text-[#009b72] font-bold">
                         <span>Đã thanh toán:</span>
                         <span>{formatPrice(totalPaid)}</span>
                       </div>
                       {remainingAmount > 0 && (
-                        <div className="flex justify-between text-[13px] text-[#d97706] font-bold">
+                        <div className="flex justify-between text-[#d97706] font-bold">
                           <span>Còn lại cần thu:</span>
                           <span>{formatPrice(remainingAmount)}</span>
                         </div>
                       )}
                     </div>
 
-                    <div className="border-t border-[#e0e0e0]/50 my-2"></div>
+                    <div className="border-t border-[#e0e0e0]/40 my-1.5"></div>
 
-                    {/* Cost & Profit (Internal only) */}
-                    <div className="space-y-2.5">
-                      <div className="flex justify-between text-[#86868b]">
-                        <span>Giá vốn sản phẩm:</span>
-                        <span className="font-semibold text-[#1d1d1f]">{formatPrice(order.totalCost)}</span>
-                      </div>
-                      <div className="flex justify-between text-[13px] font-bold pt-0.5">
-                        <span className="text-[#1d1d1f]">Lợi nhuận thực:</span>
-                        <span className="text-[#009b72]">{formatPrice(order.profit)}</span>
-                      </div>
-                      <div className="flex justify-between font-semibold uppercase text-[10px] tracking-wider text-[#86868b]">
-                        <span>Tỷ suất lợi nhuận:</span>
-                        <span className="text-[#009b72]">{Number(order.profitMargin).toFixed(1)}%</span>
-                      </div>
+                    {/* Cost & Profit (Internal only) inline row */}
+                    <div className="flex items-center gap-x-2 text-[11px] text-[#86868b] whitespace-nowrap">
+                      <span>Giá vốn: <span className="text-[#0066cc] font-medium">{formatPrice(order.totalCost)}</span></span>
+                      <span>•</span>
+                      <span>Lợi nhuận: <span className="text-[#009b72] font-semibold">{formatPrice(order.profit)}</span></span>
+                      <span>•</span>
+                      <span>Tỷ suất: <span className="text-[#009b72] font-semibold">{Number(order.profitMargin).toFixed(1)}%</span></span>
                     </div>
                   </div>
                 </div>
 
-                {/* 2.2 Internal Notes Widget */}
-                <div className="bg-[#f5f5f7] rounded-[24px] p-6 space-y-3 min-h-[140px] flex flex-col justify-between">
-                  <div className="flex items-center gap-1.5 pb-2 border-b border-[#e0e0e0]/50">
-                    <span className="text-[11px] font-bold text-[#86868b] uppercase tracking-wider">Ghi chú đơn hàng</span>
+                {/* Column 3: Notes & Giao vận */}
+                <div className="space-y-2 lg:pl-4 pt-3 lg:pt-0">
+                  <div className="pb-1.5 border-b border-[#e0e0e0]/50">
+                    <span className="text-[11px] font-bold text-[#86868b] uppercase tracking-wider">Ghi chú & Giao vận</span>
                   </div>
-                  <div className="text-[13px] leading-relaxed text-[#1d1d1f] flex-1 italic flex items-center justify-center text-center py-2">
-                    {order.notes || "Không có ghi chú thêm."}
+
+                  <div className="space-y-2 text-[13px]">
+                    <div>
+                      <p className="text-[#0066cc] italic leading-relaxed">
+                        {order.notes || "Không có ghi chú thêm."}
+                      </p>
+                    </div>
+
+                    {order.status === "processing" && (
+                      <>
+                        <div className="border-t border-[#e0e0e0]/40 my-1.5"></div>
+                        <div className="bg-amber-500/5 border border-amber-500/10 p-2.5 rounded-[12px] space-y-1.5">
+                          <span className="text-[12px] font-bold text-amber-800 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                            Đang giao hàng
+                          </span>
+                          <div className="text-[11px] text-amber-700/80 space-y-0.5">
+                            <div className="flex justify-between">
+                              <span>Đã cọc trước:</span>
+                              <span className="font-semibold text-[#0066cc]">{formatPrice(totalPaid)}</span>
+                            </div>
+                            <div className="flex justify-between border-t border-amber-500/10 pt-0.5 mt-0.5 font-bold text-amber-900">
+                              <span>COD cần thu:</span>
+                              <span>{formatPrice(remainingAmount)}</span>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 pt-0.5">
+                            <button
+                              type="button"
+                              onClick={() => setIsConfirmDeliverOpen(true)}
+                              className="w-full h-[26px] bg-[#0066cc] hover:bg-[#0071e3] text-white text-[11px] font-semibold rounded-full flex items-center justify-center transition-all cursor-pointer active:scale-95 duration-150"
+                            >
+                              Thành công
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setIsConfirmCancelOpen(true)}
+                              className="w-full h-[26px] bg-[#df2935] hover:bg-[#c2242e] text-white text-[11px] font-semibold rounded-full flex items-center justify-center transition-all cursor-pointer active:scale-95 duration-150"
+                            >
+                              Thất bại
+                            </button>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
-
-                {/* 2.3 Delivery Action Card (if processing) */}
-                {order.status === "processing" && (
-                  <div className="bg-amber-500/5 border border-amber-500/10 p-6 rounded-[24px] flex flex-col justify-between space-y-3">
-                    <div className="space-y-1">
-                      <span className="text-[14px] font-bold text-amber-800 flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-                        Đang giao hàng
-                      </span>
-                      <div className="text-[12px] text-amber-700/80 space-y-1">
-                        <div className="flex justify-between">
-                          <span>Đã cọc trước:</span>
-                          <span className="font-semibold text-[#1d1d1f]">{formatPrice(totalPaid)}</span>
-                        </div>
-                        <div className="flex justify-between border-t border-amber-500/10 pt-1 mt-1 font-bold text-amber-900">
-                          <span>COD cần thu:</span>
-                          <span>{formatPrice(remainingAmount)}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setIsConfirmDeliverOpen(true)}
-                        className="w-full h-[40px] bg-[#0066cc] hover:bg-[#0071e3] text-white text-[14px] font-semibold rounded-full flex items-center justify-center transition-all cursor-pointer shadow-sm active:scale-95 duration-150"
-                      >
-                        Giao thành công
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setIsConfirmCancelOpen(true)}
-                        className="w-full h-[40px] bg-[#df2935] hover:bg-[#c2242e] text-white text-[14px] font-semibold rounded-full flex items-center justify-center transition-all cursor-pointer shadow-sm active:scale-95 duration-150"
-                      >
-                        Giao thất bại
-                      </button>
-                    </div>
-                  </div>
-                )}
 
               </div>
-
-
             </div>
 
             {/* ROW 3: Danh sách sản phẩm (Bung hết thông tin) */}
-            <div className="bg-[#f5f5f7] rounded-[24px] p-6 space-y-4">
-              <div className="flex items-center gap-2 pb-2 border-b border-[#e0e0e0]/50">
+            <div className="bg-[#f5f5f7] rounded-[20px] p-4 space-y-3">
+              <div className="flex items-center gap-2 pb-1.5 border-b border-[#e0e0e0]/50">
                 <span className="text-[11px] font-bold text-[#86868b] uppercase tracking-wider">Danh sách sản phẩm ({items.length})</span>
               </div>
               <div className="overflow-hidden bg-transparent">
                 <table className="w-full text-left border-collapse text-[13px] table-fixed">
                   <thead>
                     <tr className="border-b border-[#e0e0e0]/60 text-[10px] font-semibold text-[#86868b] uppercase tracking-wider">
-                      <th className="px-3 py-2.5 text-center w-[50px]">STT</th>
-                      <th className="px-3 py-2.5 w-[45%]">Sản phẩm & Thông tin</th>
-                      <th className="px-3 py-2.5 text-left w-[20%]">Bảo hành</th>
-                      <th className="px-3 py-2.5 text-right w-[12%]">Giá bán</th>
-                      <th className="px-3 py-2.5 text-right w-[10%]">Giảm giá</th>
-                      <th className="px-3 py-2.5 text-right w-[13%]">Thành tiền</th>
+                      <th className="px-3 py-1.5 text-center w-[50px]">STT</th>
+                      <th className="px-3 py-1.5 w-[32%]">Sản phẩm & Thông tin</th>
+                      <th className="px-3 py-1.5 text-left w-[18%]">Số Serial (S/N)</th>
+                      <th className="px-3 py-1.5 text-left w-[15%]">Bảo hành</th>
+                      <th className="px-3 py-1.5 text-right w-[12%]">Giá bán</th>
+                      <th className="px-3 py-1.5 text-right w-[10%]">Giảm giá</th>
+                      <th className="px-3 py-1.5 text-right w-[13%]">Thành tiền</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -747,11 +563,11 @@ export function OrderDetailDialog({ isOpen, onClose, orderId }: OrderDetailDialo
                       const finalPrice = Math.max(0, Number(item.sellingPrice) - Number(item.discount));
                       return (
                         <tr key={item.id} className="border-b border-[#e0e0e0]/40 last:border-0 hover:bg-black/[0.015] transition-colors">
-                          <td className="px-3 py-3.5 text-center text-[13px] text-[#86868b] align-top">{index + 1}</td>
-                          <td className="px-3 py-3.5 align-top">
+                          <td className="px-3 py-2 text-center text-[13px] text-[#86868b] align-top">{index + 1}</td>
+                          <td className="px-3 py-2 align-top">
                             <div className="flex flex-col min-w-0">
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="font-semibold text-[#1d1d1f]">{item.productName}</span>
+                                <span className="font-semibold text-[#0066cc]">{item.productName}</span>
                                 {item.isGift && (
                                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#0066cc]/8 text-[#0066cc] border border-[#0066cc]/10 shrink-0">
                                     Tặng kèm
@@ -768,16 +584,20 @@ export function OrderDetailDialog({ isOpen, onClose, orderId }: OrderDetailDialo
                                   {formatSpecs(item.productSpecs)}
                                 </span>
                               )}
-                              {item.serialNumber && (
-                                <span className="text-[11px] text-[#86868b] font-normal mt-1.5 leading-none">
-                                  S/N: <span className="text-[#515154] font-medium">{item.serialNumber}</span>
-                                </span>
-                              )}
                             </div>
                           </td>
-                          <td className="px-3 py-3.5 text-left align-top">
+                          <td className="px-3 py-2 align-top text-left">
+                            {item.serialNumber ? (
+                              <span className="text-[11px] font-bold text-[#5856d6] tracking-wider">
+                                {item.serialNumber}
+                              </span>
+                            ) : (
+                              <span className="text-[#86868b]">-</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-left align-top">
                             <div className="space-y-0.5">
-                              <span className="font-semibold text-[#1d1d1f] block">{item.warrantyMonths} tháng</span>
+                              <span className="font-semibold text-[#0066cc] block">{item.warrantyMonths} tháng</span>
                               {item.warrantyMonths > 0 && (
                                 <span className="text-[10px] text-[#86868b] block">
                                   {formatWarrantyRange(order.createdAt, item.warrantyMonths)}
@@ -785,11 +605,11 @@ export function OrderDetailDialog({ isOpen, onClose, orderId }: OrderDetailDialo
                               )}
                             </div>
                           </td>
-                          <td className="px-3 py-3.5 text-right font-medium text-[#1d1d1f] align-top">{formatPrice(item.sellingPrice)}</td>
-                          <td className="px-3 py-3.5 text-right text-[#df2935] font-medium align-top">
+                          <td className="px-3 py-2 text-right font-medium text-[#0066cc] align-top">{formatPrice(item.sellingPrice)}</td>
+                          <td className="px-3 py-2 text-right text-[#df2935] font-medium align-top">
                             {Number(item.discount) > 0 ? `-${formatPrice(item.discount)}` : "0đ"}
                           </td>
-                          <td className="px-3 py-3.5 text-right font-bold text-[#0066cc] align-top">{formatPrice(finalPrice)}</td>
+                          <td className="px-3 py-2 text-right font-bold text-[#0066cc] align-top">{formatPrice(finalPrice)}</td>
                         </tr>
                       );
                     })}
@@ -835,135 +655,6 @@ export function OrderDetailDialog({ isOpen, onClose, orderId }: OrderDetailDialo
               </div>
             )}
 
-            {/* Hidden container for E-Receipt Image Generation */}
-            <div style={{ position: "absolute", left: "-9999px", top: "-9999px" }}>
-              <div 
-                id={`receipt-image-${order.id}`}
-                className="w-[420px] bg-white p-6 text-[#1d1d1f] font-sans flex flex-col gap-6"
-                style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}
-              >
-                {/* Header */}
-                <div className="text-center space-y-1 pb-4 border-b border-dashed border-[#e0e0e0]">
-                  <h1 className="text-[20px] font-black tracking-wide uppercase text-[#0066cc]">Tech Shop</h1>
-                  <p className="text-[12px] text-[#86868b] font-medium">Điện thoại - Laptop - Phụ kiện uy tín</p>
-                  <p className="text-[11px] text-[#86868b]">Hotline: 0987.654.321 • techshop.vn</p>
-                  <div className="inline-block mt-3 px-3 py-1 bg-[#0066cc]/8 text-[#0066cc] border border-[#0066cc]/10 rounded-full text-[12px] font-extrabold uppercase">
-                    Hóa đơn điện tử
-                  </div>
-                  <p className="text-[10px] text-[#86868b] mt-1">Mã đơn: #{order.orderNumber}</p>
-                </div>
-
-                {/* Info */}
-                <div className="space-y-2 text-[12px] bg-[#f5f5f7] p-4 rounded-2xl">
-                  <div className="flex justify-between">
-                    <span className="text-[#86868b]">Khách hàng:</span>
-                    <span className="font-bold text-[#1d1d1f]">{order.customerName}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#86868b]">Điện thoại:</span>
-                    <span className="font-semibold text-[#1d1d1f]">{order.customerPhone}</span>
-                  </div>
-                  {order.customerAddress && (
-                    <div className="flex flex-col gap-0.5 text-left">
-                      <span className="text-[#86868b]">Địa chỉ:</span>
-                      <span className="text-[#1d1d1f] leading-normal">{order.customerAddress}</span>
-                    </div>
-                  )}
-                  <div className="border-t border-[#e0e0e0] my-1.5 opacity-50"></div>
-                  <div className="flex justify-between">
-                    <span className="text-[#86868b]">Ngày mua:</span>
-                    <span className="text-[#1d1d1f]">{formatDateTime(order.createdAt)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#86868b]">Kênh bán hàng:</span>
-                    <span className="text-[#1d1d1f] capitalize">{order.saleChannel}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#86868b]">Hình thức thanh toán:</span>
-                    <span className="text-[#1d1d1f]">{getPaymentMethodName(order.paymentMethod)}</span>
-                  </div>
-                </div>
-
-                {/* Items */}
-                <div className="space-y-3">
-                  <h3 className="text-[11px] font-bold text-[#86868b] uppercase tracking-wider text-left">Danh sách sản phẩm</h3>
-                  <div className="space-y-3.5">
-                    {items.map((item: any) => {
-                      const finalPrice = Math.max(0, Number(item.sellingPrice) - Number(item.discount));
-                      const specsText = item.productSpecs ? formatSpecs(item.productSpecs) : "";
-                      return (
-                        <div key={item.id} className="flex justify-between items-start gap-4 text-[12px] pb-3 border-b border-[#e0e0e0]/40 last:border-0 last:pb-0">
-                          <div className="space-y-1 min-w-0 flex-1 text-left">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="font-semibold text-[#1d1d1f] break-words">{item.productName}</span>
-                              {item.isGift && (
-                                <span className="inline-flex items-center px-1.5 py-0.2 bg-[#0066cc]/8 text-[#0066cc] border border-[#0066cc]/10 rounded-full text-[9px] font-bold">
-                                  Tặng
-                                </span>
-                              )}
-                            </div>
-                            {specsText && (
-                              <p className="text-[10px] text-[#86868b] leading-normal">{specsText}</p>
-                            )}
-                            {item.serialNumber && (
-                              <p className="text-[10px] text-[#86868b]">S/N: {item.serialNumber}</p>
-                            )}
-                            <p className="text-[10px] text-[#86868b]">Bảo hành: {item.warrantyMonths} tháng {item.warrantyMonths > 0 && `(${formatWarrantyRange(order.createdAt, item.warrantyMonths)})`}</p>
-                          </div>
-                          <div className="text-right shrink-0 space-y-0.5">
-                            <span className="font-bold text-[#1d1d1f] block">{formatPrice(finalPrice)}</span>
-                            {Number(item.discount) > 0 && (
-                              <span className="text-[10px] text-[#df2935] block">Giảm: -{formatPrice(item.discount)}</span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Financials */}
-                <div className="border-t border-dashed border-[#e0e0e0] pt-4 space-y-2.5 text-[12px]">
-                  <div className="flex justify-between text-[#86868b]">
-                    <span>Cộng tiền hàng:</span>
-                    <span className="font-medium text-[#1d1d1f]">{formatPrice(order.subtotal)}</span>
-                  </div>
-                  {Number(order.discountAmount) > 0 && (
-                    <div className="flex justify-between text-[#df2935]">
-                      <span>Khấu trừ giảm giá:</span>
-                      <span className="font-semibold">-{formatPrice(order.discountAmount)}</span>
-                    </div>
-                  )}
-                  {Number(order.taxAmount) > 0 && (
-                    <div className="flex justify-between text-[#86868b]">
-                      <span>Thuế GTGT:</span>
-                      <span className="font-medium text-[#1d1d1f]">{formatPrice(order.taxAmount)}</span>
-                    </div>
-                  )}
-                  <div className="border-t border-[#e0e0e0] pt-3 flex justify-between text-[15px] font-black text-[#1d1d1f]">
-                    <span>TỔNG THANH TOÁN:</span>
-                    <span className="text-[#0066cc]">{formatPrice(order.totalAmount)}</span>
-                  </div>
-                  <div className="flex justify-between text-[#009b72] font-bold">
-                    <span>Khách đã trả:</span>
-                    <span>{formatPrice(totalPaid)}</span>
-                  </div>
-                  {remainingAmount > 0 && (
-                    <div className="flex justify-between text-[#d97706] font-bold">
-                      <span>Còn lại cần thu (COD):</span>
-                      <span>{formatPrice(remainingAmount)}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Footer */}
-                <div className="text-center pt-4 border-t border-dashed border-[#e0e0e0] text-[10px] text-[#86868b] space-y-1">
-                  <p className="font-semibold text-[#1d1d1f] text-[11px]">Cảm ơn Quý khách đã ủng hộ Tech Shop!</p>
-                  <p>Hóa đơn điện tử có giá trị tra cứu bảo hành.</p>
-                  <p>Rất hân hạnh được phục vụ Quý khách lần sau!</p>
-                </div>
-              </div>
-            </div>
           </div>
         )}
       </div>
@@ -1004,6 +695,197 @@ export function OrderDetailDialog({ isOpen, onClose, orderId }: OrderDetailDialo
         }}
         order={order}
       />
+
+      {/* Invoice + Warranty PDF Print Template */}
+      {typeof document !== "undefined" && createPortal(
+        <div id="print-invoice-wrapper" style={{ position: "fixed", left: 0, top: 0, width: 0, height: 0, overflow: "hidden", zIndex: -50 }}>
+          <div id="print-invoice-area" className="w-[210mm] min-h-[297mm] p-[15mm] bg-white text-black font-sans leading-normal text-[11px] box-border">
+          {/* Brand header */}
+          <div className="flex justify-between items-start border-b border-[#e0e0e0] pb-4 mb-4">
+            <div>
+              <h1 className="text-[20px] font-black tracking-tight text-[#0066cc]">TECHSHOP</h1>
+              <p className="text-[9px] text-[#7a7a7a] mt-0.5 font-medium uppercase tracking-wider">Hệ thống thiết bị số cao cấp</p>
+              <div className="text-[10px] text-[#515154] mt-2.5 space-y-0.5">
+                <p>Địa chỉ: 123 Đường ABC, Quận 1, TP. Hồ Chí Minh</p>
+                <p>Hotline: 1900 xxxx | Website: techshop.vn</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <h2 className="text-[14px] font-bold text-[#1d1d1f] uppercase tracking-wide">HÓA ĐƠN BÁN HÀNG & BẢO HÀNH</h2>
+              <p className="text-[10px] text-[#515154] mt-1.5">Mã đơn: <span className="font-semibold text-[#0066cc]">{order?.orderNumber}</span></p>
+              <p className="text-[10px] text-[#515154] mt-0.5">Ngày lập: <span>{order ? formatDate(order.createdAt) : ""}</span></p>
+            </div>
+          </div>
+
+          {/* Customer Info */}
+          <div className="bg-[#f5f5f7] rounded-[12px] p-4 mb-4 grid grid-cols-2 gap-4">
+            <div>
+              <h3 className="text-[9px] font-bold text-[#86868b] uppercase tracking-wider mb-1">Thông tin khách hàng</h3>
+              <p className="font-bold text-[#1d1d1f] text-[12px]">{order?.customerName}</p>
+              {order?.customerPhone && <p className="text-[#515154] mt-0.5">SĐT: <span className="font-semibold">{order.customerPhone}</span></p>}
+              {order?.customerAddress && <p className="text-[#515154] mt-0.5">Địa chỉ: <span>{order.customerAddress}</span></p>}
+            </div>
+            <div>
+              <h3 className="text-[9px] font-bold text-[#86868b] uppercase tracking-wider mb-1">Thông tin giao nhận</h3>
+              {order?.shippingAddress ? (
+                <p className="text-[#515154]">Giao tới: <span>{order.shippingAddress}</span></p>
+              ) : (
+                <p className="text-[#515154]">Nhận tại cửa hàng</p>
+              )}
+              <p className="text-[#515154] mt-0.5">Hình thức: <span className="capitalize">{order?.saleChannel}</span></p>
+              <p className="text-[#515154] mt-0.5">Thanh toán: <span>{order ? getPaymentMethodName(order.paymentMethod) : ""}</span></p>
+            </div>
+          </div>
+
+          {/* Product List Table */}
+          <div className="mb-4">
+            <table className="w-full text-left border-collapse text-[11px] table-fixed">
+              <thead>
+                <tr className="border-b border-[#e0e0e0] text-[9px] font-bold text-[#86868b] uppercase tracking-wider">
+                  <th className="py-2 text-center w-[40px]">STT</th>
+                  <th className="py-2 w-[40%]">Sản phẩm & Thông số</th>
+                  <th className="py-2 text-left w-[20%]">Số Serial (S/N)</th>
+                  <th className="py-2 text-left w-[12%]">Bảo hành</th>
+                  <th className="py-2 text-right w-[13%]">Đơn giá</th>
+                  <th className="py-2 text-right w-[15%]">Thành tiền</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#e0e0e0]/60">
+                {items.map((item: any, index: number) => {
+                  const finalPrice = Math.max(0, Number(item.sellingPrice) - Number(item.discount));
+                  return (
+                    <tr key={item.id} className="align-top">
+                      <td className="py-2 text-center text-[#86868b]">{index + 1}</td>
+                      <td className="py-2 pr-4">
+                        <p className="font-bold text-[#1d1d1f]">{item.productName}</p>
+                        {item.productSpecs && formatSpecs(item.productSpecs) && (
+                          <p className="text-[10px] text-[#7a7a7a] mt-0.5 leading-normal">{formatSpecs(item.productSpecs)}</p>
+                        )}
+                      </td>
+                      <td className="py-2">
+                        {item.serialNumber ? (
+                          <span className="font-semibold text-[#5856d6] tracking-wider">{item.serialNumber}</span>
+                        ) : (
+                          <span className="text-[#86868b]">-</span>
+                        )}
+                      </td>
+                      <td className="py-2 font-semibold text-[#1d1d1f]">
+                        {item.warrantyMonths} tháng
+                      </td>
+                      <td className="py-2 text-right text-[#515154]">
+                        {formatPrice(item.sellingPrice)}
+                        {Number(item.discount) > 0 && (
+                          <span className="block text-[9px] text-[#df2935]">- {formatPrice(item.discount)}</span>
+                        )}
+                      </td>
+                      <td className="py-2 text-right font-bold text-[#1d1d1f]">
+                        {formatPrice(finalPrice)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Totals */}
+          <div className="border-t border-[#e0e0e0] pt-3 mb-6 flex justify-end">
+            <div className="w-[280px] space-y-1.5 text-[11px]">
+              <div className="flex justify-between text-[#7a7a7a]">
+                <span>Cộng tiền hàng:</span>
+                <span className="font-semibold text-[#1d1d1f]">{formatPrice(order?.subtotal || 0)}</span>
+              </div>
+              {Number(order?.discountAmount || 0) > 0 && (
+                <div className="flex justify-between text-[#df2935]">
+                  <span>Khấu trừ giảm giá:</span>
+                  <span className="font-semibold">-{formatPrice(order?.discountAmount || 0)}</span>
+                </div>
+              )}
+              {Number(order?.taxAmount || 0) > 0 && (
+                <div className="flex justify-between text-[#7a7a7a]">
+                  <span>Thuế GTGT (VAT):</span>
+                  <span className="font-semibold text-[#1d1d1f]">{formatPrice(order?.taxAmount || 0)}</span>
+                </div>
+              )}
+              <div className="border-t border-[#e0e0e0] pt-1.5 flex justify-between text-[13px] font-black text-[#0066cc]">
+                <span>Tổng thanh toán:</span>
+                <span>{formatPrice(order?.totalAmount || 0)}</span>
+              </div>
+              <div className="flex justify-between text-[#009b72] font-semibold">
+                <span>Đã thanh toán:</span>
+                <span>{formatPrice(totalPaid)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Warranty Terms & Conditions */}
+          <div className="bg-[#f5f5f7] rounded-[12px] p-4 mb-6">
+            <h3 className="text-[9px] font-bold text-[#1d1d1f] uppercase tracking-wider mb-2">ĐIỀU KHOẢN BẢO HÀNH & HẬU MÃI</h3>
+            <ul className="list-decimal pl-4 space-y-1 text-[10px] text-[#515154]">
+              <li>Sản phẩm được bảo hành miễn phí theo thời gian quy định tại cột "Bảo hành" đối với lỗi phần cứng từ NSX.</li>
+              <li>TechShop từ chối bảo hành các lỗi do tác động bên ngoài: Rơi vỡ, cấn móp, ngập nước, ẩm mốc, cháy nổ chip/linh kiện, rách hoặc mất tem bảo hành/tem niêm phong.</li>
+              <li>Hỗ trợ đổi mới thiết bị tương đương cùng model trong vòng 7 ngày đầu sử dụng nếu phát sinh lỗi phần cứng được xác định từ nhà sản xuất.</li>
+            </ul>
+          </div>
+
+          {/* Signatures */}
+          <div className="grid grid-cols-2 gap-8 text-center pt-4">
+            <div>
+              <p className="font-bold text-[#1d1d1f]">KHÁCH HÀNG</p>
+              <p className="text-[9px] text-[#7a7a7a] mt-0.5 italic">(Ký và ghi rõ họ tên)</p>
+              <div className="h-16"></div>
+              <p className="font-bold text-[#515154] text-[12px]">{order?.customerName}</p>
+            </div>
+            <div>
+              <p className="font-bold text-[#1d1d1f]">NGƯỜI LẬP PHIẾU</p>
+              <p className="text-[9px] text-[#7a7a7a] mt-0.5 italic">(Ký và ghi rõ họ tên)</p>
+              <div className="h-16"></div>
+              <p className="font-bold text-[#515154] text-[12px]">TechShop Administrator</p>
+            </div>
+          </div>
+
+          {/* Custom Styles for Printing */}
+          <style dangerouslySetInnerHTML={{ __html: `
+            @media print {
+              body {
+                background: #ffffff !important;
+                color: #000000 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+              }
+              /* Show wrapper on print */
+              #print-invoice-wrapper {
+                position: static !important;
+                width: auto !important;
+                height: auto !important;
+                overflow: visible !important;
+                z-index: 9999 !important;
+              }
+              /* Hide dialog and everything else */
+              body > *:not(#print-invoice-wrapper) {
+                display: none !important;
+              }
+              #print-invoice-area {
+                display: block !important;
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 210mm;
+                min-height: 297mm;
+                padding: 15mm !important;
+                margin: 0 !important;
+                background: #ffffff !important;
+                box-sizing: border-box;
+              }
+              @page {
+                size: A4 portrait;
+                margin: 0;
+              }
+            }
+          `}} />
+        </div></div>,
+        document.body
+      )}
     </Dialog>
   );
 }

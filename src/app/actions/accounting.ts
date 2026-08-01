@@ -16,6 +16,7 @@ import {
   inventoryItems,
   customers,
   products,
+  categories,
   accountingPeriods,
   quotations,
   purchaseOrders,
@@ -1373,19 +1374,37 @@ export async function getDashboardBentoData(targetMonth: string) {
       db.select({ status: warrantyClaims.status, count: sql<number>`count(*)` }).from(warrantyClaims).groupBy(warrantyClaims.status)
     ]);
 
-    // Batch 2: Month financial aggregations (5 queries max concurrent)
+    // Batch 2: Month financial aggregations (6 queries max concurrent)
     const [
       monthSales,
       monthExpenses,
       monthReturns,
       monthWarrantyIncome,
-      monthReturnCount
+      monthReturnCount,
+      monthSoldCategoryStats
     ] = await Promise.all([
       db.select({ revenue: sql<string>`sum(${orders.totalAmount})`, cogs: sql<string>`sum(${orders.totalCost})` }).from(orders).where(and(eq(orders.status, "completed"), gte(orders.createdAt, monthStart), lt(orders.createdAt, monthEnd))),
       db.select({ total: sql<string>`sum(${expenses.amount})` }).from(expenses).where(and(gte(expenses.expenseDate, monthStartStr), lt(expenses.expenseDate, monthEndStr))),
       db.select({ refund: sql<string>`sum(${returns.refundAmount})`, fee: sql<string>`sum(${returns.feeAmount})` }).from(returns).where(and(eq(returns.status, "completed"), gte(returns.createdAt, monthStart), lt(returns.createdAt, monthEnd))),
       db.select({ total: sql<string>`sum(${warrantyClaims.repairCost})` }).from(warrantyClaims).where(and(eq(warrantyClaims.status, "completed"), gte(warrantyClaims.createdAt, monthStart), lt(warrantyClaims.createdAt, monthEnd))),
-      db.select({ count: sql<number>`count(*)` }).from(returns).where(and(eq(returns.status, "completed"), gte(returns.createdAt, monthStart), lt(returns.createdAt, monthEnd)))
+      db.select({ count: sql<number>`count(*)` }).from(returns).where(and(eq(returns.status, "completed"), gte(returns.createdAt, monthStart), lt(returns.createdAt, monthEnd))),
+      db.select({
+        categoryId: products.categoryId,
+        categoryName: categories.name,
+        count: sql<number>`count(*)`
+      })
+      .from(inventoryItems)
+      .innerJoin(products, eq(inventoryItems.productId, products.id))
+      .innerJoin(categories, eq(products.categoryId, categories.id))
+      .where(
+        and(
+          eq(inventoryItems.status, "sold"),
+          gte(inventoryItems.soldDate, monthStartStr),
+          lt(inventoryItems.soldDate, monthEndStr)
+        )
+      )
+      .groupBy(products.categoryId, categories.name)
+      .orderBy(desc(sql`count(*)`))
     ]);
 
     // Batch 3: Today data + recent orders (4 queries max concurrent)
@@ -1461,6 +1480,8 @@ export async function getDashboardBentoData(targetMonth: string) {
       thisMonthMargin,
 
       recentOrders: recentOrdersList,
+      monthSoldCategoryStats: monthSoldCategoryStats || [],
+      monthSoldItemsCount: (monthSoldCategoryStats || []).reduce((sum, item) => sum + Number(item.count || 0), 0),
     };
     serverCache.set(cacheKey, result, 120); // Cache for 2 minutes
     return result;

@@ -215,6 +215,8 @@ function CapitalSkeleton() {
   );
 }
 
+
+
 export default function DashboardHome() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -232,16 +234,7 @@ export default function DashboardHome() {
     setThangDuocChon(month);
   }, []);
 
-  const {
-    data: bentoData,
-    isLoading: isBentoLoading,
-    isFetching: isBentoFetching,
-  } = useQuery({
-    queryKey: ["dashboard_bento_stats", thangDuocChon],
-    queryFn: () => getDashboardBentoData(thangDuocChon),
-    enabled: mounted,
-    staleTime: 5 * 60 * 1000,
-  });
+
 
   const {
     data: financialSummary,
@@ -272,6 +265,17 @@ export default function DashboardHome() {
   } = useQuery({
     queryKey: ["inventory_capital_summary"],
     queryFn: () => getInventoryCapitalSummary(),
+    enabled: mounted,
+    staleTime: 5 * 60 * 1000,
+  });
+
+    const {
+    data: bentoData,
+    isLoading: isBentoLoading,
+    isFetching: isBentoFetching,
+  } = useQuery({
+    queryKey: ["dashboard_bento_stats", thangDuocChon],
+    queryFn: () => getDashboardBentoData(thangDuocChon),
     enabled: mounted,
     staleTime: 5 * 60 * 1000,
   });
@@ -533,6 +537,8 @@ export default function DashboardHome() {
                   </KinhPanel>
                 )}
 
+
+
                 {/* Aging Inventory Alert Card — Progressive: own skeleton */}
                 {isInventoryLoading ? (
                   <InventorySkeleton />
@@ -545,16 +551,12 @@ export default function DashboardHome() {
                         </h3>
                       </div>
                       <div className="flex items-center gap-2">
-                        {agedItems.length > 0 ? (
+                        {agedItems.length > 0 && (
                           <div className="text-[13px] font-medium text-slate-500 flex items-center gap-2.5 select-none">
                             <span>Đọng vốn: <span className="font-semibold text-slate-800 tabular-nums">{formatCurrency(tongVonDong)}</span></span>
                             <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />
                             <span>Tổng số: <span className="font-semibold text-slate-800">{agedItems.length} máy</span></span>
                           </div>
-                        ) : (
-                          <span className="text-[12px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 px-2.5 py-0.5 rounded-full">
-                            Kho an toàn
-                          </span>
                         )}
                       </div>
                     </div>
