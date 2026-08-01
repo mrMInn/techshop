@@ -376,9 +376,8 @@ function WarrantyPageContent() {
       <Dialog 
         isOpen={isWarrantyOpen} 
         onClose={() => setIsWarrantyOpen(false)}
-        title="Tiếp Nhận Bảo Hành"
-        description="Ghi nhận máy bảo hành từ khách hàng."
-        size="3xl"
+        title={<span className="text-[#0066cc]">Tiếp Nhận Bảo Hành</span>}
+        size="xl"
       >
         <WarrantyForm
           onSubmit={handleWarrantySubmit}
@@ -390,7 +389,7 @@ function WarrantyPageContent() {
       <Dialog 
         isOpen={!!detailClaimId} 
         onClose={() => setDetailClaimId(null)}
-        title="Chi tiết Phiếu Bảo Hành"
+        title={<span className="text-[#0066cc]">Chi Tiết Phiếu Bảo Hành</span>}
         description="Xem lỗi kỹ thuật và cập nhật tiến độ xử lý."
         size="4xl"
       >

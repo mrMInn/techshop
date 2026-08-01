@@ -32,7 +32,10 @@ export function WarrantyForm({ onSubmit, onCancel, isLoading }: WarrantyFormProp
   const orderOptions = useMemo(() => {
     return orders?.map(o => ({
       value: o.id,
-      label: `[${o.orderNumber}] ${o.customerName} - ${o.customerPhone}`,
+      label: o.customerName,
+      subLabel: o.customerPhone ? o.customerPhone : "Không có SĐT",
+      extraBadge: o.orderNumber,
+      searchKeywords: `${o.customerName} ${o.customerPhone || ""} ${o.orderNumber}`
     })) || [];
   }, [orders]);
 
@@ -71,16 +74,13 @@ export function WarrantyForm({ onSubmit, onCancel, isLoading }: WarrantyFormProp
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="p-6 rounded-[18px] bg-[#f5f5f7] border border-[#e0e0e0]/70 space-y-4">
-          <h3 className="text-[16px] font-semibold text-[#1d1d1f] flex items-center gap-2">
-            <ShieldAlert size={18} className="text-[#0066cc]" />
-            Thông tin tiếp nhận bảo hành
-          </h3>
+    <div className="space-y-4 animate-fade-in text-[14px]">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="p-4.5 rounded-[18px] bg-[#f5f5f7] border border-[#e5e5ea] space-y-3.5">
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
+            {/* Chọn Đơn Hàng */}
+            <div className="col-span-1 md:col-span-2 space-y-1.5">
               <label className="text-[11px] font-semibold text-[#7a7a7a] uppercase tracking-wider pl-1">
                 Đơn hàng gốc
               </label>
@@ -97,33 +97,76 @@ export function WarrantyForm({ onSubmit, onCancel, isLoading }: WarrantyFormProp
               />
             </div>
             
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-semibold text-[#7a7a7a] uppercase tracking-wider pl-1">
-                Sản phẩm / Serial
-              </label>
-              <CustomSelect
-                options={itemOptions}
-                value={selectedItemId}
-                onChange={setSelectedItemId}
-                placeholder={
-                  !selectedOrderId 
-                    ? "Vui lòng chọn đơn hàng trước" 
-                    : isLoadingItems ? "Đang tải máy..." : "Chọn máy cần bảo hành"
-                }
-                dropdownWidth="full"
-                searchable={true}
-              />
-            </div>
+            {/* Chọn sản phẩm cần bảo hành */}
+            {selectedOrderId && (
+              <div className="col-span-1 md:col-span-2 space-y-2 mt-1">
+                <label className="text-[11px] font-semibold text-[#7a7a7a] uppercase tracking-wider pl-1 block">
+                  Chọn sản phẩm cần bảo hành
+                </label>
+                
+                {isLoadingItems ? (
+                  <div className="text-center py-4 text-[#7a7a7a]">Đang tải danh sách sản phẩm...</div>
+                ) : items && items.length > 0 ? (
+                  <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
+                    {items.map((item: any) => {
+                      const isSelected = selectedItemId === item.inventoryItemId;
+                      return (
+                        <label 
+                          key={item.inventoryItemId}
+                          className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer select-none ${
+                            isSelected 
+                              ? "bg-[#0066cc]/5 border-[#0066cc] text-[#0066cc]" 
+                              : "bg-white border-[#e5e5ea] hover:bg-[#f5f5f7] text-[#1d1d1f]"
+                          }`}
+                        >
+                           <div className="relative flex items-center justify-center shrink-0">
+                             <input 
+                               type="radio"
+                               name="warranty-item"
+                               checked={isSelected}
+                               onChange={() => setSelectedItemId(item.inventoryItemId)}
+                               className="sr-only"
+                             />
+                             <div className={`w-4 h-4 rounded-full border transition-all flex items-center justify-center ${
+                               isSelected 
+                                 ? "border-[#0066cc] bg-[#0066cc]" 
+                                 : "border-[#d1d1d6] bg-white"
+                             }`}>
+                               {isSelected && (
+                                 <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                               )}
+                             </div>
+                           </div>
+                           <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-[14px] truncate">{item.productName}</p>
+                            <p className={`text-[12px] ${isSelected ? "text-[#0066cc]/70" : "text-[#7a7a7a]"} mt-0.5`}>
+                              Serial: {item.serialNumber}
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="font-bold text-[14px]">{item.warrantyMonths} tháng BH</span>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-[#7a7a7a]">Đơn hàng không có sản phẩm đủ điều kiện bảo hành</div>
+                )}
+              </div>
+            )}
 
             {/* Hiển thị tóm tắt thông tin đơn hàng nếu đã chọn */}
             {selectedOrderId && orders && (
-              <div className="col-span-1 md:col-span-2 mt-2 p-4 rounded-xl bg-white border border-[#e0e0e0] flex flex-col gap-1 shadow-sm">
+              <div className="col-span-1 md:col-span-2 mt-1 p-4 rounded-xl bg-white border border-[#e5e5ea] flex flex-col gap-1 shadow-sm">
                 <span className="text-[13px] text-[#7a7a7a]">Khách hàng: 
-                  <strong className="text-[#1d1d1f] ml-1">
+                  <span className="font-bold text-[#0066cc] ml-1">
                     {orders.find(o => o.id === selectedOrderId)?.customerName}
-                  </strong> 
-                  <span className="mx-2">-</span> 
-                  {orders.find(o => o.id === selectedOrderId)?.customerPhone}
+                  </span> 
+                  <span className="mx-2 text-slate-300">|</span> 
+                  <span className="text-[#5856d6] font-medium">
+                    {orders.find(o => o.id === selectedOrderId)?.customerPhone || "Không có SĐT"}
+                  </span>
                 </span>
                 <span className="text-[12px] text-[#7a7a7a]">
                   Ngày mua: {new Date(orders.find(o => o.id === selectedOrderId)?.createdAt || "").toLocaleDateString("vi-VN")}
@@ -133,8 +176,8 @@ export function WarrantyForm({ onSubmit, onCancel, isLoading }: WarrantyFormProp
 
             {/* Hiển thị chi tiết thời hạn bảo hành thực tế */}
             {selectedItemId && selectedItemDetail && (
-              <div className="col-span-1 md:col-span-2 mt-2 p-4 rounded-xl bg-[#0066cc]/5 border border-[#0066cc]/20 flex flex-col gap-2 shadow-inner">
-                <span className="text-[12px] font-semibold uppercase tracking-wider text-[#0066cc]">Thời hạn bảo hành thiết bị</span>
+              <div className="col-span-1 md:col-span-2 mt-1 p-4 rounded-xl bg-[#0066cc]/5 border border-[#0066cc]/10 flex flex-col gap-2 shadow-sm">
+                <span className="text-[12px] font-extrabold uppercase tracking-wider text-[#0066cc]">Thời hạn bảo hành thiết bị</span>
                 <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-[13px]">
                   <div>
                     <span className="text-[#7a7a7a]">Ngày mua hàng:</span>
@@ -177,7 +220,7 @@ export function WarrantyForm({ onSubmit, onCancel, isLoading }: WarrantyFormProp
               </div>
             )}
 
-            <div className="col-span-1 md:col-span-2 space-y-1.5 mt-2">
+            <div className="col-span-1 md:col-span-2 space-y-1.5 mt-1">
               <label className="text-[11px] font-semibold text-[#7a7a7a] uppercase tracking-wider pl-1">
                 Mô tả lỗi của khách báo
               </label>
@@ -185,27 +228,27 @@ export function WarrantyForm({ onSubmit, onCancel, isLoading }: WarrantyFormProp
                 placeholder="Khách báo máy sọc màn hình, pin ảo, không lên nguồn..."
                 value={issueDescription}
                 onChange={(e) => setIssueDescription(e.target.value)}
-                rows={4}
-                className="w-full px-4 py-3 rounded-xl bg-white border border-[#e0e0e0] text-[14px] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 transition-all placeholder:text-[#7a7a7a]/50 resize-none"
+                rows={3}
+                className="w-full px-4 py-3 rounded-xl bg-white border border-[#e5e5ea] text-[14px] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 transition-all placeholder:text-[#7a7a7a]/50 resize-none"
               />
             </div>
           </div>
         </div>
 
-        <div className="pt-4 flex items-center gap-3 justify-end">
+        <div className="pt-2 flex items-center gap-3 justify-end">
           <button
             type="button"
             onClick={onCancel}
-            className="px-6 h-[46px] bg-[#f5f5f7] hover:bg-[#e0e0e0] text-[#1d1d1f] rounded-full text-[15px] font-medium transition-all cursor-pointer"
+            className="px-5 h-[40px] bg-[#f5f5f7] hover:bg-[#e0e0e0] text-[#1d1d1f] rounded-full text-[14px] font-medium transition-all cursor-pointer"
           >
             Hủy bỏ
           </button>
           <button
             type="submit"
             disabled={isLoading || !issueDescription || !selectedItemId || !selectedOrderId}
-            className="px-8 h-[46px] bg-[#0066cc] text-white rounded-full text-[15px] font-semibold hover:bg-[#0071e3] transition-all cursor-pointer shadow-sm active:scale-95 duration-200 disabled:opacity-50 disabled:pointer-events-none"
+            className="px-7 h-[40px] bg-[#0066cc] text-white rounded-full text-[14px] font-semibold hover:bg-[#0071e3] transition-all cursor-pointer shadow-sm active:scale-95 duration-200 disabled:opacity-50 disabled:pointer-events-none"
           >
-            {isLoading ? "Đang xử lý..." : "Tạo Phiếu"}
+            {isLoading ? "Đang xử lý..." : "Xác nhận tạo phiếu"}
           </button>
         </div>
       </form>

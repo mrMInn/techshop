@@ -147,7 +147,15 @@ export function CustomSelect({
           {triggerIcon && <span className="shrink-0 text-slate-500 flex items-center justify-center">{triggerIcon}</span>}
           <span className="truncate flex-1 text-left flex justify-between items-center">
             {selectedOption ? (
-              selectedOption.extraBadge ? (
+              selectedOption.extraBadge && selectedOption.subLabel ? (
+                <div className="flex items-center w-full text-[14px] font-medium gap-3">
+                  <span className="text-[#5856d6] font-semibold shrink-0">{selectedOption.extraBadge}</span>
+                  <span className="text-slate-300">|</span>
+                  <span className="text-[#0066cc] font-bold truncate">{selectedOption.label}</span>
+                  <span className="text-slate-300">|</span>
+                  <span className="text-[#86868b] shrink-0">{selectedOption.subLabel}</span>
+                </div>
+              ) : selectedOption.extraBadge ? (
                 <div className="flex items-center justify-between w-full min-w-0">
                   <span className={`truncate pr-2 font-medium ${isSm ? "text-[14px]" : "text-[15px]"}`}>
                     {selectedOption.label} {selectedOption.subLabel ? `(${selectedOption.subLabel})` : ""}
@@ -246,7 +254,15 @@ export function CustomSelect({
                     }`}
                   >
                     <span className="pr-2 flex items-center flex-1 min-w-0">
-                      {opt.subLabel || opt.price || opt.listedPrice ? (
+                      {opt.extraBadge && opt.subLabel ? (
+                        <div className="flex items-center w-full text-[13.5px] py-1 select-none font-medium gap-3">
+                          <span className="text-[#5856d6] font-semibold min-w-[130px] shrink-0">{opt.extraBadge}</span>
+                          <span className="text-slate-300">|</span>
+                          <span className="text-[#0066cc] font-bold truncate flex-1">{opt.label}</span>
+                          <span className="text-slate-300">|</span>
+                          <span className="text-[#86868b] min-w-[110px] shrink-0 text-right">{opt.subLabel}</span>
+                        </div>
+                      ) : opt.subLabel || opt.price || opt.listedPrice ? (
                         <div className="flex flex-col w-full min-w-0 py-0.5">
                           <div className="flex items-start justify-between w-full min-w-0 gap-2">
                             <span className={`font-semibold text-[#1d1d1f] ${isSm ? "text-[13px]" : "text-[14px]"} leading-snug whitespace-normal break-words flex-1`}>

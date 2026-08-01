@@ -32,6 +32,8 @@ const translateLogDescription = (desc: string) => {
   Object.keys(statusLabels).forEach(key => {
     result = result.replace(new RegExp(key, "g"), statusLabels[key]);
   });
+  // Convert any YYYY-MM-DD date pattern to DD-MM-YYYY
+  result = result.replace(/(\d{4})-(\d{2})-(\d{2})/g, (match, y, m, d) => `${d}-${m}-${y}`);
   return result;
 };
 
@@ -246,62 +248,85 @@ export function WarrantyDetailDialog({ claimId, onClose }: WarrantyDetailDialogP
         </div>
       </div>
 
-      {/* Thông tin chung */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="p-4 bg-white/60 backdrop-blur-md rounded-2xl border border-[#e5e5ea] shadow-[0_8px_30px_rgb(0,0,0,0.02)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-all duration-300">
-          <div className="mb-2.5">
-            <h4 className="text-[12px] font-bold text-[#8e8e93] uppercase tracking-wider">Thông tin máy</h4>
-          </div>
-          <p className="text-[15.5px] font-bold text-[#1d1d1f] leading-snug">{claim.productName}</p>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13.5px] text-[#8e8e93] mt-3 pt-2.5 border-t border-[#f5f5f7]">
-            <span>SN: <span className="font-semibold text-[#1d1d1f]">{claim.serialNumber}</span></span>
-            <span className="text-slate-200">|</span>
-            <span className={claim.isUnderWarranty ? 'text-emerald-600 font-semibold' : 'text-rose-600 font-semibold'}>
-              {claim.isUnderWarranty ? 'Còn BH hãng' : 'Hết BH/Dịch vụ'}
-            </span>
-            <span className="text-slate-200">|</span>
-            <span>Đơn gốc: <span className="font-semibold text-[#1d1d1f]">{claim.orderNumber}</span></span>
-            <span className="text-slate-200">|</span>
-            <span className="text-amber-600 font-semibold">
-              Đã xử lý {Math.max(1, Math.ceil((new Date().getTime() - new Date(claim.receivedDate).getTime()) / (1000 * 60 * 60 * 24)))} ngày
-            </span>
-          </div>
-        </div>
-        <div className="p-4 bg-white/60 backdrop-blur-md rounded-2xl border border-[#e5e5ea] shadow-[0_8px_30px_rgb(0,0,0,0.02)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-all duration-300">
-          <div className="mb-2.5">
-            <h4 className="text-[12px] font-bold text-[#8e8e93] uppercase tracking-wider">Khách hàng</h4>
-          </div>
-          <p className="text-[15.5px] font-bold text-[#1d1d1f]">{claim.customerName}</p>
-          <p className="text-[14px] text-[#515154] font-semibold mt-1">SĐT: {claim.customerPhone}</p>
-          <div className="flex items-center gap-3 text-[13.5px] text-[#8e8e93] mt-3 pt-2.5 border-t border-[#f5f5f7]">
-            <span>Tiếp nhận: <span className="font-semibold text-[#1d1d1f]">{new Date(claim.receivedDate).toLocaleDateString("vi-VN")}</span></span>
-            <span className="text-slate-200">|</span>
-            <span>Hạn BH: <span className="font-semibold text-[#1d1d1f]">{new Date(claim.warrantyEndDate).toLocaleDateString("vi-VN")}</span></span>
-          </div>
-        </div>
-      </div>
-
-      <div className="p-4 bg-red-50/50 rounded-2xl border border-red-100/60 text-[#b91c1c] text-[14.5px]">
-        <h4 className="text-[12px] font-bold uppercase tracking-wider mb-1.5 opacity-90">Lỗi khách báo</h4>
-        <p className="font-medium">{claim.issueDescription}</p>
+      {/* Thông tin chung - Gộp thành 1 bảng tối ưu không gian */}
+      <div className="overflow-hidden rounded-2xl border border-[#e5e5ea] bg-white/60 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+        <table className="w-full border-collapse text-[13px]">
+          <thead>
+            <tr className="bg-[#f5f5f7] border-b border-[#e5e5ea] text-left text-[#86868b] text-[11px] uppercase tracking-wider font-bold">
+              <th className="px-4 py-2.5 w-[35%]">Khách hàng</th>
+              <th className="px-4 py-2.5 w-[35%] border-l border-[#e5e5ea]">Thông tin máy</th>
+              <th className="px-4 py-2.5 w-[30%] border-l border-[#e5e5ea]">Lỗi khách báo</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="divide-x divide-[#e5e5ea] align-top">
+              <td className="px-4 py-3 space-y-1">
+                <p className="font-bold text-[#0066cc] text-[14.5px]">{claim.customerName}</p>
+                <p className="text-[#515154] font-medium">SĐT: <span className="font-semibold text-[#1d1d1f]">{claim.customerPhone}</span></p>
+                <div className="flex flex-wrap items-center gap-x-2 text-[12px] text-[#86868b] pt-1">
+                  <span>Tiếp nhận: <span className="font-semibold text-[#0066cc]">{new Date(claim.receivedDate).toLocaleDateString("vi-VN")}</span></span>
+                  <span>•</span>
+                  <span className="text-[#ff9f0a] font-bold">
+                    Đã xử lý {Math.max(1, Math.ceil((new Date().getTime() - new Date(claim.receivedDate).getTime()) / (1000 * 60 * 60 * 24)))} ngày
+                  </span>
+                </div>
+              </td>
+              <td className="px-4 py-3 space-y-1">
+                <p className="font-bold text-[#0066cc] text-[14.5px] leading-snug">{claim.productName}</p>
+                <p className="text-[#515154] font-medium">SN: <span className="font-bold text-[#5856d6]">{claim.serialNumber}</span></p>
+                <div className="flex flex-wrap items-center gap-x-2 text-[12px] text-[#86868b] pt-1">
+                  <span>Hạn BH: <span className="font-semibold text-[#0066cc]">{new Date(claim.warrantyEndDate).toLocaleDateString("vi-VN")}</span></span>
+                  <span>•</span>
+                  <span className={claim.isUnderWarranty ? 'text-[#34c759] font-bold' : 'text-[#ff3b30] font-bold'}>
+                    {claim.isUnderWarranty ? 'Còn bảo hành' : 'Hết bảo hành'}
+                  </span>
+                </div>
+                <p className="text-[#86868b] text-[12px]">Đơn gốc: <span className="font-semibold text-[#0066cc]">{claim.orderNumber}</span></p>
+              </td>
+              <td className="px-4 py-3 bg-[#df2935]/4 text-[#df2935] font-semibold leading-relaxed">
+                {claim.issueDescription}
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-1">
         {/* Form cập nhật */}
         <div className="space-y-4">
           <h3 className="text-[16.5px] font-semibold text-[#1d1d1f] border-b border-[#e5e5ea] pb-2">Cập nhật xử lý</h3>
-          <form onSubmit={handleUpdate} className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-[12px] font-semibold text-[#7a7a7a] uppercase tracking-wider">Trạng thái mới</label>
-              <CustomSelect
-                options={statusOptions}
-                value={newStatus}
-                onChange={(val) => {
-                  setNewStatus(val);
-                  setSelectedReplacementId(""); // Reset replacement machine on status change
-                }}
-                dropdownWidth="full"
-              />
+          <form onSubmit={handleUpdate} className="space-y-3.5">
+            {/* Hàng 1: Trạng thái & Chi phí sửa chữa */}
+            <div className="grid grid-cols-2 gap-3.5">
+              <div className="space-y-1.5">
+                <label className="text-[12px] font-semibold text-[#7a7a7a] uppercase tracking-wider">Trạng thái mới</label>
+                <CustomSelect
+                  options={statusOptions}
+                  value={newStatus}
+                  onChange={(val) => {
+                    setNewStatus(val);
+                    setSelectedReplacementId(""); // Reset replacement machine on status change
+                  }}
+                  dropdownWidth="full"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[12px] font-semibold text-[#7a7a7a] uppercase tracking-wider truncate block" title="Chi phí sửa chữa (Khách trả nếu ngoài BH)">Chi phí sửa chữa</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={formatVNDInput(repairCost)}
+                    onChange={(e) => {
+                      const rawValue = e.target.value.replace(/\D/g, "");
+                      setRepairCost(rawValue);
+                    }}
+                    placeholder="0"
+                    className="w-full pl-3.5 pr-12 py-2.5 rounded-xl bg-[#f5f5f7] border border-[#e5e5ea] text-[14px] font-semibold focus:bg-white focus:border-[#0066cc] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/20 transition-all placeholder:text-[#7a7a7a]/60"
+                  />
+                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[13px] font-bold text-[#7a7a7a]">VNĐ</span>
+                </div>
+              </div>
             </div>
             
             {newStatus === 'replaced' && (
@@ -329,45 +354,32 @@ export function WarrantyDetailDialog({ claimId, onClose }: WarrantyDetailDialogP
               </div>
             )}
             
-            <div className="space-y-1.5">
-              <label className="text-[12px] font-semibold text-[#7a7a7a] uppercase tracking-wider">Chẩn đoán kỹ thuật (Nội bộ)</label>
-              <textarea
-                value={diagnosis}
-                onChange={(e) => setDiagnosis(e.target.value)}
-                placeholder="Nguyên nhân lỗi..."
-                className="w-full px-3.5 py-2.5 rounded-xl bg-[#f5f5f7] border border-[#e5e5ea] text-[14px] focus:bg-white focus:border-[#0066cc] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/20 transition-all placeholder:text-[#7a7a7a]/60 resize-none"
-                rows={2}
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-[12px] font-semibold text-[#7a7a7a] uppercase tracking-wider">Giải pháp / Đã xử lý</label>
-              <textarea
-                value={resolution}
-                onChange={(e) => setResolution(e.target.value)}
-                placeholder="Thay thế linh kiện gì..."
-                className="w-full px-3.5 py-2.5 rounded-xl bg-[#f5f5f7] border border-[#e5e5ea] text-[14px] focus:bg-white focus:border-[#0066cc] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/20 transition-all placeholder:text-[#7a7a7a]/60 resize-none"
-                rows={2}
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-[12px] font-semibold text-[#7a7a7a] uppercase tracking-wider">Chi phí sửa chữa (Khách trả nếu ngoài BH)</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={formatVNDInput(repairCost)}
-                  onChange={(e) => {
-                    const rawValue = e.target.value.replace(/\D/g, "");
-                    setRepairCost(rawValue);
-                  }}
-                  placeholder="0"
-                  className="w-full pl-3.5 pr-12 py-2.5 rounded-xl bg-[#f5f5f7] border border-[#e5e5ea] text-[14px] font-semibold focus:bg-white focus:border-[#0066cc] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/20 transition-all placeholder:text-[#7a7a7a]/60"
+            {/* Hàng 2: Chẩn đoán & Giải pháp */}
+            <div className="grid grid-cols-2 gap-3.5">
+              <div className="space-y-1.5">
+                <label className="text-[12px] font-semibold text-[#7a7a7a] uppercase tracking-wider block truncate" title="Chẩn đoán kỹ thuật (Nội bộ)">Chẩn đoán kỹ thuật</label>
+                <textarea
+                  value={diagnosis}
+                  onChange={(e) => setDiagnosis(e.target.value)}
+                  placeholder="Nguyên nhân lỗi..."
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#f5f5f7] border border-[#e5e5ea] text-[14px] focus:bg-white focus:border-[#0066cc] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/20 transition-all placeholder:text-[#7a7a7a]/60 resize-none font-medium"
+                  rows={2}
                 />
-                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[13px] font-bold text-[#7a7a7a]">VNĐ</span>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[12px] font-semibold text-[#7a7a7a] uppercase tracking-wider block truncate" title="Giải pháp / Đã xử lý">Giải pháp / Đã xử lý</label>
+                <textarea
+                  value={resolution}
+                  onChange={(e) => setResolution(e.target.value)}
+                  placeholder="Thay thế linh kiện gì..."
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#f5f5f7] border border-[#e5e5ea] text-[14px] focus:bg-white focus:border-[#0066cc] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/20 transition-all placeholder:text-[#7a7a7a]/60 resize-none font-medium"
+                  rows={2}
+                />
               </div>
             </div>
 
+            {/* Hàng 3: Ghi chú log */}
             <div className="space-y-1.5">
               <label className="text-[12px] font-semibold text-[#7a7a7a] uppercase tracking-wider">Ghi chú log lần này</label>
               <input
@@ -379,6 +391,7 @@ export function WarrantyDetailDialog({ claimId, onClose }: WarrantyDetailDialogP
               />
             </div>
 
+            {/* Hàng 4: Buttons */}
             <div className="pt-2 flex items-center gap-3 w-full">
               <button
                 type="button"
@@ -403,7 +416,7 @@ export function WarrantyDetailDialog({ claimId, onClose }: WarrantyDetailDialogP
         {/* Lịch sử Logs */}
         <div className="space-y-4">
           <h3 className="text-[16.5px] font-semibold text-[#1d1d1f] border-b border-[#e5e5ea] pb-2">Lịch sử xử lý</h3>
-          <div className="space-y-4 max-h-[440px] overflow-y-auto pr-2 pl-1 py-1">
+          <div className="space-y-4 max-h-[350px] overflow-y-auto pr-2 pl-1 py-1">
             {logs?.length === 0 ? (
               <p className="text-[14px] text-[#7a7a7a] pl-1">Chưa có lịch sử</p>
             ) : (

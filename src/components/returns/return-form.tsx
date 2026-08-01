@@ -21,7 +21,7 @@ export function ReturnForm({ onSubmit, onCancel, isLoading }: ReturnFormProps) {
   const [reason, setReason] = useState("");
   const [reasonDetail, setReasonDetail] = useState("");
   const [hasFee, setHasFee] = useState(false);
-  const [feeAmount, setFeeAmount] = useState("0");
+  const [feeAmount, setFeeAmount] = useState("");
   
   // State lưu thông tin cấu hình của từng máy lẻ được chọn
   const [itemConfigs, setItemConfigs] = useState<Record<string, {
@@ -65,7 +65,10 @@ export function ReturnForm({ onSubmit, onCancel, isLoading }: ReturnFormProps) {
   const orderOptions = useMemo(() => {
     return orders?.map(o => ({
       value: o.id,
-      label: `[${o.orderNumber}] ${o.customerName} - ${o.customerPhone}`,
+      label: o.customerName,
+      subLabel: o.customerPhone ? o.customerPhone : "Không có SĐT",
+      extraBadge: o.orderNumber,
+      searchKeywords: `${o.customerName} ${o.customerPhone || ""} ${o.orderNumber}`
     })) || [];
   }, [orders]);
 
@@ -206,7 +209,9 @@ export function ReturnForm({ onSubmit, onCancel, isLoading }: ReturnFormProps) {
   };
 
   const parseNumberInput = (val: string) => {
-    return val.replace(/\D/g, "");
+    const digits = val.replace(/\D/g, "");
+    if (!digits) return "";
+    return Number(digits).toString();
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -282,13 +287,9 @@ export function ReturnForm({ onSubmit, onCancel, isLoading }: ReturnFormProps) {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in text-[14px]">
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="p-6 rounded-[18px] bg-[#f5f5f7] border border-[#e0e0e0]/70 space-y-4">
-          <h3 className="text-[16px] font-semibold text-[#1d1d1f] flex items-center gap-2">
-            <RefreshCcw size={18} className="text-[#0066cc]" />
-            Thông tin Phiếu Đổi/Trả & Nhập kho lỗi
-          </h3>
+    <div className="space-y-4 animate-fade-in text-[14px]">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="p-4.5 rounded-[18px] bg-[#f5f5f7] border border-[#e0e0e0]/70 space-y-3.5">
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Chọn Đơn Hàng */}
@@ -312,15 +313,17 @@ export function ReturnForm({ onSubmit, onCancel, isLoading }: ReturnFormProps) {
 
             {/* Hiển thị tóm tắt thông tin đơn hàng nếu đã chọn */}
             {selectedOrderId && orders && (
-              <div className="col-span-1 md:col-span-2 mt-2 p-4 rounded-xl bg-white border border-[#e0e0e0] flex flex-col gap-3 shadow-sm">
+              <div className="col-span-1 md:col-span-2 mt-2 p-4 rounded-xl bg-white border border-[#e5e5ea] flex flex-col gap-3 shadow-sm">
                 <div className="flex justify-between items-start">
                   <div className="flex flex-col gap-1">
                     <span className="text-[13px] text-[#7a7a7a]">Khách hàng: 
-                      <strong className="text-[#1d1d1f] ml-1">
+                      <span className="font-bold text-[#0066cc] ml-1">
                         {orders.find(o => o.id === selectedOrderId)?.customerName}
-                      </strong> 
-                      <span className="mx-2">-</span> 
-                      {orders.find(o => o.id === selectedOrderId)?.customerPhone}
+                      </span> 
+                      <span className="mx-2 text-slate-300">|</span> 
+                      <span className="text-[#5856d6] font-medium">
+                        {orders.find(o => o.id === selectedOrderId)?.customerPhone || "Không có SĐT"}
+                      </span>
                     </span>
                     <span className="text-[12px] text-[#7a7a7a]">
                       Ngày mua: {new Date(orders.find(o => o.id === selectedOrderId)?.createdAt || "").toLocaleDateString("vi-VN")}
@@ -329,28 +332,47 @@ export function ReturnForm({ onSubmit, onCancel, isLoading }: ReturnFormProps) {
                 </div>
 
                 {/* Danh sách máy trong đơn để tích chọn trả */}
-                <div className="pt-3 border-t border-[#e0e0e0]">
-                  <p className="text-[12px] font-semibold text-[#1d1d1f] mb-2">Chọn các máy cần Đổi/Trả:</p>
+                <div className="pt-3 border-t border-[#e5e5ea]">
+                  <p className="text-[12px] font-semibold text-[#1d1d1f] mb-2">Chọn các máy cần trả:</p>
                   {isLoadingItems ? (
                     <p className="text-[12px] text-[#7a7a7a]">Đang tải danh sách máy...</p>
                   ) : items && items.length > 0 ? (
                     <div className="space-y-2">
                       {items.map(item => {
                         const originalPrice = item.sellingPrice || "0";
+                        const isChecked = selectedItemIds.includes(item.inventoryItemId);
                         return (
-                          <label key={item.inventoryItemId} className="flex items-center gap-3 p-3 rounded-lg border border-[#e0e0e0] hover:bg-[#f5f5f7] cursor-pointer transition-colors">
-                            <input 
-                              type="checkbox" 
-                              checked={selectedItemIds.includes(item.inventoryItemId)}
-                              onChange={() => handleToggleItem(item.inventoryItemId, originalPrice)}
-                              className="w-4 h-4 rounded text-[#0066cc] focus:ring-[#0066cc]"
-                            />
-                            <div className="flex justify-between items-center w-full">
-                              <div className="flex flex-col">
-                                <span className="text-[14px] font-semibold text-[#1d1d1f]">{item.productName}</span>
-                                <span className="text-[12px] text-[#7a7a7a]">SN: {item.serialNumber}</span>
+                          <label 
+                            key={item.inventoryItemId} 
+                            className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer select-none ${
+                              isChecked 
+                                ? "bg-[#0066cc]/5 border-[#0066cc] text-[#0066cc]" 
+                                : "bg-white border-[#e5e5ea] hover:bg-[#f5f5f7] text-[#1d1d1f]"
+                            }`}
+                          >
+                            <div className="relative flex items-center justify-center shrink-0">
+                              <input 
+                                type="checkbox" 
+                                checked={isChecked}
+                                onChange={() => handleToggleItem(item.inventoryItemId, originalPrice)}
+                                className="sr-only"
+                              />
+                              <div className={`w-4 h-4 rounded-full border transition-all flex items-center justify-center ${
+                                isChecked 
+                                  ? "border-[#0066cc] bg-[#0066cc]" 
+                                  : "border-[#d1d1d6] bg-white"
+                              }`}>
+                                {isChecked && (
+                                  <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                                )}
                               </div>
-                              <span className="text-[13px] font-bold text-[#1d1d1f]">{formatPrice(originalPrice)}</span>
+                            </div>
+                            <div className="flex justify-between items-center w-full min-w-0">
+                              <div className="flex flex-col min-w-0">
+                                <span className={`text-[14px] font-semibold truncate ${isChecked ? "text-[#0066cc]" : "text-[#1d1d1f]"}`}>{item.productName}</span>
+                                <span className={`text-[12px] ${isChecked ? "text-[#0066cc]/70" : "text-[#7a7a7a]"} mt-0.5`}>SN: {item.serialNumber}</span>
+                              </div>
+                              <span className={`text-[13px] font-bold shrink-0 ${isChecked ? "text-[#0066cc]" : "text-[#1d1d1f]"}`}>{formatPrice(originalPrice)}</span>
                             </div>
                           </label>
                         );
@@ -364,20 +386,7 @@ export function ReturnForm({ onSubmit, onCancel, isLoading }: ReturnFormProps) {
             )}
 
             {/* Các tùy chọn chung của Phiếu */}
-            <div className="space-y-1.5 mt-2">
-              <label className="text-[11px] font-semibold text-[#7a7a7a] uppercase tracking-wider pl-1">
-                Loại xử lý của Phiếu
-              </label>
-              <CustomSelect
-                options={typeOptions}
-                value={returnType}
-                onChange={(val) => setReturnType(val as any)}
-                placeholder="Chọn loại"
-                dropdownWidth="full"
-              />
-            </div>
-            
-            <div className="space-y-1.5 mt-2">
+            <div className="col-span-1 md:col-span-2 space-y-1.5 mt-2">
               <label className="text-[11px] font-semibold text-[#7a7a7a] uppercase tracking-wider pl-1">
                 Lý do chung của Phiếu
               </label>
@@ -399,7 +408,7 @@ export function ReturnForm({ onSubmit, onCancel, isLoading }: ReturnFormProps) {
                 value={reasonDetail}
                 onChange={(e) => setReasonDetail(e.target.value)}
                 rows={2}
-                className="w-full px-4 py-3 rounded-xl bg-white text-[14px] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 transition-all resize-none text-[#1d1d1f] border border-[#e0e0e0]"
+                className="w-full px-4 py-3 rounded-xl bg-white text-[14px] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 transition-all resize-none text-[#515154] font-medium border border-[#e5e5ea]"
               />
             </div>
           </div>
@@ -421,16 +430,16 @@ export function ReturnForm({ onSubmit, onCancel, isLoading }: ReturnFormProps) {
                 const showDefectInput = config.conditionOnReturn === "defective" || config.conditionOnReturn === "damaged" || config.isDefective;
  
                 return (
-                  <div key={id} className="p-5 rounded-2xl bg-white border border-[#e0e0e0] shadow-sm space-y-4 transition-all">
+                  <div key={id} className="p-4 rounded-xl bg-white border border-[#e5e5ea] shadow-sm space-y-3.5 transition-all">
                     {/* Item header */}
                     <div className="flex justify-between items-start border-b border-[#f5f5f7] pb-3">
                       <div>
-                        <h5 className="font-bold text-[#1d1d1f] text-[15px]">{itemDetail?.productName}</h5>
-                        <p className="text-[12px] text-[#7a7a7a] font-mono mt-0.5">Serial: {itemDetail?.serialNumber}</p>
+                        <h5 className="font-bold text-[#0066cc] text-[15px]">{itemDetail?.productName}</h5>
+                        <p className="text-[12px] text-[#7a7a7a] font-medium mt-0.5">Serial: {itemDetail?.serialNumber}</p>
                       </div>
                       <div className="text-right">
                         <span className="text-[11px] text-[#7a7a7a] block">Giá bán ban đầu</span>
-                        <span className="font-bold text-[#1d1d1f]">{formatPrice(config.originalPrice)}</span>
+                        <span className="font-bold text-[#0066cc]">{formatPrice(config.originalPrice)}</span>
                       </div>
                     </div>
  
@@ -459,7 +468,7 @@ export function ReturnForm({ onSubmit, onCancel, isLoading }: ReturnFormProps) {
                           type="text"
                           value={formatNumberInput(config.refundPrice)}
                           onChange={(e) => handleUpdateItemConfig(id, "refundPrice", parseNumberInput(e.target.value))}
-                          className="w-full h-[40px] px-3.5 rounded-xl border border-[#e0e0e0] font-semibold text-[14px] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 transition-all"
+                          className="w-full h-[40px] px-3.5 rounded-xl border border-[#e5e5ea] font-semibold text-[14px] text-[#0066cc] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 transition-all"
                         />
                       </div>
 
@@ -501,22 +510,20 @@ export function ReturnForm({ onSubmit, onCancel, isLoading }: ReturnFormProps) {
                           onChange={(e) => handleUpdateItemConfig(id, "isDefective", e.target.checked)}
                           className="w-4 h-4 rounded text-red-600 focus:ring-red-500 border-[#e0e0e0]"
                         />
-                        <label htmlFor={`defective-check-${id}`} className="text-[13px] font-semibold text-red-600 cursor-pointer flex items-center gap-1">
-                          <ShieldAlert size={14} />
+                        <label htmlFor={`defective-check-${id}`} className="text-[13px] font-semibold text-red-600 cursor-pointer">
                           Xác nhận máy bị lỗi cần đưa vào kho lỗi (Defective)
                         </label>
                       </div>
  
                       {/* 3. Mô tả chi tiết tình trạng máy khi nhận lại */}
-                      <div className={`col-span-1 md:col-span-2 space-y-1.5 p-4 rounded-xl border transition-colors ${
+                      <div className={`col-span-1 md:col-span-2 space-y-1.5 p-4 rounded-xl border transition-colors bg-white ${
                         config.isDefective 
-                          ? "bg-red-50/30 border-red-100" 
-                          : "bg-slate-50 border-slate-200/50"
+                          ? "border-red-200" 
+                          : "border-[#e5e5ea]"
                       }`}>
-                        <label className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 ${
+                        <label className={`text-[11px] font-bold uppercase tracking-wider block ${
                           config.isDefective ? "text-[#b91c1c]" : "text-slate-600"
                         }`}>
-                          <AlertCircle size={12} className={config.isDefective ? "text-red-500" : "text-slate-400"} />
                           {config.isDefective 
                             ? "Mô tả chi tiết tình trạng lỗi của máy *" 
                             : "Mô tả chi tiết/Ghi chú về tình trạng máy khi nhận lại"
@@ -531,10 +538,10 @@ export function ReturnForm({ onSubmit, onCancel, isLoading }: ReturnFormProps) {
                           value={config.defectDescription}
                           onChange={(e) => handleUpdateItemConfig(id, "defectDescription", e.target.value)}
                           rows={2}
-                          className={`w-full px-4 py-3 rounded-xl bg-white text-[14px] focus:outline-none focus:ring-2 transition-all resize-none text-[#1d1d1f] ${
+                          className={`w-full px-4 py-3 rounded-xl bg-[#f5f5f7] text-[14px] text-[#515154] font-medium focus:bg-white focus:outline-none focus:ring-2 transition-all resize-none ${
                             config.isDefective 
                               ? "border-red-200 focus:ring-red-500/40" 
-                              : "border-slate-200 focus:ring-[#0066cc]/40"
+                              : "border-[#e5e5ea] focus:ring-[#0066cc]/40"
                           }`}
                         />
                       </div>
@@ -545,43 +552,41 @@ export function ReturnForm({ onSubmit, onCancel, isLoading }: ReturnFormProps) {
             </div>
  
             {/* Phân hệ chiết khấu giảm trừ hao hụt (Khách trả máy không lỗi) */}
-            <div className="bg-white border border-[#e0e0e0] rounded-2xl p-5 shadow-sm space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="space-y-0.5">
-                  <span className="text-[13px] font-bold text-[#1d1d1f]">
-                    {returnType === "return" ? "Khấu hao chiết khấu giảm trừ" : "Chiết khấu khấu hao máy cũ"}
-                  </span>
-                  <p className="text-[11.5px] text-[#7a7a7a]">
-                    {returnType === "return" 
-                      ? "Áp dụng giảm trừ tiền hoàn trả nếu khách trả hàng máy không lỗi (Đổi ý/Nâng cấp)" 
-                      : "Áp dụng trừ khấu hao trị giá máy cũ thu hồi khi đổi sang máy mới không lỗi"
-                    }
-                  </p>
-                </div>
+            <div className="bg-white border border-[#e5e5ea] rounded-xl p-4 shadow-sm space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[13px] font-bold text-[#7a7a7a] uppercase tracking-wider pl-0.5">
+                  Chiết khấu / Khấu trừ
+                </span>
                 
                 {/* Segmented Toggle Control */}
-                <div className="flex bg-[#f5f5f7] p-0.5 rounded-xl border border-slate-200 gap-0.5 shadow-inner shrink-0 self-start sm:self-auto">
+                <div className="relative flex bg-[#f5f5f7] p-[3px] rounded-full border border-[#e5e5ea] h-[36px] w-[230px] shrink-0 select-none overflow-hidden">
+                  {/* Sliding background capsule */}
+                  <div 
+                    className="absolute top-[3px] bottom-[3px] rounded-full bg-[#0066cc] shadow-[0_2px_4px_rgba(0,102,204,0.25)] transition-all duration-300"
+                    style={{
+                      left: !hasFee ? "3px" : "115px",
+                      width: "112px"
+                    }}
+                  />
+                  
+                  {/* Buttons */}
                   <button
                     type="button"
                     onClick={() => {
                       setHasFee(false);
-                      setFeeAmount("0");
+                      setFeeAmount("");
                     }}
-                    className={`px-3 py-1 rounded-lg text-[11px] font-extrabold transition-all cursor-pointer ${
-                      !hasFee 
-                        ? "bg-white text-slate-700 shadow-sm border border-slate-200/40" 
-                        : "text-[#7a7a7a] hover:text-[#1d1d1f]"
+                    className={`relative z-10 w-1/2 h-full flex items-center justify-center text-[12px] font-bold transition-colors duration-200 cursor-pointer focus:outline-none ${
+                      !hasFee ? "text-white" : "text-[#7a7a7a] hover:text-[#1d1d1f]"
                     }`}
                   >
-                    Không áp dụng
+                    Không chiết khấu
                   </button>
                   <button
                     type="button"
                     onClick={() => setHasFee(true)}
-                    className={`px-3 py-1 rounded-lg text-[11px] font-extrabold transition-all cursor-pointer ${
-                      hasFee 
-                        ? "bg-white text-rose-600 shadow-sm border border-rose-100" 
-                        : "text-[#7a7a7a] hover:text-[#1d1d1f]"
+                    className={`relative z-10 w-1/2 h-full flex items-center justify-center text-[12px] font-bold transition-colors duration-200 cursor-pointer focus:outline-none ${
+                      hasFee ? "text-white" : "text-[#7a7a7a] hover:text-[#1d1d1f]"
                     }`}
                   >
                     Có chiết khấu
@@ -601,48 +606,25 @@ export function ReturnForm({ onSubmit, onCancel, isLoading }: ReturnFormProps) {
                       value={formatNumberInput(feeAmount)}
                       onChange={(e) => setFeeAmount(parseNumberInput(e.target.value))}
                       placeholder="0"
-                      className="w-full pl-3.5 pr-12 h-[40px] rounded-xl border border-slate-200 font-extrabold text-[14px] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 transition-all text-[#1d1d1f]"
+                      className="w-full pl-3.5 pr-12 h-[40px] rounded-xl border border-[#e5e5ea] font-extrabold text-[14px] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40 transition-all text-[#0066cc]"
                       required
                     />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-extrabold text-slate-400">VNĐ</span>
                   </div>
-                  <p className="text-[11px] text-[#7a7a7a] pl-0.5 leading-relaxed">
-                    {returnType === "return" 
-                      ? "Số tiền này sẽ được khấu trừ tự động vào dòng tiền chi ngân quỹ ở hệ thống Sổ quỹ kế toán."
-                      : "Số tiền khấu hao này sẽ giảm trừ giá trị thu hồi của máy cũ khi hạch toán dòng tiền hoàn trả liên kết Sổ quỹ."
-                    }
-                  </p>
                 </div>
               )}
             </div>
  
             {/* Total refund visual summary banner with detailed balance breakdown */}
-            <div className="p-5 rounded-2xl bg-[#0066cc]/5 border border-[#0066cc]/10 flex flex-col md:flex-row md:items-center justify-between text-[#1d1d1f] gap-4">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-[#0066cc] text-white rounded-lg shrink-0">
-                  <DollarSign size={16} />
-                </div>
-                <div>
-                  <span className="text-[11.5px] text-[#7a7a7a] font-extrabold uppercase tracking-wider block">
-                    {returnType === "return" ? "Cân đối hoàn trả ngân quỹ" : "Cân đối đổi hàng thu hồi"}
-                  </span>
-                  <span className="text-[12px] text-[#7a7a7a]">
-                    {returnType === "return" 
-                      ? "Khấu trừ tự động và đồng bộ hạch toán dòng tiền sổ quỹ"
-                      : "Ghi nhận trị giá thu hồi của sản phẩm cũ phục vụ khấu trừ đơn hàng mới"
-                    }
-                  </span>
-                </div>
-              </div>
-              
-              <div className="flex flex-col md:items-end text-right shrink-0">
+            <div className="p-4 rounded-xl bg-[#0066cc]/5 border border-[#0066cc]/10 flex flex-col items-center text-center gap-2">
+              <div className="w-full flex flex-col items-center shrink-0">
                 {returnType === "return" ? (
                   <>
                     {hasFee && (
-                      <div className="text-[12px] text-[#7a7a7a] space-y-0.5 mb-1.5 font-medium leading-none">
+                      <div className="text-[12px] text-[#7a7a7a] space-y-1 mb-1.5 font-medium leading-none flex flex-col items-center">
                         <div>
                           Tổng trị giá máy:{" "}
-                          <span className="font-bold text-[#1d1d1f]">{formatPrice(computedTotalRefund)}</span>
+                          <span className="font-bold text-[#515154]">{formatPrice(computedTotalRefund)}</span>
                         </div>
                         <div className="mt-1">
                           Hao hụt khấu trừ:{" "}
@@ -650,7 +632,7 @@ export function ReturnForm({ onSubmit, onCancel, isLoading }: ReturnFormProps) {
                         </div>
                       </div>
                     )}
-                    <div className="flex items-center gap-1 justify-end mt-1">
+                    <div className="flex items-center gap-1 justify-center mt-1">
                       <span className="text-[11px] text-[#7a7a7a] font-extrabold uppercase tracking-wider mr-1 font-sans">
                         Thực tế hoàn khách:
                       </span>
@@ -661,10 +643,10 @@ export function ReturnForm({ onSubmit, onCancel, isLoading }: ReturnFormProps) {
                   </>
                 ) : (
                   <>
-                    <div className="text-[12px] text-[#7a7a7a] space-y-0.5 mb-1.5 font-medium leading-none">
+                    <div className="text-[12px] text-[#7a7a7a] space-y-1 mb-1.5 font-medium leading-none flex flex-col items-center">
                       <div>
                         Trị giá máy cũ thu hồi:{" "}
-                        <span className="font-bold text-[#1d1d1f]">{formatPrice(computedTotalRefund)}</span>
+                        <span className="font-bold text-[#515154]">{formatPrice(computedTotalRefund)}</span>
                       </div>
                       {hasFee && (
                         <div className="mt-1">
@@ -679,7 +661,7 @@ export function ReturnForm({ onSubmit, onCancel, isLoading }: ReturnFormProps) {
                         </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 justify-end mt-1">
+                    <div className="flex items-center gap-1 justify-center mt-1">
                       <span className="text-[11px] text-[#7a7a7a] font-extrabold uppercase tracking-wider mr-1 font-sans">
                         {computedExchangeDifference >= 0 ? "Khách cần trả thêm:" : "Cửa hàng hoàn lại khách:"}
                       </span>
@@ -697,18 +679,18 @@ export function ReturnForm({ onSubmit, onCancel, isLoading }: ReturnFormProps) {
           </div>
         )}
 
-        <div className="pt-4 flex items-center gap-3 justify-end">
+        <div className="pt-2 flex items-center gap-3 justify-end">
           <button
             type="button"
             onClick={onCancel}
-            className="px-6 h-[46px] bg-[#f5f5f7] hover:bg-[#e0e0e0] text-[#1d1d1f] rounded-full text-[15px] font-medium transition-all cursor-pointer"
+            className="px-5 h-[40px] bg-[#f5f5f7] hover:bg-[#e0e0e0] text-[#1d1d1f] rounded-full text-[14px] font-medium transition-all cursor-pointer"
           >
             Hủy bỏ
           </button>
           <button
             type="submit"
             disabled={isLoading || !selectedOrderId || selectedItemIds.length === 0 || !reason}
-            className="px-8 h-[46px] bg-[#0066cc] text-white rounded-full text-[15px] font-semibold hover:bg-[#0071e3] transition-all disabled:opacity-50 cursor-pointer"
+            className="px-7 h-[40px] bg-[#0066cc] text-white rounded-full text-[14px] font-semibold hover:bg-[#0071e3] transition-all disabled:opacity-50 cursor-pointer shadow-sm active:scale-95 duration-200"
           >
             {isLoading ? "Đang xử lý..." : "Xác nhận tạo phiếu"}
           </button>

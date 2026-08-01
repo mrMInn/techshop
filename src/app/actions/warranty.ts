@@ -209,6 +209,8 @@ export async function createWarrantyClaim(data: {
       const warrantyEndDateObj = new Date(purchaseDate);
       warrantyEndDateObj.setMonth(warrantyEndDateObj.getMonth() + warrantyMonths);
       const calculatedWarrantyEndDateStr = warrantyEndDateObj.toISOString().split("T")[0];
+      const [wYear, wMonth, wDay] = calculatedWarrantyEndDateStr.split("-");
+      const formattedWarrantyEndDate = `${wDay}-${wMonth}-${wYear}`;
 
       const receivedDateObj = new Date(data.receivedDate);
       const calculatedIsUnderWarranty = receivedDateObj <= warrantyEndDateObj;
@@ -264,7 +266,7 @@ export async function createWarrantyClaim(data: {
       await tx.insert(warrantyLogs).values({
         warrantyClaimId: newClaim.id,
         action: "created",
-        description: `Khởi tạo phiếu bảo hành mới cho lỗi: ${data.issueDescription}. Thiết bị: ${calculatedIsUnderWarranty ? "Còn trong hạn bảo hành" : "Đã hết hạn bảo hành"} (Thời hạn đến: ${calculatedWarrantyEndDateStr})`,
+        description: `Khởi tạo phiếu bảo hành mới cho lỗi: ${data.issueDescription}. Thiết bị: ${calculatedIsUnderWarranty ? "Còn trong hạn bảo hành" : "Đã hết hạn bảo hành"} (Thời hạn đến: ${formattedWarrantyEndDate})`,
         newStatus: "pending",
         createdBy: createdById,
       });

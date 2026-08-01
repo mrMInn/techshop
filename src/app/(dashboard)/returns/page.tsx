@@ -159,7 +159,7 @@ export default function ReturnsPage() {
             className="flex items-center gap-1.5 px-5 h-[40px] bg-[#0066cc] text-white text-[13px] font-medium rounded-full hover:bg-[#0071e3] transition-all cursor-pointer shadow-sm active:scale-95 duration-200"
           >
             <Plus size={14} />
-            <span>Tạo Phiếu Đổi/Trả</span>
+            <span>Tạo Phiếu Trả Hàng</span>
           </button>
         </div>
 
@@ -255,9 +255,8 @@ export default function ReturnsPage() {
       <Dialog 
         isOpen={isReturnOpen} 
         onClose={() => setIsReturnOpen(false)}
-        title="Tạo Phiếu Đổi/Trả"
-        description="Xử lý đổi hàng hoặc hoàn tiền cho khách."
-        size="3xl"
+        title={<span className="text-[#0066cc]">Tạo Phiếu Trả Hàng</span>}
+        size="xl"
       >
         <ReturnForm
           onSubmit={handleReturnSubmit}
@@ -273,7 +272,14 @@ export default function ReturnsPage() {
           setIsDetailOpen(false);
           setReturnDetail(null);
         }}
-        title={`Chi Tiết Phiếu Đổi Trả #${returnDetail?.returnData?.returnNumber || ""}`}
+        title={
+          <span className="text-[#0066cc]">
+            Chi Tiết Phiếu Trả Hàng{" "}
+            <span className="text-[#5856d6] font-semibold">
+              #{returnDetail?.returnData?.returnNumber || ""}
+            </span>
+          </span>
+        }
         size="2xl"
       >
         {detailLoading ? (
@@ -284,74 +290,71 @@ export default function ReturnsPage() {
         ) : returnDetail?.success ? (
           <div className="space-y-6">
             {/* Thông tin chung */}
-            <div className="grid grid-cols-2 gap-x-6 gap-y-4 bg-slate-50 p-4 rounded-xl border border-slate-200 text-[14px]">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3 pb-4 border-b border-[#e5e5ea] text-[14px]">
               <div>
-                <span className="text-slate-500">Mã đơn hàng gốc:</span>
-                <p className="font-semibold text-slate-800 mt-0.5">{returnDetail.returnData.orderNumber}</p>
+                <span className="text-[#86868b] font-medium">Mã đơn hàng gốc:</span>
+                <p className="font-bold text-[#0066cc] mt-0.5">{returnDetail.returnData.orderNumber}</p>
               </div>
               <div>
-                <span className="text-slate-500">Khách hàng:</span>
-                <p className="font-semibold text-slate-800 mt-0.5">
-                  {returnDetail.returnData.customerName} ({returnDetail.returnData.customerPhone})
+                <span className="text-[#86868b] font-medium">Khách hàng:</span>
+                <p className="font-bold text-[#0066cc] mt-0.5">
+                  {returnDetail.returnData.customerName} <span className="text-[#5856d6] font-medium">({returnDetail.returnData.customerPhone})</span>
                 </p>
               </div>
               <div>
-                <span className="text-slate-500">Phân loại đổi trả:</span>
+                <span className="text-[#86868b] font-medium">Phân loại đổi trả:</span>
                 <p className="mt-0.5">
-                  <span className={`font-semibold ${
-                    returnDetail.returnData.type === "exchange" ? "text-blue-600" : "text-[#ff3b30]"
+                  <span className={`font-bold ${
+                    returnDetail.returnData.type === "exchange" ? "text-[#5856d6]" : "text-[#ff3b30]"
                   }`}>
-                    {returnDetail.returnData.type === "exchange" ? "Đổi hàng" : "Trả hàng"}
+                    {returnDetail.returnData.type === "exchange" ? "Đổi hàng (Mới)" : "Trả hàng (Hoàn tiền)"}
                   </span>
                 </p>
               </div>
               <div>
-                <span className="text-slate-500">Lý do chính:</span>
-                <p className="font-semibold text-slate-800 mt-0.5">
+                <span className="text-[#86868b] font-medium">Lý do chính:</span>
+                <p className="font-bold text-[#ff9f0a] mt-0.5">
                   {getReturnReasonLabel(returnDetail.returnData.reason)}
                 </p>
               </div>
               <div className="col-span-2">
-                <span className="text-slate-500">Chi tiết lý do:</span>
-                <p className="text-slate-700 mt-0.5 italic">"{returnDetail.returnData.reasonDetail}"</p>
+                <span className="text-[#86868b] font-medium">Chi tiết lý do:</span>
+                <p className="text-[#515154] font-medium mt-0.5 italic">"{returnDetail.returnData.reasonDetail}"</p>
               </div>
             </div>
 
             {/* Chi tiết sản phẩm đổi trả */}
-            <div>
-              <h4 className="text-[14px] font-semibold text-slate-700 mb-2 uppercase tracking-wider">Sản phẩm hoàn trả</h4>
-              <div className="border border-slate-200 rounded-xl overflow-hidden">
+            <div className="space-y-2">
+              <h4 className="text-[13px] font-bold text-[#86868b] uppercase tracking-wider">Sản phẩm hoàn trả</h4>
+              <div className="border border-[#e5e5ea] rounded-2xl overflow-hidden">
                 <table className="w-full text-left text-[13px] border-collapse">
                   <thead>
-                    <tr className="bg-slate-100/80 border-b border-slate-200 text-slate-600 font-semibold">
-                      <th className="px-4 py-2.5">Sản phẩm</th>
-                      <th className="px-4 py-2.5 text-center">Tình trạng</th>
-                      <th className="px-4 py-2.5 text-right">Giá gốc mua</th>
-                      <th className="px-4 py-2.5 text-right">Giá hoàn</th>
+                    <tr className="border-b border-[#e5e5ea] text-[#86868b] font-bold bg-transparent">
+                      <th className="px-4 py-3">Sản phẩm</th>
+                      <th className="px-4 py-3 text-center">Tình trạng</th>
+                      <th className="px-4 py-3 text-right">Giá gốc mua</th>
+                      <th className="px-4 py-3 text-right">Giá hoàn</th>
                     </tr>
                   </thead>
                   <tbody>
                     {returnDetail.items.map((item: any) => (
-                      <tr key={item.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
+                      <tr key={item.id} className="border-b border-[#e5e5ea] last:border-0 hover:bg-[#0066cc]/5 transition-all">
                         <td className="px-4 py-3">
-                          <p className="font-medium text-slate-800">{item.productName}</p>
+                          <p className="font-bold text-[#0066cc]">{item.productName}</p>
                           {item.defectDescription && (
-                            <p className="text-[11px] text-red-500 mt-0.5">Lỗi: {item.defectDescription}</p>
+                            <p className="text-[11px] text-[#ff3b30] font-medium mt-0.5">Lỗi: {item.defectDescription}</p>
                           )}
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                            item.conditionOnReturn === "like_new" ? "bg-green-100 text-green-800" :
-                            item.conditionOnReturn === "good" ? "bg-emerald-100 text-emerald-800" :
-                            item.conditionOnReturn === "damaged" ? "bg-amber-100 text-amber-800" : "bg-red-100 text-red-800"
-                          }`}>
-                            {item.conditionOnReturn === "like_new" ? "Như mới" :
-                             item.conditionOnReturn === "good" ? "Tốt" :
-                             item.conditionOnReturn === "damaged" ? "Trầy xước" : "Lỗi hỏng"}
+                          <span className="font-bold text-[13px]">
+                            {item.conditionOnReturn === "like_new" && <span className="text-[#34c759]">Như mới</span>}
+                            {item.conditionOnReturn === "good" && <span className="text-[#30d158]">Tốt</span>}
+                            {item.conditionOnReturn === "damaged" && <span className="text-[#ff9f0a]">Trầy xước</span>}
+                            {item.conditionOnReturn === "defective" && <span className="text-[#ff3b30]">Lỗi hỏng</span>}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-right text-slate-600">{formatPrice(item.originalPrice)}</td>
-                        <td className="px-4 py-3 text-right font-semibold text-slate-800">{formatPrice(item.refundPrice)}</td>
+                        <td className="px-4 py-3 text-right font-medium text-[#86868b]">{formatPrice(item.originalPrice)}</td>
+                        <td className="px-4 py-3 text-right font-bold text-[#0066cc]">{formatPrice(item.refundPrice)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -360,31 +363,31 @@ export default function ReturnsPage() {
             </div>
 
             {/* Chi tiết tài chính & hạch toán */}
-            <div className="grid grid-cols-3 gap-4 border-t border-slate-100 pt-4">
-              <div className="bg-slate-50 p-3 rounded-lg text-center border border-slate-100">
-                <span className="text-[12px] text-slate-500">Phí dịch vụ</span>
-                <p className="text-[16px] font-semibold text-slate-800 mt-0.5">
+            <div className="grid grid-cols-3 gap-4 border-t border-[#e5e5ea] pt-4">
+              <div className="p-3 text-center">
+                <span className="text-[12px] text-[#86868b] font-medium">Phí dịch vụ</span>
+                <p className="text-[16px] font-bold text-[#ff9f0a] mt-0.5">
                   {formatPrice(returnDetail.returnData.feeAmount || 0)}
                 </p>
               </div>
-              <div className="bg-slate-50 p-3 rounded-lg text-center border border-slate-100">
-                <span className="text-[12px] text-slate-500">Thực hoàn khách</span>
-                <p className="text-[16px] font-bold text-red-600 mt-0.5">
+              <div className="p-3 text-center border-x border-[#e5e5ea]">
+                <span className="text-[12px] text-[#86868b] font-medium">Thực hoàn khách</span>
+                <p className="text-[18px] font-bold text-[#ff3b30] mt-0.5">
                   {formatPrice(returnDetail.returnData.refundAmount || 0)}
                 </p>
               </div>
-              <div className="bg-slate-50 p-3 rounded-lg text-center border border-slate-100">
-                <span className="text-[12px] text-slate-500">Chênh lệch đổi hàng</span>
-                <p className="text-[16px] font-semibold text-slate-800 mt-0.5">
+              <div className="p-3 text-center">
+                <span className="text-[12px] text-[#86868b] font-medium">Chênh lệch đổi hàng</span>
+                <p className="text-[16px] font-bold text-[#0066cc] mt-0.5">
                   {formatPrice(returnDetail.returnData.exchangeDifference || 0)}
                 </p>
               </div>
             </div>
 
             {/* Thông tin thêm */}
-            <div className="text-[12px] text-slate-500 flex justify-between pt-2 border-t border-slate-100">
-              <span>Nhân viên lập: <strong className="text-slate-700">{returnDetail.returnData.processedByName}</strong></span>
-              <span>Ngày hạch toán: <strong className="text-slate-700">{formatToDDMMYYYY(returnDetail.returnData.createdAt)}</strong></span>
+            <div className="text-[12px] text-[#86868b] flex justify-between pt-2.5 border-t border-[#e5e5ea]">
+              <span>Nhân viên lập: <strong className="text-[#0066cc] font-semibold">{returnDetail.returnData.processedByName}</strong></span>
+              <span>Ngày hạch toán: <strong className="text-[#0066cc] font-semibold">{formatToDDMMYYYY(returnDetail.returnData.createdAt)}</strong></span>
             </div>
           </div>
         ) : (
