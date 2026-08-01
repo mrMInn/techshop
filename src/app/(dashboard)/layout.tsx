@@ -1,6 +1,6 @@
 "use client";
 
-import { Package, ShoppingCart, Users, Wrench, Settings, LayoutDashboard, RefreshCcw, Wallet, FileText, Search, LogOut, List, CheckCircle, Truck, Globe, XCircle, Boxes, Inbox, AlertOctagon, ClipboardList, CornerUpLeft, Cable, Receipt, Landmark, BarChart3, ShieldAlert } from "lucide-react";
+import { Package, ShoppingCart, Users, Wrench, Settings, LayoutDashboard, RefreshCcw, Wallet, FileText, Search, LogOut, List, CheckCircle, Truck, Globe, XCircle, Boxes, Inbox, AlertOctagon, ClipboardList, CornerUpLeft, Cable, Receipt, Landmark, BarChart3 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useRef, Fragment } from "react";
@@ -54,7 +54,6 @@ function getPageTitle(path: string | null, searchParams?: any) {
   }
   if (path.startsWith("/returns")) return "Đổi trả";
   if (path.startsWith("/lookup")) return "Tra cứu";
-  if (path.startsWith("/system")) return "Giám sát & Sao lưu";
   if (path.startsWith("/accounting/expenses")) return "Chi phí";
   if (path.startsWith("/accounting/reports")) return "Báo cáo tài chính";
   if (path.startsWith("/accounting")) return "Sổ quỹ";
@@ -133,8 +132,6 @@ function getBreadcrumbs(path: string | null, searchParams?: any): { label: strin
     crumbs.push({ label: "Nhật ký thu chi" });
   } else if (path.startsWith("/settings")) {
     crumbs.push({ label: "Cấu hình hệ thống", href: "/settings" });
-  } else if (path.startsWith("/system")) {
-    crumbs.push({ label: "Giám sát & Sao lưu", href: "/system" });
   }
   
   return crumbs;
@@ -210,7 +207,6 @@ export default function DashboardLayout({
     ...(isAdmin ? [{ href: "/accounting", label: "Sổ quỹ", icon: <Wallet size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-[#34c759] to-[#28a745]", match: (p: string) => p.startsWith("/accounting") }] : []),
   ];
 
-  const systemItem = isAdmin ? { href: "/system", label: "Giám sát & Sao lưu", icon: <ShieldAlert size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-[#ff5b5b] to-[#dc2626]", match: (p: string) => p.startsWith("/system") } : null;
   const settingsItem = isAdmin ? { href: "/settings", label: "Cấu hình hệ thống", icon: <Settings size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-[#8e8e93] to-[#636366]", match: (p: string) => p.startsWith("/settings") } : null;
 
   return (
@@ -249,15 +245,6 @@ export default function DashboardLayout({
 
         {/* Sidebar Footer: System Config & Profile */}
         <div className="space-y-1.5 border-t border-[#e0e0e0]/50 pt-4">
-          {systemItem && (
-            <SidebarLink
-              href={systemItem.href}
-              bgColor={systemItem.bgColor}
-              icon={systemItem.icon}
-              label={systemItem.label}
-              active={!!(pathname && systemItem.match(pathname))}
-            />
-          )}
           {settingsItem && (
             <SidebarLink
               href={settingsItem.href}

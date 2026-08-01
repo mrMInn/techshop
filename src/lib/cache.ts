@@ -63,5 +63,6 @@ export function invalidateDashboardCache() {
   serverCache.clearPattern("expense_categories");
   serverCache.clearPattern("warranty_claims_select");
   serverCache.clearPattern("aged_inventory_items");
+  serverCache.clearPattern("inventory_capital_summary");
   serverCache.clearPattern("orders_overall_stats");
 }

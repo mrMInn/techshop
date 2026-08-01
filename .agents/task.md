@@ -1,0 +1,6 @@
+- [ ] Gỡ bỏ code timeline "Lịch sử hoạt động" cùng các hàm/biến phụ trợ liên quan trong `order-detail-dialog.tsx`
+- [ ] Di chuyển "Danh sách sản phẩm" và "Lịch sử đổi trả & hoàn tiền" lên cột bên trái (chiếm 2/3 không gian)
+- [ ] Thiết kế lại cột bên phải (chiếm 1/3 không gian) xếp chồng đứng các thẻ thông tin (Trạng thái, Khách hàng, Tài chính, Ghi chú, Vận đơn)
+- [ ] Tối ưu hóa padding, margin các thẻ thông tin để không bị thừa khoảng trống
+- [ ] Chạy kiểm tra TypeScript (`npx tsc --noEmit`)
+- [ ] Cập nhật tệp walkthrough.md

@@ -2,12 +2,8 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { getFinancialSummary, getDashboardBentoData } from "@/app/actions/accounting";
-import { getAgedInventoryItems } from "@/app/actions/inventory";
-import {
-  ChevronDown,
-} from "lucide-react";
+import { getAgedInventoryItems, getInventoryCapitalSummary } from "@/app/actions/inventory";
 import { SFSymbolBanknote, SFSymbolCreditCard } from "@/components/ui/apple-icons";
-import Link from "next/link";
 import { useState, useMemo, useEffect, useCallback } from "react";
 import dynamic from "next/dynamic";
 
@@ -175,13 +171,45 @@ function KPISkeleton() {
 // Inventory Skeleton
 function InventorySkeleton() {
   return (
-    <KinhPanel className="p-5 bg-white/35 backdrop-blur-xl">
-      <div className="animate-pulse space-y-3">
+    <KinhPanel className="p-5 bg-white/35 backdrop-blur-xl h-[480px]">
+      <div className="animate-pulse space-y-4">
         <div className="h-6 bg-white/40 rounded w-[250px]" />
         <div className="h-px bg-slate-200/60" />
         {[1, 2, 3].map((i) => (
           <div key={i} className="h-16 bg-white/20 rounded-[20px] border border-white/60" />
         ))}
+      </div>
+    </KinhPanel>
+  );
+}
+
+// Capital Skeleton
+function CapitalSkeleton() {
+  return (
+    <KinhPanel className="p-5 bg-white/35 backdrop-blur-xl h-[480px]">
+      <div className="animate-pulse space-y-4 flex flex-col justify-between">
+        <div className="space-y-4">
+          <div className="flex justify-between items-center pb-3 border-b border-slate-200/60">
+            <div className="h-6 bg-white/40 rounded w-[180px]" />
+            <div className="h-6 bg-white/40 rounded w-[120px]" />
+          </div>
+          <div className="grid grid-cols-2 gap-3.5">
+            <div className="h-16 bg-white/20 rounded-[20px] border border-white/60" />
+            <div className="h-16 bg-white/20 rounded-[20px] border border-white/60" />
+          </div>
+          <div className="space-y-3.5">
+            <div className="h-4 bg-white/30 rounded w-[150px]" />
+            {[1, 2].map((i) => (
+              <div key={i} className="space-y-1.5">
+                <div className="flex justify-between">
+                  <div className="h-4 bg-white/20 rounded w-[100px]" />
+                  <div className="h-4 bg-white/20 rounded w-[70px]" />
+                </div>
+                <div className="h-2 bg-white/10 rounded-full w-full" />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </KinhPanel>
   );
@@ -237,7 +265,18 @@ export default function DashboardHome() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const isRefreshing = isBentoFetching || isSummaryFetching || isInventoryFetching;
+  const {
+    data: capitalData,
+    isLoading: isCapitalLoading,
+    isFetching: isCapitalFetching,
+  } = useQuery({
+    queryKey: ["inventory_capital_summary"],
+    queryFn: () => getInventoryCapitalSummary(),
+    enabled: mounted,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const isRefreshing = isBentoFetching || isSummaryFetching || isInventoryFetching || isCapitalFetching;
 
   // Month selector options
   const luaChonThang = useMemo(() => {
@@ -377,123 +416,229 @@ export default function DashboardHome() {
                 onMonthChange={handleChartMonthChange}
               />
 
-              {/* Aging Inventory Alert Card — Progressive: own skeleton */}
-              {isInventoryLoading ? (
-                <InventorySkeleton />
-              ) : (
-              <KinhPanel className="p-5 bg-white/35 backdrop-blur-xl">
-                <div className="flex items-center justify-between border-b border-slate-200/60 pb-3 mb-4">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-[16px] font-bold text-[#d12229]">
-                      Cảnh báo tồn kho quá hạn
-                    </h3>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {agedItems.length > 0 ? (
-                      <div className="text-[13px] font-medium text-slate-500 flex items-center gap-2.5 select-none">
-                        <span>Đọng vốn: <span className="font-semibold text-slate-800 tabular-nums">{formatCurrency(tongVonDong)}</span></span>
-                        <span className="w-1 h-1 rounded-full bg-slate-300" />
-                        <span>Tổng số: <span className="font-semibold text-slate-800">{agedItems.length} máy</span></span>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                {/* Capital Inventory Valuation Card */}
+                {isCapitalLoading ? (
+                  <CapitalSkeleton />
+                ) : (
+                  <KinhPanel className="p-5 bg-white/35 backdrop-blur-xl flex flex-col h-[480px]">
+                    <div className="flex items-center justify-between border-b border-slate-200/60 pb-3 mb-4 shrink-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-[16px] font-bold text-[#0066cc]">
+                          Thống kê vốn tồn kho
+                        </h3>
                       </div>
-                    ) : (
-                      <span className="text-[12px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 px-2.5 py-0.5 rounded-full">
-                        Kho an toàn
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="overflow-y-auto max-h-[350px] pr-1 space-y-2">
-                  {agedItems.length > 0 && (
-                    <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-1.5 text-[11px] font-bold text-slate-400 border-b border-slate-200/30 mb-2 uppercase tracking-wider">
-                      <div className="col-span-1 text-center">STT</div>
-                      <div className="col-span-4">Sản phẩm & Cấu hình</div>
-                      <div className="col-span-1 text-center">Tồn kho</div>
-                      <div className="col-span-2 text-right">Tồn đọng vốn</div>
-                      <div className="col-span-2 text-center">Ngày nhập</div>
-                      <div className="col-span-2 text-right">Thời gian</div>
+                      <div className="text-[13px] font-medium text-slate-500 select-none">
+                        Tổng vốn: <span className="font-extrabold text-[#0066cc] tabular-nums text-[15px]">{formatCurrency(capitalData?.totalCapital || 0)}</span>
+                      </div>
                     </div>
-                  )}
 
-                  {visibleAgedItems.map((item: any, index: number) => {
-                    const stockQty = item.stockQty;
-                    const avgCost = item.avgCost;
-                    const rowDongVon = item.rowDongVon;
-                    return (
-                      <div
-                        key={item.id}
-                        className="rounded-[20px] border border-white/60 bg-white/20 backdrop-blur-md p-3.5 flex flex-col md:grid md:grid-cols-12 md:gap-4 md:items-center shadow-[inset_0_1px_1px_rgba(255,255,255,0.6)] hover:bg-white/35 transition-colors duration-200"
-                      >
-                        {/* STT */}
-                        <div className="hidden md:block col-span-1 text-center text-[12px] font-bold text-slate-400">
-                          {index + 1}
+                    <div className="overflow-y-auto flex-1 pr-1 space-y-4 scrollbar-thin">
+                      {/* Grid showing simple machine and accessory stats */}
+                      <div className="grid grid-cols-2 gap-3.5">
+                        <div className="rounded-[20px] border border-white/60 bg-white/20 p-3 flex flex-col justify-between shadow-[inset_0_1px_1px_rgba(255,255,255,0.6)]">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                            Vốn Máy Lẻ ({capitalData?.machineCapital?.count || 0} máy)
+                          </span>
+                          <span className="text-[16px] font-black text-[#0066cc] tabular-nums mt-1.5">
+                            {formatCurrency(capitalData?.machineCapital?.totalCost || 0)}
+                          </span>
                         </div>
-
-                        {/* Tên & cấu hình */}
-                        <div className="col-span-12 md:col-span-4 space-y-0.5">
-                          <div className="text-[13.5px] font-semibold text-slate-800">
-                            {item.productName}
-                          </div>
-                          <div className="text-[11px] text-slate-400 font-semibold truncate" title={`${item.brandName} • ${item.categoryName} ${getSpecsLabel(item.productSpecs) ? ` • ${getSpecsLabel(item.productSpecs)}` : ""}`}>
-                            {item.brandName || "TechShop"} • {item.categoryName || "Thiết bị"} {getSpecsLabel(item.productSpecs) ? ` • ${getSpecsLabel(item.productSpecs)}` : ""}
-                          </div>
-                        </div>
-
-                        {/* Tồn kho (Model) */}
-                        <div className="col-span-12 md:col-span-1 mt-1 md:mt-0 text-left md:text-center text-[13px] font-bold text-slate-700 whitespace-nowrap">
-                          <span className="inline md:hidden text-slate-400 font-semibold text-[11px] mr-1 uppercase">Tồn kho:</span>
-                          {stockQty} máy
-                        </div>
-
-                        {/* Giá vốn */}
-                        <div className="col-span-12 md:col-span-2 mt-1 md:mt-0 text-left md:text-right text-[13px] font-bold text-slate-700 tabular-nums whitespace-nowrap leading-tight">
-                          <span className="inline md:hidden text-slate-400 font-semibold text-[11px] mr-1 uppercase">Giá vốn:</span>
-                          <div>{formatCurrency(rowDongVon)}</div>
-                          {stockQty > 1 && (
-                            <div className="text-[10px] text-slate-400 font-semibold normal-case">
-                              (TB: {formatCurrency(avgCost)})
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Ngày nhập */}
-                        <div className="col-span-12 md:col-span-2 mt-1 md:mt-0 text-left md:text-center text-[12px] text-slate-500 font-medium whitespace-nowrap">
-                          <span className="inline md:hidden text-slate-400 font-semibold text-[11px] mr-1 uppercase">Ngày nhập:</span>
-                          {formatToDDMMYYYY(item.stockedDate)}
-                        </div>
-
-                        {/* Thời gian tồn */}
-                        <div className="col-span-12 md:col-span-2 mt-1.5 md:mt-0 text-left md:text-right">
-                          <span className="inline md:hidden text-slate-400 font-semibold text-[11px] mr-1 uppercase">Thời gian:</span>
-                          <span className="text-[13px] font-bold text-[#d12229] tabular-nums whitespace-nowrap">
-                            Tồn {item.diffDays} ngày
+                        <div className="rounded-[20px] border border-white/60 bg-white/20 p-3 flex flex-col justify-between shadow-[inset_0_1px_1px_rgba(255,255,255,0.6)]">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                            Vốn Phụ Kiện ({capitalData?.accessoryCapital?.count || 0} món)
+                          </span>
+                          <span className="text-[16px] font-black text-[#ff8000] tabular-nums mt-1.5">
+                            {formatCurrency(capitalData?.accessoryCapital?.totalCost || 0)}
                           </span>
                         </div>
                       </div>
-                    );
-                  })}
 
-                  {/* "Xem thêm" pagination button */}
-                  {agedItems.length > visibleAgedCount && (
-                    <button
-                      onClick={() => setVisibleAgedCount(prev => prev + 20)}
-                      className="w-full py-2.5 mt-2 rounded-[16px] border border-white/60 bg-white/30 backdrop-blur-md text-[13px] font-semibold text-[#0066cc] hover:bg-white/50 transition-all duration-200 cursor-pointer active:scale-[0.98]"
-                    >
-                      Xem thêm ({agedItems.length - visibleAgedCount} còn lại)
-                    </button>
-                  )}
+                      {/* Machine Category breakdown */}
+                      <div className="space-y-2.5">
+                        <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-200/30 pb-1">
+                          Cơ cấu vốn theo Danh mục máy lẻ
+                        </div>
+                        {capitalData?.machineCategoryStats?.length > 0 ? (
+                          <div className="space-y-3">
+                            {capitalData.machineCategoryStats.slice(0, 5).map((cat: any) => {
+                              const pct = Math.round(
+                                ((cat.totalCost || 0) / (capitalData.machineCapital?.totalCost || 1)) * 100
+                              );
+                              return (
+                                <div key={cat.categoryId} className="space-y-1">
+                                  <div className="flex justify-between text-[12.5px] font-medium text-slate-700">
+                                    <span className="truncate max-w-[200px]" title={`${cat.categoryName} (${cat.count} máy)`}>
+                                      {cat.categoryName} <span className="text-[11px] text-slate-400">({cat.count} máy)</span>
+                                    </span>
+                                    <span className="tabular-nums font-bold text-slate-800">
+                                      {formatCurrency(cat.totalCost)} <span className="text-[10px] text-slate-400 font-semibold ml-0.5">({pct}%)</span>
+                                    </span>
+                                  </div>
+                                  <div className="h-2 w-full bg-slate-200/50 rounded-full overflow-hidden border border-white/40">
+                                    <div
+                                      className="h-full bg-gradient-to-r from-sky-400 to-sky-500 rounded-full transition-all duration-500"
+                                      style={{ width: `${Math.max(1, pct)}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="text-[12px] text-slate-400 italic text-center py-2">
+                            Không có máy lẻ nào trong kho.
+                          </div>
+                        )}
+                      </div>
 
-                  {agedItems.length === 0 && (
-                    <div className="flex flex-col items-center justify-center py-6 text-center">
-                      <div className="text-[14px] font-bold text-slate-800">Kho hàng an toàn</div>
-                      <div className="text-[12px] text-slate-500 mt-1">
-                        Không có sản phẩm nào tồn kho vượt quá 45 ngày.
+                      {/* Accessory breakdown */}
+                      <div className="space-y-2.5 pt-1">
+                        <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-200/30 pb-1">
+                          Cơ cấu vốn theo Loại phụ kiện
+                        </div>
+                        {capitalData?.accessoryCatalogStats?.length > 0 ? (
+                          <div className="space-y-3">
+                            {capitalData.accessoryCatalogStats.slice(0, 5).map((item: any) => {
+                              const pct = Math.round(
+                                ((item.totalCost || 0) / (capitalData.accessoryCapital?.totalCost || 1)) * 100
+                              );
+                              return (
+                                <div key={item.catalogId} className="space-y-1">
+                                  <div className="flex justify-between text-[12.5px] font-medium text-slate-700">
+                                    <span className="truncate max-w-[200px]" title={`${item.catalogName} (${item.count} món)`}>
+                                      {item.catalogName} <span className="text-[11px] text-slate-400">({item.count} món)</span>
+                                    </span>
+                                    <span className="tabular-nums font-bold text-slate-800">
+                                      {formatCurrency(item.totalCost)} <span className="text-[10px] text-slate-400 font-semibold ml-0.5">({pct}%)</span>
+                                    </span>
+                                  </div>
+                                  <div className="h-2 w-full bg-slate-200/50 rounded-full overflow-hidden border border-white/40">
+                                    <div
+                                      className="h-full bg-gradient-to-r from-orange-400 to-orange-500 rounded-full transition-all duration-500"
+                                      style={{ width: `${Math.max(1, pct)}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="text-[12px] text-slate-400 italic text-center py-2">
+                            Không có phụ kiện nào trong kho.
+                          </div>
+                        )}
                       </div>
                     </div>
-                  )}
-                </div>
-              </KinhPanel>
-              )}
+                  </KinhPanel>
+                )}
+
+                {/* Aging Inventory Alert Card — Progressive: own skeleton */}
+                {isInventoryLoading ? (
+                  <InventorySkeleton />
+                ) : (
+                  <KinhPanel className="p-5 bg-white/35 backdrop-blur-xl flex flex-col h-[480px]">
+                    <div className="flex items-center justify-between border-b border-slate-200/60 pb-3 mb-4 shrink-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-[16px] font-bold text-[#d12229]">
+                          Cảnh báo tồn kho quá hạn
+                        </h3>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {agedItems.length > 0 ? (
+                          <div className="text-[13px] font-medium text-slate-500 flex items-center gap-2.5 select-none">
+                            <span>Đọng vốn: <span className="font-semibold text-slate-800 tabular-nums">{formatCurrency(tongVonDong)}</span></span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />
+                            <span>Tổng số: <span className="font-semibold text-slate-800">{agedItems.length} máy</span></span>
+                          </div>
+                        ) : (
+                          <span className="text-[12px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 px-2.5 py-0.5 rounded-full">
+                            Kho an toàn
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="overflow-y-auto flex-1 pr-1 space-y-2 scrollbar-thin">
+                      {agedItems.length > 0 && (
+                        <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-1.5 text-[11px] font-bold text-slate-400 border-b border-slate-200/30 mb-2 uppercase tracking-wider">
+                          <div className="col-span-1 text-center">STT</div>
+                          <div className="col-span-5">Sản phẩm</div>
+                          <div className="col-span-2 text-center">Tồn kho</div>
+                          <div className="col-span-2 text-right">Giá vốn</div>
+                          <div className="col-span-2 text-right">Thời gian</div>
+                        </div>
+                      )}
+
+                      {visibleAgedItems.map((item: any, index: number) => {
+                        const stockQty = item.stockQty;
+                        const avgCost = item.avgCost;
+                        const rowDongVon = item.rowDongVon;
+                        return (
+                          <div
+                            key={item.id}
+                            className="rounded-[20px] border border-white/60 bg-white/20 backdrop-blur-md p-3.5 flex flex-col md:grid md:grid-cols-12 md:gap-4 md:items-center shadow-[inset_0_1px_1px_rgba(255,255,255,0.6)] hover:bg-white/35 transition-colors duration-200"
+                          >
+                            {/* STT */}
+                            <div className="hidden md:block col-span-1 text-center text-[12px] font-bold text-slate-400">
+                              {index + 1}
+                            </div>
+
+                            {/* Tên & cấu hình */}
+                            <div className="col-span-12 md:col-span-5 space-y-0.5">
+                              <div className="text-[13px] font-semibold text-slate-800 truncate" title={item.productName}>
+                                {item.productName}
+                              </div>
+                              <div className="text-[10px] text-slate-400 font-semibold truncate" title={`${item.brandName} • ${item.categoryName} ${getSpecsLabel(item.productSpecs) ? ` • ${getSpecsLabel(item.productSpecs)}` : ""}`}>
+                                {item.brandName || "TechShop"} • {item.categoryName || "Thiết bị"} {getSpecsLabel(item.productSpecs) ? ` • ${getSpecsLabel(item.productSpecs)}` : ""}
+                              </div>
+                            </div>
+
+                            {/* Tồn kho (Model) */}
+                            <div className="col-span-12 md:col-span-2 mt-1 md:mt-0 text-left md:text-center text-[12.5px] font-bold text-slate-700 whitespace-nowrap">
+                              <span className="inline md:hidden text-slate-400 font-semibold text-[10px] mr-1 uppercase">Tồn kho:</span>
+                              {stockQty} máy
+                            </div>
+
+                            {/* Giá vốn */}
+                            <div className="col-span-12 md:col-span-2 mt-1 md:mt-0 text-left md:text-right text-[12.5px] font-bold text-slate-700 tabular-nums whitespace-nowrap leading-tight">
+                              <span className="inline md:hidden text-slate-400 font-semibold text-[10px] mr-1 uppercase">Giá vốn:</span>
+                              <div>{formatCurrency(rowDongVon)}</div>
+                            </div>
+
+                            {/* Thời gian tồn */}
+                            <div className="col-span-12 md:col-span-2 mt-1.5 md:mt-0 text-left md:text-right">
+                              <span className="inline md:hidden text-slate-400 font-semibold text-[10px] mr-1 uppercase">Thời gian:</span>
+                              <span className="text-[12.5px] font-bold text-[#d12229] tabular-nums whitespace-nowrap">
+                                Tồn {item.diffDays} ngày
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {/* "Xem thêm" pagination button */}
+                      {agedItems.length > visibleAgedCount && (
+                        <button
+                          onClick={() => setVisibleAgedCount(prev => prev + 20)}
+                          className="w-full py-2 mt-2 rounded-[16px] border border-white/60 bg-white/30 backdrop-blur-md text-[12px] font-semibold text-[#0066cc] hover:bg-white/50 transition-all duration-200 cursor-pointer active:scale-[0.98]"
+                        >
+                          Xem thêm ({agedItems.length - visibleAgedCount} còn lại)
+                        </button>
+                      )}
+
+                      {agedItems.length === 0 && (
+                        <div className="flex flex-col items-center justify-center py-10 text-center">
+                          <div className="text-[14px] font-bold text-slate-800">Kho hàng an toàn</div>
+                          <div className="text-[12px] text-slate-500 mt-1">
+                            Không có sản phẩm nào tồn kho vượt quá 45 ngày.
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </KinhPanel>
+                )}
+              </div>
             </div>
 
         </div>

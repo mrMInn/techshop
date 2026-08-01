@@ -1,7 +1,6 @@
 "use server";
 
 import { db, recalculateRunningBalances } from "@/lib/db";
-import { logAndNotify } from "@/lib/db/audit";
 import { after } from "next/server";
 import { invalidateDashboardCache } from "@/lib/cache";
 import { 
@@ -476,13 +475,9 @@ export async function createReturn(data: {
       await recalculateOrderTotals(tx, data.orderId);
       await recalculateCustomerStats(tx, data.customerId);
 
-      // 8. Tính toán lại số dư lũy kế sổ quỹ
       if (needRecalc) {
         await recalculateRunningBalances(tx);
       }
-
-      // Ghi audit log
-      await logAndNotify("CREATE", "returns", newReturn.id, null, newReturn, tx);
 
       const result = { success: true, message: "Tạo phiếu Đổi/Trả thành công. Đã cập nhật kho & đơn hàng gốc.", return: newReturn };
       after(() => {
@@ -692,9 +687,6 @@ export async function deleteReturnAction(id: string) {
 
       // 8. Recalculate Cashbook balances
       await recalculateRunningBalances(tx);
-
-      // Ghi audit log
-      await logAndNotify("DELETE", "returns", id, returnRow[0], null, tx);
 
       const result = { 
         success: true, 

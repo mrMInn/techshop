@@ -1,7 +1,6 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { logAndNotify } from "@/lib/db/audit";
 import {
   customers,
   leadSources,
@@ -230,8 +229,6 @@ export async function createCustomerFullAction(data: {
       })
       .returning();
 
-    await logAndNotify("CREATE", "customers", newCustomer.id, null, newCustomer);
-
     return { success: true, message: "Thêm khách hàng thành công", customer: newCustomer };
   } catch (error: any) {
     console.error("Lỗi tạo khách hàng:", error);
@@ -279,8 +276,6 @@ export async function updateCustomerAction(
       .where(eq(customers.id, id))
       .returning();
 
-    await logAndNotify("UPDATE", "customers", id, existing[0], updatedCustomer);
-
     return { success: true, message: "Cập nhật khách hàng thành công", customer: updatedCustomer };
   } catch (error: any) {
     console.error("Lỗi cập nhật khách hàng:", error);
@@ -312,8 +307,6 @@ export async function deleteCustomerAction(id: string) {
 
     const existing = await db.select().from(customers).where(eq(customers.id, id)).limit(1);
     await db.delete(customers).where(eq(customers.id, id));
-    
-    await logAndNotify("DELETE", "customers", id, existing[0], null);
 
     return { success: true, message: "Xóa khách hàng thành công" };
   } catch (error: any) {

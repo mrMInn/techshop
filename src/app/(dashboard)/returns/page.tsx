@@ -211,7 +211,7 @@ export default function ReturnsPage() {
                     <td className={`px-6 py-5 text-[#7a7a7a] text-[13px] capitalize ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
                       {getReturnReasonLabel(r.reason)}
                     </td>
-                    <td className={`px-6 py-5 text-right font-bold ${r.refundAmount > 0 ? "text-[#ff3b30]" : "text-[#7a7a7a]"} ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                    <td className={`px-6 py-5 text-right font-bold ${Number(r.refundAmount || 0) > 0 ? "text-[#ff3b30]" : "text-[#7a7a7a]"} ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
                       {formatPrice(r.refundAmount || 0)}
                     </td>
                     <td 

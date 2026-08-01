@@ -29,7 +29,6 @@ async function generateBulkSystemTestData() {
     
     // Cấp 1: Các bảng nhật ký vết và audit logs thô độc lập
     try { await db.delete(schema.warrantyLogs); } catch {}
-    try { await db.delete(schema.auditLogs); } catch {}
     try { await db.delete(schema.telegramNotificationLogs); } catch {}
     try { await db.delete(schema.telegramNotificationEvents); } catch {}
     try { await db.delete(schema.quotationItems); } catch {}

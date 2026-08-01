@@ -1,7 +1,6 @@
 "use server";
 
 import { db, recalculateRunningBalances } from "@/lib/db";
-import { logAndNotify } from "@/lib/db/audit";
 import { after } from "next/server";
 import { 
   warrantyClaims, 
@@ -269,9 +268,6 @@ export async function createWarrantyClaim(data: {
         newStatus: "pending",
         createdBy: createdById,
       });
-
-      // 7. Ghi audit log
-      await logAndNotify("CREATE", "warranty_claims", newClaim.id, null, newClaim, tx);
 
       // 8. Lấy thêm tên sản phẩm và tên khách hàng để gửi Telegram
       const customer = await tx.select().from(customers).where(eq(customers.id, data.customerId)).limit(1);
@@ -548,10 +544,6 @@ export async function updateWarrantyStatus(data: {
         }
       }
 
-      // Ghi audit log
-      const updatedClaim = await tx.select().from(warrantyClaims).where(eq(warrantyClaims.id, data.claimId)).limit(1);
-      await logAndNotify("UPDATE", "warranty_claims", data.claimId, claim[0], updatedClaim[0], tx);
-
       const result = { success: true, message: "Cập nhật trạng thái thành công" };
       after(() => {
         invalidateDashboardCache();
@@ -602,9 +594,6 @@ export async function deleteWarrantyClaim(claimId: string) {
 
       // 6. Tính toán lại số dư sổ quỹ
       await recalculateRunningBalances(tx);
-
-      // Ghi audit log
-      await logAndNotify("DELETE", "warranty_claims", claimId, claim[0], null, tx);
 
       const result = { success: true, message: "Xóa phiếu bảo hành thành công. Đã khôi phục trạng thái máy." };
       after(() => {

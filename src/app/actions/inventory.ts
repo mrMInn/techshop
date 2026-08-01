@@ -357,6 +357,108 @@ export async function getAgedInventoryItems(daysThreshold = 45) {
 
 
 /**
+ * Lấy báo cáo tổng hợp vốn tồn kho (Tổng vốn máy lẻ + Phụ kiện + Cơ cấu danh mục)
+ */
+export async function getInventoryCapitalSummary() {
+  const cacheKey = "inventory_capital_summary";
+  const cached = serverCache.get(cacheKey);
+  if (cached) {
+    console.log("CACHE HIT: getInventoryCapitalSummary");
+    return cached;
+  }
+
+  try {
+    // 1. Tổng vốn máy lẻ
+    const [machineStats] = await db
+      .select({
+        count: sql<number>`cast(count(${inventoryItems.id}) as integer)`,
+        totalCost: sql<number>`cast(coalesce(sum(${inventoryItems.costPrice}), 0) as double precision)`,
+      })
+      .from(inventoryItems)
+      .where(eq(inventoryItems.status, "in_stock"));
+
+    // 2. Tổng vốn phụ kiện
+    const [accessoryStats] = await db
+      .select({
+        count: sql<number>`cast(count(${accessoryItems.id}) as integer)`,
+        totalCost: sql<number>`cast(coalesce(sum(${accessoryItems.unitCost}), 0) as double precision)`,
+      })
+      .from(accessoryItems)
+      .where(eq(accessoryItems.status, "in_stock"));
+
+    // 3. Cơ cấu vốn máy lẻ theo danh mục
+    const machineCategoryStats = await db
+      .select({
+        categoryId: products.categoryId,
+        categoryName: categories.name,
+        count: sql<number>`cast(count(${inventoryItems.id}) as integer)`,
+        totalCost: sql<number>`cast(coalesce(sum(${inventoryItems.costPrice}), 0) as double precision)`,
+      })
+      .from(inventoryItems)
+      .innerJoin(products, eq(inventoryItems.productId, products.id))
+      .innerJoin(categories, eq(products.categoryId, categories.id))
+      .where(eq(inventoryItems.status, "in_stock"))
+      .groupBy(products.categoryId, categories.name)
+      .orderBy(desc(sql`sum(${inventoryItems.costPrice})`));
+
+    // 4. Cơ cấu vốn phụ kiện theo loại phụ kiện
+    const accessoryCatalogStats = await db
+      .select({
+        catalogId: accessoryItems.accessoryCatalogId,
+        catalogName: accessoryCatalog.name,
+        count: sql<number>`cast(count(${accessoryItems.id}) as integer)`,
+        totalCost: sql<number>`cast(coalesce(sum(${accessoryItems.unitCost}), 0) as double precision)`,
+      })
+      .from(accessoryItems)
+      .innerJoin(accessoryCatalog, eq(accessoryItems.accessoryCatalogId, accessoryCatalog.id))
+      .where(eq(accessoryItems.status, "in_stock"))
+      .groupBy(accessoryItems.accessoryCatalogId, accessoryCatalog.name)
+      .orderBy(desc(sql`sum(${accessoryItems.unitCost})`));
+
+    const totalMachineCapital = Number(machineStats?.totalCost || 0);
+    const totalAccessoryCapital = Number(accessoryStats?.totalCost || 0);
+    const totalCapital = totalMachineCapital + totalAccessoryCapital;
+
+    const result = {
+      totalCapital,
+      machineCapital: {
+        totalCost: totalMachineCapital,
+        count: Number(machineStats?.count || 0),
+      },
+      accessoryCapital: {
+        totalCost: totalAccessoryCapital,
+        count: Number(accessoryStats?.count || 0),
+      },
+      machineCategoryStats: machineCategoryStats.map(c => ({
+        categoryId: c.categoryId,
+        categoryName: c.categoryName,
+        count: Number(c.count || 0),
+        totalCost: Number(c.totalCost || 0),
+      })),
+      accessoryCatalogStats: accessoryCatalogStats.map(a => ({
+        catalogId: a.catalogId,
+        catalogName: a.catalogName,
+        count: Number(a.count || 0),
+        totalCost: Number(a.totalCost || 0),
+      })),
+    };
+
+    serverCache.set(cacheKey, result, 300); // 5 minutes cache
+    return result;
+  } catch (error) {
+    console.error("Lỗi lấy báo cáo vốn tồn kho:", error);
+    return {
+      totalCapital: 0,
+      machineCapital: { totalCost: 0, count: 0 },
+      accessoryCapital: { totalCost: 0, count: 0 },
+      machineCategoryStats: [],
+      accessoryCatalogStats: [],
+    };
+  }
+}
+
+
+/**
  * Lấy danh sách thiết bị gom nhóm theo Model Sản phẩm (có phân trang và bộ lọc phía máy chủ)
  */
 export async function getInventoryGroups(filters?: {

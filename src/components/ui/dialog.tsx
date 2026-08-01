@@ -8,9 +8,10 @@ interface DialogProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
-  description?: string;
+  description?: React.ReactNode;
   children: React.ReactNode;
   size?: "sm" | "md" | "lg" | "xl" | "2xl" | "3xl" | "4xl" | "5xl" | "6xl" | "7xl";
+  headerActions?: React.ReactNode;
 }
 
 const sizeMap = {
@@ -32,7 +33,8 @@ export function Dialog({
   title, 
   description, 
   children,
-  size = "lg"
+  size = "lg",
+  headerActions
 }: DialogProps) {
   const [mounted, setMounted] = useState(false);
 
@@ -84,15 +86,20 @@ export function Dialog({
           <div>
             <h2 className="text-[21px] font-semibold text-[#1d1d1f] tracking-tight leading-tight">{title}</h2>
             {description && (
-              <p className="text-[14px] text-[#7a7a7a] mt-1 font-normal leading-tight">{description}</p>
+              <div className="text-[14px] text-[#7a7a7a] mt-1.5 font-normal leading-none flex items-center gap-2 flex-wrap">
+                {description}
+              </div>
             )}
           </div>
-          <button 
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-[#f5f5f7] hover:bg-[#e0e0e0] transition-colors text-[#7a7a7a]"
-          >
-            <X size={16} />
-          </button>
+          <div className="flex items-center gap-3">
+            {headerActions}
+            <button 
+              onClick={onClose}
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-[#f5f5f7] hover:bg-[#e0e0e0] transition-colors text-[#7a7a7a]"
+            >
+              <X size={16} />
+            </button>
+          </div>
         </div>
         
         <div className="px-6 py-6 overflow-y-auto">

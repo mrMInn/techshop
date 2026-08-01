@@ -58,7 +58,6 @@ async function main() {
   await db.delete(schema.telegramNotificationLogs);
   await db.delete(schema.telegramNotificationEvents);
   await db.delete(schema.telegramSettings);
-  await db.delete(schema.auditLogs);
   await db.delete(schema.accountingPeriods);
   await db.delete(schema.cashBookEntries);
   await db.delete(schema.expenses);

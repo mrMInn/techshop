@@ -587,7 +587,7 @@ function DashboardChartInner({ chartData, monthlyChartData, isLoading, onMonthCh
     if (activeMetric === "revenue") {
       if (activeTimeframe === "yearly") {
         return (
-          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+          <ResponsiveContainer width="100%" height={280}>
             <ComposedChart data={duLieuChartHienTai} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="date" stroke="#94a3b8" tickLine={false} axisLine={false} fontSize={12} fontWeight={600} />
@@ -599,7 +599,7 @@ function DashboardChartInner({ chartData, monthlyChartData, isLoading, onMonthCh
         );
       } else {
         return (
-          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+          <ResponsiveContainer width="100%" height={280}>
             <ComposedChart data={duLieuChartHienTai} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
@@ -620,7 +620,7 @@ function DashboardChartInner({ chartData, monthlyChartData, isLoading, onMonthCh
 
     if (activeMetric === "expense") {
       return (
-        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+        <ResponsiveContainer width="100%" height={280}>
           <ComposedChart data={duLieuChartHienTai} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
             <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
             <XAxis dataKey="date" stroke="#94a3b8" tickLine={false} axisLine={false} fontSize={12} fontWeight={600} />
@@ -635,7 +635,7 @@ function DashboardChartInner({ chartData, monthlyChartData, isLoading, onMonthCh
     if (activeMetric === "profit") {
       if (activeTimeframe === "yearly") {
         return (
-          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+          <ResponsiveContainer width="100%" height={280}>
             <ComposedChart data={duLieuChartHienTai} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="date" stroke="#94a3b8" tickLine={false} axisLine={false} fontSize={12} fontWeight={600} />
@@ -657,7 +657,7 @@ function DashboardChartInner({ chartData, monthlyChartData, isLoading, onMonthCh
         );
       } else {
         return (
-          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+          <ResponsiveContainer width="100%" height={280}>
             <ComposedChart data={duLieuChartHienTai} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="date" stroke="#94a3b8" tickLine={false} axisLine={false} fontSize={12} fontWeight={600} />

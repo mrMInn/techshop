@@ -31,7 +31,6 @@ import {
   telegramNotificationLogs,
   telegramNotificationEvents,
   telegramSettings,
-  auditLogs,
   countries,
   shippingCarriers,
 } from '../src/lib/db/schema'; 
@@ -46,8 +45,7 @@ async function main() {
     await db.transaction(async (tx) => {
       
       // Bước 1: Xóa logs & audit
-      console.log('🧹 Đang xóa Audit logs & Telegram logs...');
-      await tx.delete(auditLogs);
+      console.log('🧹 Đang xóa Telegram logs...');
       await tx.delete(telegramNotificationLogs);
       await tx.delete(telegramNotificationEvents);
       await tx.delete(telegramSettings);

@@ -485,110 +485,28 @@ export function OrderDetailDialog({ isOpen, onClose, orderId }: OrderDetailDialo
     printWindow.document.close();
   };
 
-  // Helper dịch phương thức thanh toán chi tiết cho timeline
-  const getPaymentItemMethodName = (method: string) => {
-    const maps: Record<string, string> = {
-      cash: "Tiền mặt",
-      bank_transfer: "Chuyển khoản",
-      card: "Quẹt thẻ",
-      momo: "Ví Momo",
-      vnpay: "Cổng VNPay",
-    };
-    return maps[method] || method;
-  };
-
-  // Xây dựng Timeline hoạt động tự động của đơn hàng
-  const timelineEvents: {
-    date: Date | string;
-    title: string;
-    description: string;
-    actor?: string;
-    icon: string;
-    status: 'done' | 'pending' | 'failed' | 'info';
-  }[] = [];
-
-  if (order) {
-    // 1. Tạo đơn hàng
-    timelineEvents.push({
-      date: order.createdAt,
-      title: "Tạo đơn hàng",
-      description: `Đơn hàng #${order.orderNumber} được lập thành công trên hệ thống (${order.saleChannel === 'online' ? 'Kênh Online' : 'Kênh Offline'}).`,
-      actor: order.soldByName,
-      icon: 'check',
-      status: 'done',
-    });
-
-    // 2. Các đợt thanh toán thực tế
-    if (paymentList && paymentList.length > 0) {
-      const sortedPayments = [...paymentList].sort((a, b) => new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime());
-      sortedPayments.forEach((p, idx) => {
-        timelineEvents.push({
-          date: p.paymentDate,
-          title: `Thanh toán đợt ${idx + 1}`,
-          description: `Thu tiền thành công: +${formatPrice(p.amount)} qua ${getPaymentItemMethodName(p.paymentMethod)}.${p.referenceNumber ? ` Mã GD: ${p.referenceNumber}` : ""}${p.notes ? ` (Ghi chú: ${p.notes})` : ""}`,
-          actor: p.createdByName || "Hệ thống",
-          icon: 'payment',
-          status: 'done',
-        });
-      });
-    }
-
-    // 3. Thông tin gửi hàng vận chuyển
-    if (order.shippingCarrier || order.trackingNumber) {
-      timelineEvents.push({
-        date: order.updatedAt,
-        title: "Thông tin vận chuyển",
-        description: `Cập nhật thông tin giao hàng qua đối tác ${order.shippingCarrier || "vận chuyển"}.${order.trackingNumber ? ` Mã vận đơn: ${order.trackingNumber}` : ""}`,
-        icon: 'shipping',
-        status: order.status === 'cancelled' ? 'failed' : 'info',
-      });
-    }
-
-    // 4. Trạng thái cuối của đơn (Hoàn thành / Hủy)
-    if (order.status === 'completed') {
-      timelineEvents.push({
-        date: order.updatedAt,
-        title: "Đơn hàng hoàn tất",
-        description: "Đơn bán lẻ đã được giao dịch thành công và đóng hồ sơ đơn hàng.",
-        icon: 'complete',
-        status: 'done',
-      });
-    } else if (order.status === 'cancelled') {
-      timelineEvents.push({
-        date: order.updatedAt,
-        title: "Đơn hàng đã hủy",
-        description: "Đơn hàng bị hủy bỏ giao dịch trên hệ thống.",
-        icon: 'cancel',
-        status: 'failed',
-      });
-    }
-
-    // 5. Đổi trả / Hoàn tiền
-    if (returnsList && returnsList.length > 0) {
-      returnsList.forEach((r: any) => {
-        timelineEvents.push({
-          date: r.createdAt,
-          title: r.type === 'exchange' ? "Đổi trả hàng" : "Hoàn tiền trả hàng",
-          description: `Thực hiện đổi trả đơn hàng (Số phiếu: ${r.returnNumber}). Lý do: ${
-            ({ defective: "Lỗi kỹ thuật", wrong_item: "Giao sai hàng", changed_mind: "Đổi ý", upgrade: "Nâng cấp", downgrade: "Hạ cấp", other: "Khác" } as Record<string, string>)[r.reason] || r.reason
-          }.${Number(r.refundAmount) > 0 ? ` Số tiền hoàn lại khách: ${formatPrice(r.refundAmount)}.` : ""}`,
-          actor: r.processedByName || "Hệ thống",
-          icon: 'return',
-          status: 'info',
-        });
-      });
-    }
-  }
-
-  // Sắp xếp timeline theo thứ tự thời gian tăng dần (cũ ở trên, mới ở dưới)
-  const sortedTimeline = timelineEvents.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   return (
     <Dialog
       isOpen={isOpen}
       onClose={onClose}
       title="Chi tiết đơn hàng"
-      description={order ? `Mã đơn: ${order.orderNumber} • Ngày lập: ${formatDate(order.createdAt)}` : "Đang truy xuất thông tin..."}
+      description={
+        order ? (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span>Mã đơn: <span className="font-semibold text-[#1d1d1f]">{order.orderNumber}</span></span>
+            <span className="text-[#e0e0e0]">•</span>
+            <span>Ngày lập: <span className="font-semibold text-[#1d1d1f]">{formatDate(order.createdAt)}</span></span>
+            <span className="text-[#e0e0e0]">•</span>
+            <span className="flex items-center gap-1.5 ml-1 select-none">
+              {renderDetailOrderStatus(order.status)}
+              {renderDetailPaymentStatus(order.paymentStatus)}
+            </span>
+          </div>
+        ) : (
+          "Đang truy xuất thông tin..."
+        )
+      }
       size="6xl"
     >
       <div className="space-y-5">
@@ -625,23 +543,11 @@ export function OrderDetailDialog({ isOpen, onClose, orderId }: OrderDetailDialo
             </div>
 
             {/* Metadata Section: Apple Minimalist 3-column grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               
               {/* COLUMN 1: Trạng thái & Khách hàng */}
               <div className="flex flex-col gap-4 h-full">
                 
-                {/* 1.1 Status Badges Card */}
-                <div className="bg-[#f5f5f7] rounded-[24px] p-6 space-y-4 flex flex-col justify-center">
-                  <div className="flex items-center justify-between text-[14px]">
-                    <span className="text-[#86868b] font-medium">Trạng thái đơn:</span>
-                    {renderDetailOrderStatus(order.status)}
-                  </div>
-                  <div className="border-t border-[#e0e0e0]/50"></div>
-                  <div className="flex items-center justify-between text-[14px]">
-                    <span className="text-[#86868b] font-medium">Thanh toán:</span>
-                    {renderDetailPaymentStatus(order.paymentStatus)}
-                  </div>
-                </div>
 
                 {/* 1.2 Customer & Transaction Card */}
                 <div className="bg-[#f5f5f7] rounded-[24px] p-6 space-y-4 flex-1 flex flex-col justify-between">
@@ -816,52 +722,6 @@ export function OrderDetailDialog({ isOpen, onClose, orderId }: OrderDetailDialo
 
               </div>
 
-              {/* COLUMN 3: Lịch sử hoạt động (Timeline) */}
-              <div className="bg-[#f5f5f7] rounded-[24px] p-6 space-y-4 flex flex-col h-full overflow-hidden">
-                <div className="flex items-center gap-2 pb-2 border-b border-[#e0e0e0]/50">
-                  <span className="text-[11px] font-bold text-[#86868b] uppercase tracking-wider">Lịch sử hoạt động</span>
-                </div>
-                
-                <div className="flex-1 overflow-y-auto pr-1 scrollbar-thin space-y-4 max-h-[380px]">
-                  {sortedTimeline.map((evt, idx) => {
-                    let iconBg = "bg-gray-200 text-gray-600";
-                    if (evt.status === 'done') iconBg = "bg-emerald-100 text-emerald-700";
-                    else if (evt.status === 'failed') iconBg = "bg-red-100 text-red-700";
-                    else if (evt.status === 'info') iconBg = "bg-blue-100 text-blue-700";
-
-                    return (
-                      <div key={idx} className="flex gap-3 relative group">
-                        {idx < sortedTimeline.length - 1 && (
-                          <span className="absolute left-[11px] top-[24px] bottom-[-24px] w-[1.5px] bg-[#e0e0e0]" />
-                        )}
-                        
-                        <div className={`w-[22px] h-[22px] rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold ${iconBg}`}>
-                          {evt.icon === 'check' && "✓"}
-                          {evt.icon === 'payment' && "đ"}
-                          {evt.icon === 'shipping' && "✈"}
-                          {evt.icon === 'complete' && "★"}
-                          {evt.icon === 'cancel' && "✕"}
-                          {evt.icon === 'return' && "↩"}
-                        </div>
-
-                        <div className="space-y-0.5 min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-[13px] font-bold text-[#1d1d1f] truncate">{evt.title}</span>
-                            <span className="text-[10px] text-[#86868b] whitespace-nowrap">{formatDateTime(evt.date).split(" ")[1] || formatDateTime(evt.date)}</span>
-                          </div>
-                          <p className="text-[12px] text-[#515154] leading-relaxed break-words">{evt.description}</p>
-                          {evt.actor && (
-                            <span className="inline-block text-[10px] text-[#86868b] font-medium mt-0.5">
-                              Người thực hiện: <span className="text-[#1d1d1f] font-semibold">{evt.actor}</span>
-                            </span>
-                          )}
-                          <span className="block text-[9px] text-[#86868b] leading-none pt-0.5">{formatDateTime(evt.date).split(" ")[0]}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
 
             </div>
 

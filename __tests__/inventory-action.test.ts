@@ -17,7 +17,8 @@ import {
   sendToRepairAction,
   completeRepairAction,
   supplierRefundAction,
-  supplierReturnWriteOffAction
+  supplierReturnWriteOffAction,
+  getInventoryCapitalSummary
 } from '@/app/actions/inventory';
 import { db } from '@/lib/db';
 
@@ -903,6 +904,51 @@ describe('Server Actions - Quản lý Kho hàng (Inventory Actions)', () => {
       vi.mocked(db.transaction).mockRejectedValueOnce(new Error('Writeoff failed'));
       const res = await supplierReturnWriteOffAction('inv-1');
       expect(res.success).toBe(false);
+    });
+  });
+
+  describe('getInventoryCapitalSummary', () => {
+    it('thành công tính toán vốn tồn kho và cơ cấu', async () => {
+      let queryIndex = 0;
+      mockDb.then.mockImplementation((onfulfilled) => {
+        queryIndex++;
+        if (queryIndex === 1) {
+          // Machine Stats
+          return Promise.resolve([{ count: 10, totalCost: 150000000 }]).then(onfulfilled);
+        } else if (queryIndex === 2) {
+          // Accessory Stats
+          return Promise.resolve([{ count: 5, totalCost: 10000000 }]).then(onfulfilled);
+        } else if (queryIndex === 3) {
+          // Category Stats
+          return Promise.resolve([
+            { categoryId: 'cat-1', categoryName: 'Laptop', count: 8, totalCost: 120000000 },
+            { categoryId: 'cat-2', categoryName: 'PC', count: 2, totalCost: 30000000 }
+          ]).then(onfulfilled);
+        } else {
+          // Accessory Catalog Stats
+          return Promise.resolve([
+            { catalogId: 'acc-1', catalogName: 'RAM', count: 5, totalCost: 10000000 }
+          ]).then(onfulfilled);
+        }
+      });
+
+      const res = await getInventoryCapitalSummary();
+      expect(res.totalCapital).toBe(160000000);
+      expect(res.machineCapital.totalCost).toBe(150000000);
+      expect(res.machineCapital.count).toBe(10);
+      expect(res.accessoryCapital.totalCost).toBe(10000000);
+      expect(res.accessoryCapital.count).toBe(5);
+      expect(res.machineCategoryStats.length).toBe(2);
+      expect(res.accessoryCatalogStats.length).toBe(1);
+    });
+
+    it('catch block', async () => {
+      mockDb.then.mockImplementationOnce((resolve: any, reject: any) => {
+        return Promise.reject(new Error('DB Query failed')).catch(reject);
+      });
+      const res = await getInventoryCapitalSummary();
+      expect(res.totalCapital).toBe(0);
+      expect(res.machineCapital.totalCost).toBe(0);
     });
   });
 });
