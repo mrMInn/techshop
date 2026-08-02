@@ -123,6 +123,11 @@ const categoryMeta: Record<string, { color: string; bg: string }> = {
 export default function ExpensesPage() {
   const queryClient = useQueryClient();
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Trạng thái bộ lọc (đồng bộ với sổ quỹ)
   const [selectedCategory, setSelectedCategory] = useState("all");
 
@@ -635,8 +640,17 @@ export default function ExpensesPage() {
     };
   }, [filteredExpenses]);
  
+  if (!mounted) {
+    return (
+      <div className="p-16 flex flex-col items-center justify-center text-[#7a7a7a]">
+        <Loader2 className="animate-spin mb-4 text-[#0066cc]" size={24} />
+        <p className="text-[15px] font-medium">Đang tải chi phí vận hành...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="space-y-6">
       {/* Header - Flat Clean Apple Style */}
     
  

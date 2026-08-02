@@ -22,18 +22,18 @@ import {
 } from "@/components/ui/apple-icons";
 
 const getStatusBadge = (status: string) => {
-  const map: Record<string, { label: string }> = {
-    pending: { label: "Đã tiếp nhận" },
-    inspecting: { label: "Đang kiểm tra" },
-    waiting_parts: { label: "Chờ linh kiện" },
-    repairing: { label: "Đang sửa chữa" },
-    completed: { label: "Đã hoàn thành" },
-    rejected: { label: "Từ chối" },
-    replaced: { label: "Đổi máy mới" },
+  const map: Record<string, { label: string; textClass: string }> = {
+    pending: { label: "Đã tiếp nhận", textClass: "text-[#0066cc]" },
+    inspecting: { label: "Đang kiểm tra", textClass: "text-[#d97706]" },
+    waiting_parts: { label: "Chờ linh kiện", textClass: "text-[#7c3aed]" },
+    repairing: { label: "Đang sửa chữa", textClass: "text-[#b45309]" },
+    completed: { label: "Đã hoàn thành", textClass: "text-[#16a34a]" },
+    rejected: { label: "Từ chối", textClass: "text-[#dc2626]" },
+    replaced: { label: "Đổi máy mới", textClass: "text-[#4f46e5]" },
   };
-  const item = map[status] || { label: status };
+  const item = map[status] || { label: status, textClass: "text-[#7a7a7a]" };
   return (
-    <span className="text-[13.5px] font-semibold text-[#1d1d1f]">
+    <span className={`text-[13.5px] font-semibold ${item.textClass}`}>
       {item.label}
     </span>
   );
@@ -184,8 +184,17 @@ function WarrantyPageContent() {
   const processingCount = warranties?.filter(w => w.status === 'repairing' || w.status === 'inspecting' || w.status === 'waiting_parts').length || 0;
   const completedCount = warranties?.filter(w => w.status === 'completed' || w.status === 'replaced' || w.status === 'rejected').length || 0;
 
+  if (!mounted) {
+    return (
+      <div className="p-16 flex flex-col items-center justify-center text-[#7a7a7a]">
+        <RefreshCw className="animate-spin mb-4 text-[#0066cc]" size={24} />
+        <p className="text-[15px] font-medium">Đang tải trang bảo hành...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="space-y-6">
       {/* Header - Apple premium single-row layout */}
       <div className="pb-6 border-b border-[#e0e0e0]">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 w-full">
@@ -236,19 +245,25 @@ function WarrantyPageContent() {
 
       {/* Main Table */}
       <GlassCard className="p-0 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-separate border-spacing-0">
-            <thead>
+        {!mounted || isLoadingWarranties ? (
+          <div className="p-16 flex flex-col items-center justify-center text-[#7a7a7a]">
+            <RefreshCw className="animate-spin mb-4 text-[#0066cc]" size={24} />
+            <p className="text-[15px] font-medium">Đang truy xuất sổ bảo hành...</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-separate border-spacing-0">
+              <thead>
               <tr className="bg-[#f5f5f7]/50 text-[12px] font-semibold text-[#7a7a7a] uppercase tracking-wider whitespace-nowrap">
-                <th className="px-6 py-4 w-12 text-center border-b border-[#e0e0e0]">STT</th>
-                <th className="px-6 py-4 border-b border-[#e0e0e0]">Mã Phiếu</th>
-                <th className="px-6 py-4 border-b border-[#e0e0e0]">Sản Phẩm & Serial</th>
-                <th className="px-6 py-4 border-b border-[#e0e0e0]">Khách Hàng</th>
-                <th className="px-6 py-4 border-b border-[#e0e0e0]">Trạng Thái</th>
-                <th className="px-6 py-4 w-[160px] text-center border-b border-[#e0e0e0]">Tác vụ</th>
+                <th className="px-3 py-3 w-10 text-center border-b border-[#e0e0e0]">STT</th>
+                <th className="px-4 py-3 border-b border-[#e0e0e0]">Mã Phiếu</th>
+                <th className="px-4 py-3 border-b border-[#e0e0e0]">Sản Phẩm & Serial</th>
+                <th className="px-4 py-3 border-b border-[#e0e0e0]">Khách Hàng</th>
+                <th className="px-4 py-3 border-b border-[#e0e0e0]">Trạng Thái</th>
+                <th className="px-3 py-3 w-[160px] text-center border-b border-[#e0e0e0]">Tác vụ</th>
               </tr>
             </thead>
-            <tbody className="text-[14px] text-[#1d1d1f]">
+            <tbody className="text-[15px] text-[#1d1d1f]">
               {paginatedWarranties?.map((w, index) => {
                 const isLast = index === paginatedWarranties.length - 1;
                 return (
@@ -257,10 +272,10 @@ function WarrantyPageContent() {
                     className="group cursor-pointer"
                     onClick={() => setDetailClaimId(w.id)}
                   >
-                    <td className={`px-6 py-5 text-center font-semibold text-[#7a7a7a] ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                    <td className={`px-3 py-4 text-center font-semibold text-[#7a7a7a] ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
                       {(page - 1) * limit + index + 1}
                     </td>
-                    <td className={`px-6 py-5 font-semibold ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                    <td className={`px-4 py-4 font-semibold ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
                       <span className="text-[#0066cc] group-hover:underline font-semibold block">
                         {w.claimNumber}
                       </span>
@@ -268,20 +283,20 @@ function WarrantyPageContent() {
                         Ngày nhận: {formatToDDMMYYYY(w.receivedDate)}
                       </span>
                     </td>
-                    <td className={`px-6 py-5 ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
-                      <p className="font-semibold">{w.productName}</p>
-                      <span className="text-[12.5px] text-[#7a7a7a] block mt-0.5">{w.serialNumber}</span>
+                    <td className={`px-4 py-4 ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                      <p className="font-semibold text-[#0066cc]">{w.productName}</p>
+                      <span className="text-[12px] text-[#7a7a7a] block mt-0.5">SN: {w.serialNumber}</span>
                     </td>
-                    <td className={`px-6 py-5 ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
-                      <p className="font-semibold">{w.customerName}</p>
-                      <p className="text-[12px] text-[#7a7a7a]">{w.customerPhone}</p>
+                    <td className={`px-4 py-4 ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                      <p className="font-semibold text-[#0066cc]">{w.customerName}</p>
+                      <p className="text-[12px] text-[#5856d6] font-medium mt-0.5">{w.customerPhone || "Không có SĐT"}</p>
                     </td>
-                    <td className={`px-6 py-5 ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                    <td className={`px-4 py-4 ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
                       {getStatusBadge(w.status)}
                     </td>
                     
                     <td 
-                      className={`px-6 py-5 text-center whitespace-nowrap w-[160px] ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}
+                      className={`px-3 py-4 text-center whitespace-nowrap w-[160px] ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className="flex items-center justify-center gap-2.5">
@@ -315,6 +330,7 @@ function WarrantyPageContent() {
             </tbody>
           </table>
         </div>
+        )}
 
         {/* Bộ điều khiển phân trang */}
         {totalPages > 1 && (

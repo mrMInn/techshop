@@ -1735,9 +1735,7 @@ export async function getInventoryItemLifecycle(serialNumber: string) {
         date: new Date(r.createdAt).toISOString(),
         title: `Phiếu đổi/trả phát sinh (${typeLabel})`,
         description: `Khách hàng ${r.customerName} yêu cầu ${typeLabel.toLowerCase()} máy. Tình trạng lúc nhận lại: ${
-          r.conditionOnReturn === 'like_new' ? 'Mới 100%' : 
-          (r.conditionOnReturn === 'good' ? 'Hoạt động tốt / Xước nhẹ' : 
-          (r.conditionOnReturn === 'damaged' ? 'Ngoại hình xấu' : 'Lỗi chức năng'))
+          (r.conditionOnReturn === 'like_new' || r.conditionOnReturn === 'good') ? 'Hoạt động tốt' : 'Lỗi'
         }. ${r.defectDescription ? `Ghi chú chi tiết: "${r.defectDescription}"` : ""}`,
         meta: {
           returnNumber: r.returnNumber,

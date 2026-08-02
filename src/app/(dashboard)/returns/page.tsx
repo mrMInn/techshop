@@ -130,7 +130,7 @@ export default function ReturnsPage() {
   const getReturnReasonLabel = (reason: string) => {
     const mapping: Record<string, string> = {
       defective: "Lỗi nhà sản xuất",
-      changed_mind: "Khách đổi ý / Nâng cấp",
+      changed_mind: "Khách đổi ý",
       wrong_item: "Giao sai hàng",
       other: "Lý do khác",
     };
@@ -138,6 +138,15 @@ export default function ReturnsPage() {
   };
 
 
+
+  if (!mounted) {
+    return (
+      <div className="p-16 flex flex-col items-center justify-center text-[#7a7a7a]">
+        <RefreshCcw className="animate-spin mb-4 text-[#0066cc]" size={24} />
+        <p className="text-[15px] font-medium">Đang truy xuất sổ đổi trả...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -166,21 +175,27 @@ export default function ReturnsPage() {
 
 
       <GlassCard className="p-0 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-separate border-spacing-0">
+        {!mounted || isLoadingReturns ? (
+          <div className="p-16 flex flex-col items-center justify-center text-[#7a7a7a]">
+            <RefreshCcw className="animate-spin mb-4 text-[#0066cc]" size={24} />
+            <p className="text-[15px] font-medium">Đang truy xuất sổ đổi trả...</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-separate border-spacing-0">
             <thead>
               <tr className="bg-[#f5f5f7]/50 text-[12px] font-semibold text-[#7a7a7a] uppercase tracking-wider whitespace-nowrap">
-                <th className="px-6 py-4 w-12 text-center border-b border-[#e0e0e0]">STT</th>
-                <th className="px-6 py-4 border-b border-[#e0e0e0]">Mã Phiếu</th>
-                <th className="px-6 py-4 border-b border-[#e0e0e0]">Đơn Gốc</th>
-                <th className="px-6 py-4 border-b border-[#e0e0e0]">Khách Hàng</th>
-                <th className="px-6 py-4 border-b border-[#e0e0e0]">Loại Phiếu</th>
-                <th className="px-6 py-4 border-b border-[#e0e0e0]">Lý do</th>
-                <th className="px-6 py-4 text-right border-b border-[#e0e0e0]">Tiền Hoàn</th>
-                <th className="px-6 py-4 w-44 text-center border-b border-[#e0e0e0]">Tác vụ</th>
+                <th className="px-3 py-3 w-10 text-center border-b border-[#e0e0e0]">STT</th>
+                <th className="px-4 py-3 border-b border-[#e0e0e0]">Mã Phiếu</th>
+                <th className="px-4 py-3 border-b border-[#e0e0e0]">Đơn Gốc</th>
+                <th className="px-4 py-3 border-b border-[#e0e0e0]">Khách Hàng</th>
+                <th className="px-4 py-3 border-b border-[#e0e0e0]">Loại Phiếu</th>
+                <th className="px-4 py-3 border-b border-[#e0e0e0]">Lý do</th>
+                <th className="px-4 py-3 text-right border-b border-[#e0e0e0]">Tiền Hoàn</th>
+                <th className="px-3 py-3 w-44 text-center border-b border-[#e0e0e0]">Tác vụ</th>
               </tr>
             </thead>
-            <tbody className="text-[14px] text-[#1d1d1f]">
+            <tbody className="text-[15px] text-[#1d1d1f]">
               {filteredReturns?.map((r, index) => {
                 const isLast = index === filteredReturns.length - 1;
                 return (
@@ -189,33 +204,33 @@ export default function ReturnsPage() {
                     className="group cursor-pointer"
                     onClick={() => handleViewDetail(r.id)}
                   >
-                    <td className={`px-6 py-5 text-center font-semibold text-[#7a7a7a] text-[13px] ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                    <td className={`px-3 py-4 text-center font-semibold text-[#7a7a7a] text-[13px] ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
                       {index + 1}
                     </td>
-                    <td className={`px-6 py-5 font-semibold text-[#dc2626] group-hover:underline ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                    <td className={`px-4 py-4 font-semibold text-[#dc2626] group-hover:underline ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
                       <span className="block">{r.returnNumber}</span>
                       <span className="text-[12px] text-[#7a7a7a] block mt-0.5 font-normal whitespace-nowrap">Ngày tạo: {formatToDDMMYYYY(r.createdAt)}</span>
                     </td>
-                    <td className={`px-6 py-5 font-semibold ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                    <td className={`px-4 py-4 font-semibold ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
                       {r.orderNumber}
                     </td>
-                    <td className={`px-6 py-5 ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                    <td className={`px-4 py-4 ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
                       <p className="font-semibold">{r.customerName}</p>
                       <p className="text-[12px] text-[#7a7a7a]">{r.customerPhone}</p>
                     </td>
-                    <td className={`px-6 py-5 ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                    <td className={`px-4 py-4 ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
                       <span className={`font-semibold ${r.type === 'exchange' ? 'text-blue-600' : 'text-[#ff3b30]'}`}>
                         {r.type === 'exchange' ? 'Đổi hàng' : 'Trả hàng'}
                       </span>
                     </td>
-                    <td className={`px-6 py-5 text-[#7a7a7a] text-[13px] capitalize ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                    <td className={`px-4 py-4 text-[#7a7a7a] text-[13px] capitalize ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
                       {getReturnReasonLabel(r.reason)}
                     </td>
-                    <td className={`px-6 py-5 text-right font-bold ${Number(r.refundAmount || 0) > 0 ? "text-[#ff3b30]" : "text-[#7a7a7a]"} ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                    <td className={`px-4 py-4 text-right font-bold ${Number(r.refundAmount || 0) > 0 ? "text-[#ff3b30]" : "text-[#7a7a7a]"} ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
                       {formatPrice(r.refundAmount || 0)}
                     </td>
                     <td 
-                      className={`px-6 py-5 ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}
+                      className={`px-3 py-4 ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className="flex items-center justify-center gap-2.5">
@@ -249,6 +264,7 @@ export default function ReturnsPage() {
             </tbody>
           </table>
         </div>
+        )}
       </GlassCard>
 
       {/* Dialogs */}
@@ -347,10 +363,12 @@ export default function ReturnsPage() {
                         </td>
                         <td className="px-4 py-3 text-center">
                           <span className="font-bold text-[13px]">
-                            {item.conditionOnReturn === "like_new" && <span className="text-[#34c759]">Như mới</span>}
-                            {item.conditionOnReturn === "good" && <span className="text-[#30d158]">Tốt</span>}
-                            {item.conditionOnReturn === "damaged" && <span className="text-[#ff9f0a]">Trầy xước</span>}
-                            {item.conditionOnReturn === "defective" && <span className="text-[#ff3b30]">Lỗi hỏng</span>}
+                            {(item.conditionOnReturn === "like_new" || item.conditionOnReturn === "good") && (
+                              <span className="text-[#34c759]">Hoạt động tốt</span>
+                            )}
+                            {(item.conditionOnReturn === "defective" || item.conditionOnReturn === "damaged") && (
+                              <span className="text-[#ff3b30]">Lỗi</span>
+                            )}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right font-medium text-[#86868b]">{formatPrice(item.originalPrice)}</td>

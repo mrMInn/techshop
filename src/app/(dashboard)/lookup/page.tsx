@@ -136,6 +136,11 @@ function LookupPageContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Smart Search States
   const [searchQuery, setSearchQuery] = useState("");
   const [searchType, setSearchType] = useState<"customer" | "serial" | null>(null);
@@ -1116,6 +1121,15 @@ function LookupPageContent() {
       </div>
     );
   };
+
+  if (!mounted) {
+    return (
+      <div className="flex flex-col items-center justify-center py-32 text-[#86868b]">
+        <Loader2 className="animate-spin mb-4 text-[#0066cc]" size={28} />
+        <p className="text-[16px] font-semibold text-[#1d1d1f]">Đang tải dữ liệu tra cứu...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 pb-10">

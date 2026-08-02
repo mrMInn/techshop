@@ -169,6 +169,11 @@ function KinhPanel({
 export default function CashBookPage() {
   const queryClient = useQueryClient();
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Kích hoạt realtime đồng bộ Sổ quỹ
   useRealtimeSubscription("cash_book_entries", [["cashbook_entries"], ["financial_summary"]]);
 
@@ -910,6 +915,15 @@ export default function CashBookPage() {
     if (isNaN(num)) return "";
     return num.toLocaleString("vi-VN");
   };
+
+  if (!mounted) {
+    return (
+      <div className="p-16 flex flex-col items-center justify-center text-[#7a7a7a]">
+        <Loader2 className="animate-spin mb-4 text-[#0066cc]" size={24} />
+        <p className="text-[15px] font-medium">Đang tải sổ quỹ...</p>
+      </div>
+    );
+  }
 
   return (
     <div 

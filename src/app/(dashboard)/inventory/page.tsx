@@ -622,6 +622,15 @@ function InventoryPageContent() {
     return drawerItems.filter((item: any) => item.status === 'defective' || item.status === 'warranty_repair').length;
   }, [drawerItems]);
 
+  if (!mounted) {
+    return (
+      <div className="flex flex-col items-center justify-center py-32 text-[#86868b]">
+        <SFSymbolArrowClockwise className="animate-spin mb-4 text-[#0066cc]" size={28} />
+        <p className="text-[16px] font-semibold text-[#1d1d1f]">Đang tải dữ liệu kho hàng...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Dropdown Filters & Search & Action Buttons */}
@@ -896,7 +905,7 @@ function InventoryPageContent() {
                       <td className={`px-6 py-3 ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
                         <div className="flex items-center gap-4">
                           <div>
-                            <p className="font-semibold text-[#1d1d1f] tracking-tight group-hover:text-[#0066cc] transition-colors duration-200">
+                            <p className="font-semibold text-[#0066cc] tracking-tight transition-colors duration-200">
                               <span className="mr-1.5">{group.brandName}</span>
                               {group.productName}
                             </p>
@@ -974,7 +983,7 @@ function InventoryPageContent() {
                         </td>
                       )}
 
-                      <td className={`px-6 py-3 text-right font-semibold text-[#1d1d1f] ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
+                      <td className={`px-6 py-3 text-right font-bold text-[#0066cc] ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
                         {formatPrice(avgCost.toFixed(0))}
                       </td>
                     </tr>
@@ -1061,7 +1070,7 @@ function InventoryPageContent() {
               {/* Modal Header - Clean Apple Style */}
               <div className="px-8 py-6 border-b border-[#e0e0e0] bg-[#f5f5f7]/50 flex items-start justify-between">
                 <div className="space-y-2">
-                  <h2 className="text-[24px] font-extrabold tracking-tight leading-snug bg-gradient-to-r from-[#1d1d1f] via-[#2d2d30] to-[#434345] bg-clip-text text-transparent flex items-center gap-2">
+                  <h2 className="text-[24px] font-extrabold tracking-tight leading-snug text-[#0066cc] flex items-center gap-2">
                     <span>{activeDrawerProduct.productName}</span>
                   </h2>
                   <div className="flex items-center gap-2.5 flex-wrap">
@@ -1122,7 +1131,7 @@ function InventoryPageContent() {
 
 
               {/* Serials Scrollable List - Concept 2: iOS-style Interactive List */}
-              <div className="flex-1 overflow-y-auto p-8 bg-white max-h-[58vh]">
+              <div className="flex-1 overflow-y-auto px-8 pt-5 pb-8 bg-white max-h-[58vh]">
                 <div className="flex items-center justify-between mb-5">
                   <h3 className="text-[14.5px] font-bold text-[#7a7a7a] uppercase tracking-wider">
                     Danh Sách Máy Lẻ ({activeDrawerProduct.items.length})
@@ -1141,11 +1150,7 @@ function InventoryPageContent() {
                       <SFSymbolCheckmarkCircle size={14} />
                       <span>Nhận về kho tất cả ({activeDrawerProduct.items.filter((item: any) => item.status === 'incoming').length} máy)</span>
                     </button>
-                  ) : (
-                    <span className="text-[12px] text-[#7a7a7a] font-medium">
-                      Chọn số Serial để xem lịch sử thẻ kho
-                    </span>
-                  )}
+                  ) : null}
                 </div>
                 
                 <div className="border border-[#e0e0e0] rounded-2xl overflow-hidden bg-white shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
@@ -1175,10 +1180,10 @@ function InventoryPageContent() {
                             <td className="px-5 py-3 whitespace-nowrap">
                               <div className="flex flex-col">
                                 <span 
-                                  className={`text-[15px] font-semibold ${
+                                  className={`text-[15px] font-bold ${
                                     item.serialNumber.startsWith("SN-PENDING-")
                                       ? "text-amber-600"
-                                      : "text-[#1d1d1f]"
+                                      : "text-[#5856d6]"
                                   }`}
                                 >
                                   {item.serialNumber.startsWith("SN-PENDING-") ? "Chờ cập nhật" : item.serialNumber}
@@ -1301,7 +1306,7 @@ function InventoryPageContent() {
                                 
                                 return (
                                   <div className="relative group/cost flex flex-col items-end">
-                                    <span className="font-extrabold text-[#1d1d1f] hover:text-[#0066cc] cursor-help text-[15px]">
+                                    <span className="font-extrabold text-[#0066cc] hover:text-[#0071e3] cursor-help text-[15px]">
                                       {formatPrice(totalCost.toFixed(2))}
                                     </span>
                                     {hasAdd && (
@@ -1380,7 +1385,7 @@ function InventoryPageContent() {
                                     <div className="relative group/tooltip">
                                       <Link
                                         href={`/lookup?serial=${item.serialNumber}`}
-                                        className="w-9 h-9 rounded-xl flex items-center justify-center bg-white hover:bg-[#f5f5f7] border border-[#e5e5ea] hover:border-[#d1d1d6] text-[#48484a] hover:text-[#0066cc] cursor-pointer transition-all duration-200 active:scale-95 shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)]"
+                                        className="w-9 h-9 rounded-xl flex items-center justify-center bg-blue-50 hover:bg-[#0066cc] border border-blue-100 hover:border-[#0066cc] text-[#0066cc] hover:text-white cursor-pointer transition-all duration-200 active:scale-95 shadow-[0_2px_8px_rgba(0,102,204,0.08)] hover:shadow-[0_4px_12px_rgba(0,102,204,0.2)]"
                                       >
                                         <SFSymbolActivity size={14} />
                                       </Link>
@@ -1391,7 +1396,7 @@ function InventoryPageContent() {
                                     <div className="relative group/tooltip">
                                       <button
                                         onClick={() => handleOpenEditDialog(item)}
-                                        className="w-9 h-9 rounded-xl flex items-center justify-center bg-white hover:bg-[#f5f5f7] border border-[#e5e5ea] hover:border-[#d1d1d6] text-[#48484a] hover:text-[#1c1c1e] cursor-pointer transition-all duration-200 active:scale-95 shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)]"
+                                        className="w-9 h-9 rounded-xl flex items-center justify-center bg-indigo-50 hover:bg-[#5856d6] border border-indigo-100 hover:border-[#5856d6] text-[#5856d6] hover:text-white cursor-pointer transition-all duration-200 active:scale-95 shadow-[0_2px_8px_rgba(88,86,214,0.08)] hover:shadow-[0_4px_12px_rgba(88,86,214,0.2)]"
                                       >
                                         <SFSymbolSquareAndPencil size={14} />
                                       </button>
@@ -1537,12 +1542,6 @@ function InventoryPageContent() {
                 </div>
               </div>
 
-              {/* Modal Footer */}
-              <div className="p-5 border-t border-[#e0e0e0] bg-[#f5f5f7]/30 text-center">
-                <span className="text-[13.5px] text-[#7a7a7a] font-medium">
-                  Nhấp vào mã serial để xem cấu hình chi tiết sản phẩm cụ thể.
-                </span>
-              </div>
               
             </div>
           </div>

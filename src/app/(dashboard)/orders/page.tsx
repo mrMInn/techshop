@@ -316,6 +316,15 @@ function OrdersPageContent() {
   const cancelledOrdersCount = stats.cancelledCount;
   const onlineOrdersCount = stats.onlineCount;
 
+  if (!mounted) {
+    return (
+      <div className="p-16 flex flex-col items-center justify-center text-[#7a7a7a]">
+        <RefreshCw className="animate-spin mb-4 text-[#0066cc]" size={24} />
+        <p className="text-[15px] font-medium">Đang tải sổ đơn hàng...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* 1. Header Section - Apple premium responsive layout */}
@@ -441,14 +450,16 @@ function OrdersPageContent() {
                       {/* Khách hàng */}
                       <td className={`px-4 py-4 whitespace-nowrap ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
                         <div className="max-w-[150px] truncate" title={order.customerName}>
-                          <p className="font-semibold text-[#1d1d1f] tracking-tight truncate">{order.customerName}</p>
-                          <p className="text-[12px] text-[#7a7a7a] mt-0.5 truncate">{order.customerPhone}</p>
+                          <p className="font-semibold text-[#0066cc] tracking-tight truncate">{order.customerName}</p>
+                          <p className="text-[12px] text-[#5856d6] font-medium mt-0.5 truncate">{order.customerPhone}</p>
                         </div>
                       </td>
 
                       {/* Kênh bán */}
                       <td className={`px-4 py-4 whitespace-nowrap ${isLast ? "" : "border-b border-[#e0e0e0]"} group-hover:border-transparent group-hover:bg-[#0066cc]/10 first:rounded-l-2xl last:rounded-r-2xl transition-all duration-200`}>
-                        <span className="capitalize text-[14px] text-[#1d1d1f] font-medium">{order.saleChannel}</span>
+                        <span className={`capitalize text-[14px] font-semibold ${
+                          order.saleChannel === "online" ? "text-[#5856d6]" : "text-[#16a34a]"
+                        }`}>{order.saleChannel === "online" ? "Online" : "Offline"}</span>
                         {order.leadSourceName && (
                           <span className="block text-[11px] text-[#7a7a7a] mt-0.5 truncate max-w-[120px]" title={`Nguồn: ${order.leadSourceName}`}>
                             Nguồn: {order.leadSourceName}

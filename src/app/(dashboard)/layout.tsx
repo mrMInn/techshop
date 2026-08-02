@@ -57,7 +57,7 @@ function getPageTitle(path: string | null, searchParams?: any) {
   if (path.startsWith("/accounting/expenses")) return "Chi phí";
   if (path.startsWith("/accounting/reports")) return "Báo cáo tài chính";
   if (path.startsWith("/accounting")) return "Sổ quỹ";
-  if (path.startsWith("/settings")) return "Cấu hình hệ thống";
+  if (path.startsWith("/settings")) return "Cấu hình Telegram";
   return "TechStore ERP";
 }
 
@@ -131,7 +131,7 @@ function getBreadcrumbs(path: string | null, searchParams?: any): { label: strin
     crumbs.push({ label: "Sổ quỹ", href: "/accounting" });
     crumbs.push({ label: "Nhật ký thu chi" });
   } else if (path.startsWith("/settings")) {
-    crumbs.push({ label: "Cấu hình hệ thống", href: "/settings" });
+    crumbs.push({ label: "Cấu hình Telegram", href: "/settings" });
   }
   
   return crumbs;
@@ -207,7 +207,7 @@ export default function DashboardLayout({
     ...(isAdmin ? [{ href: "/accounting", label: "Sổ quỹ", icon: <Wallet size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-[#34c759] to-[#28a745]", match: (p: string) => p.startsWith("/accounting") }] : []),
   ];
 
-  const settingsItem = isAdmin ? { href: "/settings", label: "Cấu hình hệ thống", icon: <Settings size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-[#8e8e93] to-[#636366]", match: (p: string) => p.startsWith("/settings") } : null;
+  const settingsItem = isAdmin ? { href: "/settings", label: "Cấu hình Telegram", icon: <Settings size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-[#8e8e93] to-[#636366]", match: (p: string) => p.startsWith("/settings") } : null;
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#f5f5f7] antialiased font-sans">
@@ -517,32 +517,28 @@ function SidebarNavList({
             }
             onClick={(e) => {
               if (item.href === "/orders") {
-                if (pathname?.startsWith("/orders")) {
+                if (pathname === "/orders") {
                   e.preventDefault();
                   setOrdersExpanded(!ordersExpanded);
                 } else {
                   setOrdersExpanded(true);
                 }
               } else if (item.href === "/inventory") {
-                if (pathname?.startsWith("/inventory")) {
-                  // Toggle collapse when clicking on the already active link
+                if (pathname === "/inventory") {
                   e.preventDefault();
                   setInventoryExpanded(!inventoryExpanded);
                 } else {
-                  // Open dropdown when navigating to inventory
                   setInventoryExpanded(true);
                 }
               } else if (item.href === "/accounting") {
-                if (pathname?.startsWith("/accounting")) {
-                  // Toggle collapse when clicking on the already active link
+                if (pathname === "/accounting") {
                   e.preventDefault();
                   setAccountingExpanded(!accountingExpanded);
                 } else {
-                  // Open dropdown when navigating to accounting
                   setAccountingExpanded(true);
                 }
               } else if (item.href === "/warranty") {
-                if (pathname?.startsWith("/warranty")) {
+                if (pathname === "/warranty") {
                   e.preventDefault();
                   setWarrantyExpanded(!warrantyExpanded);
                 } else {

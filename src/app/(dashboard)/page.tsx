@@ -113,7 +113,38 @@ function KinhPanel({
   );
 }
 
-// KPI card with Apple Shortcuts dynamic gradient styling
+// SF Symbol: shippingbox / box
+function SFSymbolShippingBox({ className = "", size = 20 }: { className?: string; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" />
+      <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+      <line x1="12" y1="22.08" x2="12" y2="12" />
+    </svg>
+  );
+}
+
+// SF Symbol: wrench / screwdriver
+function SFSymbolWrench({ className = "", size = 20 }: { className?: string; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+    </svg>
+  );
+}
+
+// SF Symbol: coins / centralbank
+function SFSymbolCoins({ className = "", size = 20 }: { className?: string; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <circle cx="8" cy="8" r="6" />
+      <circle cx="18" cy="18" r="4" />
+      <path d="M12 18a6 6 0 0 0-6-6" />
+    </svg>
+  );
+}
+
+// KPI card with Apple Shortcuts dynamic gradient styling (Compact design for 6 columns grid)
 function TheChiSo({
   nhan,
   giaTri,
@@ -128,7 +159,7 @@ function TheChiSo({
   return (
     <div
       className={cn(
-        "relative rounded-[22px] p-5 flex flex-col justify-between h-[120px] text-white shadow-[0_10px_25px_rgba(0,0,0,0.08)] hover:scale-[1.02] hover:shadow-[0_15px_30px_rgba(0,0,0,0.12)] transition-all duration-300 border border-white/10 overflow-hidden group select-none cursor-pointer"
+        "relative rounded-[20px] p-4 flex flex-col justify-between h-[105px] text-white shadow-[0_8px_20px_rgba(0,0,0,0.06)] hover:scale-[1.02] hover:shadow-[0_12px_24px_rgba(0,0,0,0.1)] transition-all duration-300 border border-white/10 overflow-hidden group select-none cursor-pointer"
       )}
     >
       {/* Background Gradient */}
@@ -139,18 +170,18 @@ function TheChiSo({
 
       {/* Top Row with Label and Icon */}
       <div className="relative z-20 flex justify-between items-start">
-        <span className="text-[12px] font-bold uppercase tracking-wider text-white/70">
+        <span className="text-[11px] font-extrabold uppercase tracking-wider text-white/85 line-clamp-1">
           {nhan}
         </span>
         {icon && (
-          <div className="w-8 h-8 rounded-[9px] bg-white/20 flex items-center justify-center text-white backdrop-blur-md border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+          <div className="w-7 h-7 rounded-[8px] bg-white/20 flex items-center justify-center text-white backdrop-blur-md border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] shrink-0">
             {icon}
           </div>
         )}
       </div>
 
       {/* Value */}
-      <div className="relative z-20 text-[28px] font-black text-white tracking-tight leading-none tabular-nums mt-auto">
+      <div className="relative z-20 text-[22px] font-black text-white tracking-tight leading-none tabular-nums mt-auto">
         {giaTri}
       </div>
     </div>
@@ -160,9 +191,12 @@ function TheChiSo({
 // KPI Cards Skeleton
 function KPISkeleton() {
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-3 animate-pulse">
-      {[1, 2, 3].map((i) => (
-        <div key={i} className="rounded-[22px] h-[120px] bg-slate-200/50" />
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-pulse">
+      {[1, 2, 3].map((colIdx) => (
+        <div key={colIdx} className="flex flex-col gap-3">
+          <div className="rounded-[20px] h-[105px] bg-slate-200/50" />
+          <div className="rounded-[20px] h-[105px] bg-slate-200/50" />
+        </div>
       ))}
     </div>
   );
@@ -311,17 +345,40 @@ export default function DashboardHome() {
   const monthlyChartData = useMemo(() => financialSummary?.monthlyChartData || [], [financialSummary]);
 
   // KPI computed values (memoized)
-  const { tongDoanhThu, tongChiPhi, tongLoiNhuan, nhanThang } = useMemo(() => {
+  const { tongDoanhThu, tongChiPhi, tongLoiNhuan, nhanThang, tonKhoBanHang, tonKhoBaoHanh, giaVonTonKho } = useMemo(() => {
     const data = bentoData || {
       todayIncome: 0, todayExpense: 0, todayNetProfit: 0,
       thisMonthIncome: 0, thisMonthExpense: 0, thisMonthNetProfit: 0,
+      warranty: { pending: 0, inspecting: 0, repairing: 0, waiting_parts: 0, completed: 0 }
     };
     const doanhThu = kyTaiChinh === "today" ? Number(data.todayIncome || 0) : Number(data.thisMonthIncome || 0);
     const chiPhi = kyTaiChinh === "today" ? Number(data.todayExpense || 0) : Number(data.thisMonthExpense || 0);
     const loiNhuan = kyTaiChinh === "today" ? Number(data.todayNetProfit || 0) : Number(data.thisMonthNetProfit || 0);
     const nhan = luaChonThang.find((opt) => opt.value === thangDuocChon)?.label || "Tháng hiện tại";
-    return { tongDoanhThu: doanhThu, tongChiPhi: chiPhi, tongLoiNhuan: loiNhuan, nhanThang: nhan };
-  }, [bentoData, kyTaiChinh, thangDuocChon, luaChonThang]);
+
+    // New inventory stats
+    const machineCount = capitalData?.machineCapital?.count || 0;
+    const accessoryCount = capitalData?.accessoryCapital?.count || 0;
+    const salesInv = machineCount + accessoryCount;
+
+    const wPending = data.warranty?.pending || 0;
+    const wInspecting = data.warranty?.inspecting || 0;
+    const wRepairing = data.warranty?.repairing || 0;
+    const wWaiting = data.warranty?.waiting_parts || 0;
+    const activeWarr = wPending + wInspecting + wRepairing + wWaiting;
+
+    const totalCap = capitalData?.totalCapital || 0;
+
+    return {
+      tongDoanhThu: doanhThu,
+      tongChiPhi: chiPhi,
+      tongLoiNhuan: loiNhuan,
+      nhanThang: nhan,
+      tonKhoBanHang: salesInv,
+      tonKhoBaoHanh: activeWarr,
+      giaVonTonKho: totalCap
+    };
+  }, [bentoData, kyTaiChinh, thangDuocChon, luaChonThang, capitalData]);
 
   if (!mounted) {
     return (
@@ -329,8 +386,13 @@ export default function DashboardHome() {
         <div className="mx-auto max-w-[1450px] px-4 md:px-5 py-5 md:py-6">
           <div className="space-y-4 animate-pulse">
             <div className="h-[40px]" />
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              {[1, 2, 3].map(i => <div key={i} className="rounded-[22px] h-[120px] bg-slate-200/50" />)}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[1, 2, 3].map(colIdx => (
+                <div key={colIdx} className="flex flex-col gap-3">
+                  <div className="rounded-[20px] h-[105px] bg-slate-200/50" />
+                  <div className="rounded-[20px] h-[105px] bg-slate-200/50" />
+                </div>
+              ))}
             </div>
             <div className="rounded-[28px] border border-white/60 bg-white/70 h-[400px]" />
             <div className="rounded-[28px] border border-white/60 bg-white/70 h-[300px]" />
@@ -386,27 +448,54 @@ export default function DashboardHome() {
           {isBentoLoading ? (
             <KPISkeleton />
           ) : (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <TheChiSo
-                nhan={`Tổng doanh thu (${nhanThang})`}
-                giaTri={formatCurrency(tongDoanhThu)}
-                bgGradient="bg-gradient-to-br from-[#2ea1ff] to-[#0066cc]"
-                icon={<SFSymbolBanknote size={16} />}
-              />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Cột 1: Tài chính (Doanh thu & Chi phí) */}
+              <div className="flex flex-col gap-3">
+                <TheChiSo
+                  nhan={`Doanh thu (${nhanThang})`}
+                  giaTri={formatCurrency(tongDoanhThu)}
+                  bgGradient="bg-gradient-to-br from-[#2ea1ff] to-[#0066cc]"
+                  icon={<SFSymbolBanknote size={16} />}
+                />
+                <TheChiSo
+                  nhan={`Chi phí (${nhanThang})`}
+                  giaTri={formatCurrency(tongChiPhi)}
+                  bgGradient="bg-gradient-to-br from-[#ff9f0a] to-[#ff8000]"
+                  icon={<SFSymbolCreditCard size={16} />}
+                />
+              </div>
 
-              <TheChiSo
-                nhan={`Tổng chi phí (${nhanThang})`}
-                giaTri={formatCurrency(tongChiPhi)}
-                bgGradient="bg-gradient-to-br from-[#ff9f0a] to-[#ff8000]"
-                icon={<SFSymbolCreditCard size={16} />}
-              />
+              {/* Cột 2: Hiệu quả & Vốn (Lợi nhuận & Vốn tồn kho) */}
+              <div className="flex flex-col gap-3">
+                <TheChiSo
+                  nhan={`Lợi nhuận (${nhanThang})`}
+                  giaTri={`${tongLoiNhuan >= 0 ? "+" : ""}${formatCurrency(tongLoiNhuan)}`}
+                  bgGradient="bg-gradient-to-br from-[#34c759] to-[#28a745]"
+                  icon={<SFSymbolTrendingUp size={16} />}
+                />
+                <TheChiSo
+                  nhan="Vốn tồn kho"
+                  giaTri={formatCurrency(giaVonTonKho)}
+                  bgGradient="bg-gradient-to-br from-[#bf5af2] to-[#5e5ce6]"
+                  icon={<SFSymbolCoins size={16} />}
+                />
+              </div>
 
-              <TheChiSo
-                nhan={`Lợi nhuận ròng (${nhanThang})`}
-                giaTri={`${tongLoiNhuan >= 0 ? "+" : ""}${formatCurrency(tongLoiNhuan)}`}
-                bgGradient="bg-gradient-to-br from-[#34c759] to-[#28a745]"
-                icon={<SFSymbolTrendingUp size={16} />}
-              />
+              {/* Cột 3: Số lượng kho (Tồn kho bán hàng & Tồn kho bảo hành) */}
+              <div className="flex flex-col gap-3">
+                <TheChiSo
+                  nhan="Tồn kho bán hàng"
+                  giaTri={`${tonKhoBanHang} sản phẩm`}
+                  bgGradient="bg-gradient-to-br from-[#5e5ce6] to-[#0066cc]"
+                  icon={<SFSymbolShippingBox size={16} />}
+                />
+                <TheChiSo
+                  nhan="Tồn kho bảo hành"
+                  giaTri={`${tonKhoBaoHanh} máy`}
+                  bgGradient="bg-gradient-to-br from-[#ff453a] to-[#ff9f0a]"
+                  icon={<SFSymbolWrench size={16} />}
+                />
+              </div>
             </div>
           )}
 

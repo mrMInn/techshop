@@ -181,17 +181,17 @@ export function WarrantyForm({ onSubmit, onCancel, isLoading }: WarrantyFormProp
                 <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-[13px]">
                   <div>
                     <span className="text-[#7a7a7a]">Ngày mua hàng:</span>
-                    <strong className="text-[#1d1d1f] ml-1.5">
+                    <strong className="text-[#0066cc] font-bold ml-1.5">
                       {new Date(selectedItemDetail.purchaseDate).toLocaleDateString("vi-VN")}
                     </strong>
                   </div>
                   <div>
                     <span className="text-[#7a7a7a]">Thời hạn bảo hành:</span>
-                    <strong className="text-[#1d1d1f] ml-1.5">{selectedItemDetail.warrantyMonths} tháng</strong>
+                    <strong className="text-[#0066cc] font-bold ml-1.5">{selectedItemDetail.warrantyMonths} tháng</strong>
                   </div>
                   <div>
                     <span className="text-[#7a7a7a]">Hạn bảo hành đến:</span>
-                    <strong className="text-[#1d1d1f] ml-1.5">
+                    <strong className="text-[#0066cc] font-bold ml-1.5">
                       {(() => {
                         const d = new Date(selectedItemDetail.purchaseDate);
                         d.setMonth(d.getMonth() + selectedItemDetail.warrantyMonths);
@@ -206,11 +206,11 @@ export function WarrantyForm({ onSubmit, onCancel, isLoading }: WarrantyFormProp
                       d.setMonth(d.getMonth() + selectedItemDetail.warrantyMonths);
                       const isUnder = new Date() <= d;
                       return isUnder ? (
-                        <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-green-50 text-green-700 border border-green-200">
+                        <span className="text-[13px] font-bold text-green-600">
                           Còn bảo hành
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-red-50 text-red-700 border border-red-200">
+                        <span className="text-[13px] font-bold text-red-500">
                           Hết bảo hành
                         </span>
                       );

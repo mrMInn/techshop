@@ -7,7 +7,7 @@ import {
   Search, Plus, Copy, ShoppingCart, Landmark, Eye, Loader2,
   FileText, CheckCircle, XCircle, RefreshCw
 } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
 import { Dialog } from "@/components/ui/dialog";
 import { QuotationForm } from "@/components/quotations/quotation-form";
@@ -17,6 +17,11 @@ export default function QuotationsPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   
   // Modals
   const [isQuotationOpen, setIsQuotationOpen] = useState(false);
@@ -133,6 +138,15 @@ export default function QuotationsPage() {
     if (statusFilter === "converted") return 4;
     return 0;
   }, [statusFilter]);
+
+  if (!mounted) {
+    return (
+      <div className="p-16 flex flex-col items-center justify-center text-[#7a7a7a]">
+        <RefreshCw className="animate-spin mb-4 text-[#0066cc]" size={24} />
+        <p className="text-[15px] font-medium">Đang tải sổ báo giá...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 pb-10">

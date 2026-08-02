@@ -187,6 +187,28 @@ export function WarrantyDetailDialog({ claimId, onClose }: WarrantyDetailDialogP
   };
   const activeStepIndex = getActiveStepIndex(claim.status);
 
+  const renderLogDescription = (descText: string) => {
+    const translated = translateLogDescription(descText);
+    if (!claim.issueDescription) return <span>{translated}</span>;
+    
+    const parts = translated.split(claim.issueDescription);
+    if (parts.length > 1) {
+      return (
+        <span>
+          {parts.map((part, index) => (
+            <span key={index}>
+              {part}
+              {index < parts.length - 1 && (
+                <span className="text-[#0066cc] font-semibold">{claim.issueDescription}</span>
+              )}
+            </span>
+          ))}
+        </span>
+      );
+    }
+    return <span>{translated}</span>;
+  };
+
   return (
     <div className="space-y-5">
       {/* Thanh tiến trình Stepper */}
@@ -263,13 +285,12 @@ export function WarrantyDetailDialog({ claimId, onClose }: WarrantyDetailDialogP
               <td className="px-4 py-3 space-y-1">
                 <p className="font-bold text-[#0066cc] text-[14.5px]">{claim.customerName}</p>
                 <p className="text-[#515154] font-medium">SĐT: <span className="font-semibold text-[#1d1d1f]">{claim.customerPhone}</span></p>
-                <div className="flex flex-wrap items-center gap-x-2 text-[12px] text-[#86868b] pt-1">
-                  <span>Tiếp nhận: <span className="font-semibold text-[#0066cc]">{new Date(claim.receivedDate).toLocaleDateString("vi-VN")}</span></span>
-                  <span>•</span>
-                  <span className="text-[#ff9f0a] font-bold">
-                    Đã xử lý {Math.max(1, Math.ceil((new Date().getTime() - new Date(claim.receivedDate).getTime()) / (1000 * 60 * 60 * 24)))} ngày
-                  </span>
-                </div>
+                <p className="text-[12px] text-[#86868b] pt-1">
+                  Tiếp nhận: <span className="font-semibold text-[#0066cc]">{new Date(claim.receivedDate).toLocaleDateString("vi-VN")}</span>
+                </p>
+                <p className="text-[12px] text-[#ff9f0a] font-bold mt-0.5">
+                  Đã xử lý: {Math.max(1, Math.ceil((new Date().getTime() - new Date(claim.receivedDate).getTime()) / (1000 * 60 * 60 * 24)))} ngày
+                </p>
               </td>
               <td className="px-4 py-3 space-y-1">
                 <p className="font-bold text-[#0066cc] text-[14.5px] leading-snug">{claim.productName}</p>
@@ -283,7 +304,7 @@ export function WarrantyDetailDialog({ claimId, onClose }: WarrantyDetailDialogP
                 </div>
                 <p className="text-[#86868b] text-[12px]">Đơn gốc: <span className="font-semibold text-[#0066cc]">{claim.orderNumber}</span></p>
               </td>
-              <td className="px-4 py-3 bg-[#df2935]/4 text-[#df2935] font-semibold leading-relaxed">
+              <td className="px-4 py-3 text-[#0066cc] font-semibold leading-relaxed">
                 {claim.issueDescription}
               </td>
             </tr>
@@ -294,7 +315,7 @@ export function WarrantyDetailDialog({ claimId, onClose }: WarrantyDetailDialogP
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-1">
         {/* Form cập nhật */}
         <div className="space-y-4">
-          <h3 className="text-[16.5px] font-semibold text-[#1d1d1f] border-b border-[#e5e5ea] pb-2">Cập nhật xử lý</h3>
+          <h3 className="text-[11px] font-bold text-[#86868b] uppercase tracking-wider border-b border-[#e5e5ea] pb-2">Cập nhật xử lý</h3>
           <form onSubmit={handleUpdate} className="space-y-3.5">
             {/* Hàng 1: Trạng thái & Chi phí sửa chữa */}
             <div className="grid grid-cols-2 gap-3.5">
@@ -415,7 +436,7 @@ export function WarrantyDetailDialog({ claimId, onClose }: WarrantyDetailDialogP
 
         {/* Lịch sử Logs */}
         <div className="space-y-4">
-          <h3 className="text-[16.5px] font-semibold text-[#1d1d1f] border-b border-[#e5e5ea] pb-2">Lịch sử xử lý</h3>
+          <h3 className="text-[11px] font-bold text-[#86868b] uppercase tracking-wider border-b border-[#e5e5ea] pb-2">Lịch sử xử lý</h3>
           <div className="space-y-4 max-h-[350px] overflow-y-auto pr-2 pl-1 py-1">
             {logs?.length === 0 ? (
               <p className="text-[14px] text-[#7a7a7a] pl-1">Chưa có lịch sử</p>
@@ -440,7 +461,7 @@ export function WarrantyDetailDialog({ claimId, onClose }: WarrantyDetailDialogP
                         year: 'numeric'
                       })} - {log.createdByName}
                     </p>
-                    <p className="text-[14px] text-[#1d1d1f] font-medium mt-1 whitespace-pre-wrap">{translateLogDescription(log.description)}</p>
+                    <p className="text-[14px] text-[#1d1d1f] font-medium mt-1 whitespace-pre-wrap">{renderLogDescription(log.description)}</p>
                     
                     {log.oldStatus && log.newStatus && log.oldStatus !== log.newStatus ? (
                       <span className="block text-[12.5px] text-[#7a7a7a] mt-2 font-medium">

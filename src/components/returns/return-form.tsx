@@ -79,16 +79,14 @@ export function ReturnForm({ onSubmit, onCancel, isLoading }: ReturnFormProps) {
 
   const reasonOptions = [
     { value: "defective", label: "Lỗi từ nhà sản xuất" },
-    { value: "changed_mind", label: "Khách đổi ý / Nâng cấp" },
+    { value: "changed_mind", label: "Khách đổi ý" },
     { value: "wrong_item", label: "Giao sai hàng" },
     { value: "other", label: "Lý do khác" },
   ];
 
   const conditionOptions = [
-    { value: "like_new", label: "Mới 100% / Like New" },
-    { value: "good", label: "Hoạt động tốt / Xước nhẹ" },
-    { value: "damaged", label: "Ngoại hình xấu / Móp méo" },
-    { value: "defective", label: "Lỗi chức năng / Lỗi phần cứng" },
+    { value: "good", label: "Hoạt động tốt" },
+    { value: "defective", label: "Lỗi" },
   ];
 
   // Cập nhật cấu hình mặc định khi đổi Lý do chung của phiếu
@@ -121,7 +119,7 @@ export function ReturnForm({ onSubmit, onCancel, isLoading }: ReturnFormProps) {
         setItemConfigs(prevConfigs => ({
           ...prevConfigs,
           [inventoryItemId]: {
-            conditionOnReturn: reason === "defective" ? "defective" : "like_new",
+            conditionOnReturn: reason === "defective" ? "defective" : "good",
             isDefective: reason === "defective",
             defectDescription: "",
             refundPrice: originalPrice,
@@ -559,13 +557,13 @@ export function ReturnForm({ onSubmit, onCancel, isLoading }: ReturnFormProps) {
                 </span>
                 
                 {/* Segmented Toggle Control */}
-                <div className="relative flex bg-[#f5f5f7] p-[3px] rounded-full border border-[#e5e5ea] h-[36px] w-[230px] shrink-0 select-none overflow-hidden">
+                <div className="relative flex bg-[#f5f5f7] p-[3px] rounded-full border border-[#e5e5ea] h-[36px] w-[280px] shrink-0 select-none overflow-hidden">
                   {/* Sliding background capsule */}
                   <div 
                     className="absolute top-[3px] bottom-[3px] rounded-full bg-[#0066cc] shadow-[0_2px_4px_rgba(0,102,204,0.25)] transition-all duration-300"
                     style={{
-                      left: !hasFee ? "3px" : "115px",
-                      width: "112px"
+                      left: !hasFee ? "3px" : "140px",
+                      width: "137px"
                     }}
                   />
                   

@@ -45,6 +45,11 @@ const formatToDDMMYYYY = (dateString: string | Date | null) => {
 };
 
 export default function ReportsPage() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const [startDate, setStartDate] = useState("2026-05-01");
   const [endDate, setEndDate] = useState(() => {
     const now = new Date();
@@ -324,6 +329,15 @@ export default function ReportsPage() {
 
   const isDataLoading = activeReportTab === "pl" ? isLoadingPL : isLoadingCashFlow;
   const isRefreshing = activeReportTab === "pl" ? isFetchingPL : isFetchingCashFlow;
+
+  if (!mounted) {
+    return (
+      <div className="p-16 flex flex-col items-center justify-center text-[#7a7a7a]">
+        <Loader2 className="animate-spin mb-4 text-[#0066cc]" size={24} />
+        <p className="text-[15px] font-medium">Đang tải báo cáo tài chính...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 font-sans print:bg-white print:text-black">

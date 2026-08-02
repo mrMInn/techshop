@@ -339,7 +339,7 @@ export function OrderDetailDialog({ isOpen, onClose, orderId }: OrderDetailDialo
               ) : (
                 <Download size={13} className="shrink-0" />
               )}
-              <span>Tải PDF hóa đơn & BH</span>
+              <span>Tải hóa đơn</span>
             </button>
           </div>
         ) : (

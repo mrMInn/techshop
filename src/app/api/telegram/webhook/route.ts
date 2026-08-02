@@ -212,6 +212,124 @@ async function getWarrantyStatusBySerial(serialNumber: string) {
   };
 }
 
+// Gọi trực tiếp Gemini AI API với dữ liệu ngữ cảnh thời gian thực từ database
+async function handleGeminiAIResponse(chatId: string | number, text: string, messageId: number) {
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (!geminiKey) {
+    throw new Error("GEMINI_API_KEY is not defined");
+  }
+
+  // 1. Thu thập dữ liệu ngữ cảnh tài chính
+  let financialContext = "";
+  try {
+    const fin = await getFinancialReportForBot();
+    const formatMoney = (val: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(val);
+    financialContext = 
+      `Báo cáo tài chính hôm nay: Doanh thu ${formatMoney(fin.today.revenue)}, Lợi nhuận gộp ${formatMoney(fin.today.profit)}, Chi phí ${formatMoney(fin.today.expenses)}, Số đơn hàng thành công: ${fin.today.ordersCount}. ` +
+      `Tháng này: Doanh thu ${formatMoney(fin.month.revenue)}, Lợi nhuận gộp ${formatMoney(fin.month.profit)}, Chi phí vận hành ${formatMoney(fin.month.expenses)}, Số đơn: ${fin.month.ordersCount}.`;
+  } catch (e) {
+    financialContext = "Không thể lấy thông tin tài chính từ cơ sở dữ liệu.";
+  }
+
+  // 2. Thu thập dữ liệu tồn kho
+  let inventoryContext = "";
+  try {
+    const stats = await getInventoryStats();
+    const inStock = stats.find(s => s.status === "in_stock")?.count || 0;
+    const sold = stats.find(s => s.status === "sold")?.count || 0;
+    const defective = stats.find(s => s.status === "defective")?.count || 0;
+    const warranty = stats.find(s => s.status === "warranty_repair")?.count || 0;
+    inventoryContext = `Thống kê kho: Trong kho sẵn bán ${inStock} máy, Đã bán ${sold} máy, Đang gửi bảo hành sửa chữa ${warranty} máy, Lỗi/Hỏng ${defective} máy.`;
+  } catch (e) {
+    inventoryContext = "Không thể lấy thống kê kho hàng lúc này.";
+  }
+
+  // 3. Phân tích ngữ cảnh bảo hành (nếu có nhắc tới mã máy Serial)
+  let warrantyContext = "";
+  const serialMatch = text.match(/SN-[A-Za-z0-9-]+/i);
+  if (serialMatch) {
+    const serialNum = serialMatch[0].toUpperCase();
+    try {
+      const result = await getWarrantyStatusBySerial(serialNum);
+      if (result.found && result.item) {
+        const item = result.item;
+        const formatDate = (dateVal: any) => dateVal ? new Date(dateVal).toLocaleDateString('vi-VN') : "chưa xác định";
+        warrantyContext = `Thiết bị tra cứu bảo hành: Tên máy: ${item.productName}, Mã Serial: ${item.serialNumber}, Trạng thái: ${item.status}, Thời hạn bảo hành: ${formatDate(item.warrantyStart)} - ${formatDate(item.warrantyEnd)}. `;
+        if (result.claims && result.claims.length > 0) {
+          warrantyContext += `Lịch sử sự kiện bảo hành sửa chữa lỗi: ${result.claims.map(c => `Mã ${c.claimNumber} (Lỗi khách báo: ${c.issueDescription}, Trạng thái xử lý: ${c.status})`).join("; ")}`;
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 4. Tìm kiếm sản phẩm (nếu câu hỏi có từ khóa tìm kiếm)
+  let searchContext = "";
+  const cleanText = text.toLowerCase();
+  if (cleanText.includes("tìm") || cleanText.includes("kiếm") || cleanText.includes("lục") || cleanText.includes("tra cứu")) {
+    const queryWord = text
+      .replace(/bot/gi, "")
+      .replace(/ơi/gi, "")
+      .replace(/tìm kiếm/gi, "")
+      .replace(/tìm/gi, "")
+      .replace(/kiếm/gi, "")
+      .replace(/tra cứu/gi, "")
+      .replace(/@TechStoreERPBot/gi, "")
+      .replace(/[?,.!]/g, "")
+      .trim();
+    if (queryWord) {
+      try {
+        const results = await searchInventoryItems(queryWord);
+        if (results.length > 0) {
+          searchContext = `Danh sách thiết bị khớp từ khóa "${queryWord}" trong kho: ` +
+            results.map((r, i) => `${i+1}. ${r.productName} (Serial: ${r.serialNumber}, Giá bán: ${r.sellingPrice ? new Intl.NumberFormat('vi-VN').format(Number(r.sellingPrice)) : 'N/A'}, Trạng thái: ${r.status})`).join("; ");
+        }
+      } catch (e) {}
+    }
+  }
+
+  // System instruction để định hình tính cách & bắt buộc định dạng Telegram HTML
+  const systemInstruction = 
+    `Bạn là Trợ lý ảo AI chăm sóc cửa hàng thuộc hệ thống TechStore ERP. Hãy trả lời câu hỏi của người dùng bằng tiếng Việt một cách thân thiện, chuyên nghiệp, thông minh và súc tích dựa trên dữ liệu hệ thống thực tế được cung cấp.\n` +
+    `LƯU Ý ĐỊNH DẠNG (BẮT BUỘC): Chỉ sử dụng các thẻ HTML được Telegram hỗ trợ bao gồm <b> (in đậm), <i> (in nghiêng), <code> ( monospace copy), và <a> (đường dẫn). KHÔNG dùng các định dạng markdown như **, *, \` hoặc các thẻ HTML không được hỗ trợ khác. Sử dụng icon cảm xúc sinh động.`;
+
+  const prompt = 
+    `Dữ liệu ERP thời gian thực hiện tại:\n` +
+    `- Thời gian: ${new Date().toLocaleString('vi-VN')}\n` +
+    `- Tài chính: ${financialContext}\n` +
+    `- Tồn kho: ${inventoryContext}\n` +
+    `${warrantyContext ? `- Tra cứu Bảo hành: ${warrantyContext}\n` : ""}` +
+    `${searchContext ? `- Kết quả Tìm kiếm: ${searchContext}\n` : ""}\n` +
+    `Câu hỏi từ Telegram: "${text}"\n\n` +
+    `Hãy trả lời câu hỏi một cách tự nhiên, sử dụng số liệu thực tế ở trên để làm dẫn chứng nếu liên quan:`;
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      systemInstruction: { parts: [{ text: systemInstruction }] },
+      generationConfig: { temperature: 0.3, maxOutputTokens: 800 }
+    })
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Gemini status ${response.status}: ${errText}`);
+  }
+
+  const resJson = await response.json();
+  const replyText = resJson.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!replyText) {
+    throw new Error("Gemini returned empty message candidates");
+  }
+
+  const formattedText = markdownToHtml(replyText);
+  await sendTelegramReply(chatId, formattedText, messageId);
+}
+
 // Bộ phân tích từ khóa cục bộ dự phòng (Fallback) khi Gemini API bị lỗi hoặc quota/429
 async function handleLocalKeywordFallback(chatId: string | number, text: string, messageId: number) {
   const cleanText = text.toLowerCase();
@@ -586,12 +704,30 @@ export async function POST(request: Request) {
 
     // Nếu bot được kích hoạt và không phải luồng đồng bộ đa phương tiện (có đính kèm file)
     if (isGeminiTriggered && !isMediaSyncFlow) {
+      // Nếu không cấu hình GEMINI_API_KEY (ví dụ trong môi trường Test), chạy trực tiếp chế độ Local Keyword
+      if (!process.env.GEMINI_API_KEY) {
+        try {
+          await handleLocalKeywordFallback(chatId, text || caption, messageId);
+          return NextResponse.json({ success: true, processed: true, mode: "local" });
+        } catch (err: any) {
+          console.error("Local bot execution error:", err);
+          return NextResponse.json({ success: false, error: err.message });
+        }
+      }
+
       try {
-        await handleLocalKeywordFallback(chatId, text || caption, messageId);
-        return NextResponse.json({ success: true, processed: true, mode: "local" });
-      } catch (err: any) {
-        console.error("Local bot execution error:", err);
-        return NextResponse.json({ success: false, error: err.message });
+        // Ưu tiên sử dụng Gemini AI để phản hồi thông minh, linh hoạt
+        await handleGeminiAIResponse(chatId, text || caption, messageId);
+        return NextResponse.json({ success: true, processed: true, mode: "gemini" });
+      } catch (geminiErr: any) {
+        console.warn("Gemini API failed, falling back to local keywords:", geminiErr.message || geminiErr);
+        try {
+          await handleLocalKeywordFallback(chatId, text || caption, messageId);
+          return NextResponse.json({ success: true, processed: true, mode: "local" });
+        } catch (err: any) {
+          console.error("Local bot execution error:", err);
+          return NextResponse.json({ success: false, error: err.message });
+        }
       }
     }
 
