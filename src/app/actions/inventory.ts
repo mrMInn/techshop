@@ -28,6 +28,7 @@ import {
 import { db, recalculateRunningBalances } from "@/lib/db";
 import { eq, desc, inArray, sql, and, or, like, ilike, lte } from "drizzle-orm";
 import { syncHistoricalData } from "./accounting";
+import { sendSystemNotification } from "@/lib/notifications";
 import { after } from "next/server";
 import { serverCache } from "@/lib/cache";
 
@@ -1032,10 +1033,41 @@ export async function createInventoryItemsBatch(data: {
       };
     });
 
-    if (result.success) {
+    if (result.success && result.items) {
       try {
-        after(() => {
+        after(async () => {
           syncHistoricalData().catch(err => console.error("Lỗi đồng bộ lịch sử tài chính:", err));
+
+          if (process.env.NODE_ENV !== 'test') {
+            try {
+              const product = await db.select().from(products).where(eq(products.id, data.productId)).limit(1);
+              const productName = product[0]?.name || "Thiết bị";
+
+              const statusMap = { incoming: "Đang về", in_stock: "Sẵn hàng", sold: "Đã bán", defective: "Lỗi", deleted: "Đã xóa", warranty_repair: "Bảo hành" };
+              const statusLabel = statusMap[data.status as keyof typeof statusMap] || data.status;
+
+              const condMap = { new: "Mới", used: "Đã sử dụng" };
+              const condLabel = condMap[data.condition as 'new'|'used'] || data.condition;
+
+              const formatVND = (value: string | number | null) => {
+                if (value === null || value === undefined || value === "") return "N/A";
+                const num = Math.round(Number(value));
+                if (isNaN(num)) return "N/A";
+                return num.toLocaleString("vi-VN") + " ₫";
+              };
+
+              await sendSystemNotification("inventory_added", {
+                product_name: productName,
+                quantity: String(cleanSerials.length),
+                condition: condLabel,
+                cost_price: formatVND(data.costPrice),
+                status: statusLabel,
+                serials_list: cleanSerials.map((s, idx) => `${idx + 1}. <code>${s}</code>`).join("\n")
+              });
+            } catch (notifyErr) {
+              console.error("Lỗi gửi thông báo nhập kho:", notifyErr);
+            }
+          }
         });
       } catch (e) {
         syncHistoricalData().catch(err => console.error("Lỗi đồng bộ lịch sử tài chính:", err));
@@ -1266,13 +1298,32 @@ export async function updateInventoryItem(
         }
       }
 
-      return { success: true, message: "Cập nhật thành công", item: updatedItem };
+      return { success: true, message: "Cập nhật thành công", item: updatedItem, changes };
     });
 
-    if (result.success) {
+    if (result.success && result.item) {
       try {
-        after(() => {
+        after(async () => {
           syncHistoricalData().catch(err => console.error("Lỗi đồng bộ lịch sử tài chính:", err));
+          
+          if (result.changes && result.changes.length > 0 && process.env.NODE_ENV !== 'test') {
+            try {
+              const product = await db.select().from(products).where(eq(products.id, result.item.productId)).limit(1);
+              const productName = product[0]?.name || "Thiết bị";
+              
+              const statusMap = { incoming: "Đang về", in_stock: "Sẵn hàng", sold: "Đã bán", defective: "Lỗi", deleted: "Đã xóa", warranty_repair: "Bảo hành" };
+              const statusLabel = statusMap[result.item.status as keyof typeof statusMap] || result.item.status;
+
+              await sendSystemNotification("inventory_updated", {
+                product_name: productName,
+                serial_number: result.item.serialNumber,
+                status: statusLabel,
+                change_log: result.changes.join("\n")
+              });
+            } catch (notifyErr) {
+              console.error("Lỗi gửi thông báo cập nhật kho:", notifyErr);
+            }
+          }
         });
       } catch (e) {
         syncHistoricalData().catch(err => console.error("Lỗi đồng bộ lịch sử tài chính:", err));

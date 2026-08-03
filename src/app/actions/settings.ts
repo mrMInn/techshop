@@ -38,9 +38,18 @@ export async function getSystemSettings() {
     await ensureDbSchema();
 
     const config = await db.select().from(telegramSettings).limit(1);
+    const hasEnvConfig = !!(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID);
 
     if (config.length === 0) {
-      return { settings: null, events: [] };
+      return { 
+        settings: {
+          botToken: process.env.TELEGRAM_BOT_TOKEN ? "••••••••••••••••" : "",
+          chatId: process.env.TELEGRAM_CHAT_ID || "",
+          isActive: true,
+        } as any, 
+        events: [],
+        hasEnvConfig
+      };
     }
 
     const events = await db
@@ -48,13 +57,23 @@ export async function getSystemSettings() {
       .from(telegramNotificationEvents)
       .where(eq(telegramNotificationEvents.telegramSettingId, config[0].id));
 
+    // Nếu cấu hình DB rỗng nhưng có env config, điền sẵn thông tin env làm giá trị hiển thị giả
+    const settings = { ...config[0] };
+    if (!settings.botToken && process.env.TELEGRAM_BOT_TOKEN) {
+      settings.botToken = "••••••••••••••••";
+    }
+    if (!settings.chatId && process.env.TELEGRAM_CHAT_ID) {
+      settings.chatId = process.env.TELEGRAM_CHAT_ID;
+    }
+
     return {
-      settings: config[0],
-      events: events
+      settings,
+      events,
+      hasEnvConfig
     };
   } catch (error) {
     console.error("Lỗi truy xuất cấu hình hệ thống:", error);
-    return { settings: null, events: [] };
+    return { settings: null, events: [], hasEnvConfig: false };
   }
 }
 
@@ -104,7 +123,7 @@ export async function saveSystemSettings(data: {
       
       let settingId = "";
       const updateData = {
-        botToken: data.botToken,
+        botToken: data.botToken === "••••••••••••••••" ? (existingConfig[0]?.botToken || "") : data.botToken,
         chatId: data.chatId,
         isActive: data.isActive,
         
@@ -185,11 +204,18 @@ export async function saveSystemSettings(data: {
 // 4. Gửi thử nghiệm kết nối Telegram Bot
 export async function testTelegramConnectionAction(botToken: string, chatId: string) {
   try {
-    const cleanToken = botToken.trim();
-    const cleanChatId = chatId.trim();
+    let cleanToken = botToken.trim();
+    let cleanChatId = chatId.trim();
+
+    if (cleanToken === "••••••••••••••••" && process.env.TELEGRAM_BOT_TOKEN) {
+      cleanToken = process.env.TELEGRAM_BOT_TOKEN;
+    }
+    if ((!cleanChatId || cleanChatId === "") && process.env.TELEGRAM_CHAT_ID) {
+      cleanChatId = process.env.TELEGRAM_CHAT_ID;
+    }
 
     if (!cleanToken || !cleanChatId) {
-      return { success: false, message: "Vui lòng nhập đầy đủ Bot Token và Chat ID" };
+      return { success: false, message: "Vui lòng nhập đầy đủ Bot Token và Chat ID hoặc cấu hình file .env.local" };
     }
 
     const testMessage = `<b>🔔 TechStore ERP — Kết nối kiểm thử thành công!</b>\n\nHệ thống thông báo real-time tự động đã thiết lập kết nối an toàn và sẵn sàng hoạt động.\n\n<i>Thời gian kiểm thử: ${new Date().toLocaleString("vi-VN")}</i>`;

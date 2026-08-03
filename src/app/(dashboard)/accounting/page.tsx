@@ -1663,14 +1663,14 @@ export default function CashBookPage() {
                       <button
                         type="button"
                         onClick={() => setIsEditing(false)}
-                        className="px-4 h-[34px] bg-[#fafafc] hover:bg-[#f5f5f7] border border-[#e0e0e0] text-slate-700 rounded-lg text-[12px] font-semibold transition-all cursor-pointer active:scale-[0.97]"
+                        className="px-5 h-[34px] bg-[#fafafc] hover:bg-[#f5f5f7] border border-[#e0e0e0] text-slate-700 rounded-full text-[12px] font-semibold transition-all cursor-pointer active:scale-95 duration-200"
                       >
                         Hủy
                       </button>
                       <button
                         type="submit"
                         disabled={updateMutation.isPending || updateManualIncomeMutation.isPending}
-                        className="flex items-center justify-center gap-1.5 px-4.5 h-[34px] bg-[#0066cc] text-white hover:bg-blue-600 rounded-lg text-[12px] font-semibold transition-all disabled:opacity-50 cursor-pointer active:scale-[0.97] shadow-sm"
+                        className="flex items-center justify-center gap-1.5 px-5 h-[34px] bg-[#0066cc] text-white hover:bg-blue-600 rounded-full text-[12px] font-semibold transition-all disabled:opacity-50 cursor-pointer active:scale-95 duration-200 shadow-sm"
                       >
                         {updateMutation.isPending || updateManualIncomeMutation.isPending ? "Đang lưu..." : "Lưu thay đổi"}
                       </button>
@@ -1679,7 +1679,7 @@ export default function CashBookPage() {
                     <button
                       type="button"
                       onClick={() => setIsConfirmDeleteOpen(true)}
-                      className="w-full flex items-center justify-center gap-1.5 h-[34px] bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg text-[12px] font-semibold transition-all border border-rose-200 cursor-pointer active:scale-[0.97]"
+                      className="w-full flex items-center justify-center gap-1.5 h-[34px] bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-full text-[12px] font-semibold transition-all border border-rose-200 cursor-pointer active:scale-95 duration-200"
                     >
                       <Trash2 size={13} /> Xóa chứng từ
                     </button>
@@ -1788,7 +1788,7 @@ export default function CashBookPage() {
                   <button
                     type="button"
                     onClick={() => setSelectedEntry(null)}
-                    className="px-4 h-[34px] bg-[#fafafc] hover:bg-[#f5f5f7] border border-[#e0e0e0] text-slate-700 rounded-lg text-[12px] font-semibold transition-all cursor-pointer active:scale-[0.97]"
+                    className="px-5 h-[34px] bg-[#fafafc] hover:bg-[#f5f5f7] border border-[#e0e0e0] text-slate-700 rounded-full text-[12px] font-semibold transition-all cursor-pointer active:scale-95 duration-200"
                   >
                     Đóng
                   </button>
@@ -1803,7 +1803,7 @@ export default function CashBookPage() {
                         setEditExpenseDate(selectedEntry.entryDate || "");
                         setEditPaymentMethod(selectedEntry.paymentMethod || "cash");
                       }}
-                      className="flex items-center gap-1 px-4.5 h-[34px] bg-[#0066cc] text-white hover:bg-[#0071e3] rounded-lg text-[12px] font-semibold transition-all cursor-pointer shadow-sm active:scale-[0.97]"
+                      className="flex items-center gap-1.5 px-5 h-[34px] bg-[#0066cc] text-white hover:bg-[#0071e3] rounded-full text-[12px] font-semibold transition-all cursor-pointer shadow-sm active:scale-95 duration-200"
                     >
                       <Edit2 size={12} /> Hiệu chỉnh
                     </button>

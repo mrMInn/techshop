@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { db } from '@/lib/db';
-import { sendTelegramNotification } from '@/lib/telegram/notifier';
+import { sendSystemNotification } from '@/lib/notifications';
 import {
   syncHistoricalAccountingDataAction,
   getFinancialSummary,
@@ -29,8 +29,8 @@ vi.mock('next/server', () => ({
   after: vi.fn((cb) => cb()),
 }));
 
-vi.mock('@/lib/telegram/notifier', () => ({
-  sendTelegramNotification: vi.fn().mockResolvedValue(true),
+vi.mock('@/lib/notifications', () => ({
+  sendSystemNotification: vi.fn().mockResolvedValue(true),
 }));
 
 const { mockDb } = vi.hoisted(() => {
@@ -879,7 +879,7 @@ describe('Accounting Server Actions', () => {
     });
 
     it('thành công với Telegram send rejected', async () => {
-      vi.mocked(sendTelegramNotification).mockRejectedValueOnce(new Error('Telegram send error'));
+      vi.mocked(sendSystemNotification).mockRejectedValueOnce(new Error('Telegram send error'));
 
       const txMock = createTxMock(
         [

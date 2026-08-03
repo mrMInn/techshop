@@ -13,7 +13,7 @@ import {
   getOrderDetail
 } from '@/app/actions/orders';
 import { db } from '@/lib/db';
-import { sendTelegramNotification } from '@/lib/telegram/notifier';
+import { sendSystemNotification } from '@/lib/notifications';
 
 const { mockDb } = vi.hoisted(() => {
   const mockDbObj: any = {
@@ -50,8 +50,8 @@ vi.mock('@/lib/db', () => ({
   recalculateRunningBalances: vi.fn().mockResolvedValue(true),
 }));
 
-vi.mock('@/lib/telegram/notifier', () => ({
-  sendTelegramNotification: vi.fn().mockResolvedValue(true),
+vi.mock('@/lib/notifications', () => ({
+  sendSystemNotification: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock('next/server', () => ({
@@ -320,7 +320,7 @@ describe('Server Actions - Quản lý Đơn hàng (Orders Module)', () => {
     });
 
     it('phải tạo đơn hàng online thành công nhưng gặp lỗi gửi Telegram', async () => {
-      vi.mocked(sendTelegramNotification).mockRejectedValueOnce(new Error('Telegram failed'));
+      vi.mocked(sendSystemNotification).mockRejectedValueOnce(new Error('Telegram failed'));
       
       const txMock = createTxMock(
         [
@@ -487,7 +487,7 @@ describe('Server Actions - Quản lý Đơn hàng (Orders Module)', () => {
     });
 
     it('phải hủy đơn hàng thành công nhưng gặp lỗi gửi Telegram', async () => {
-      vi.mocked(sendTelegramNotification).mockRejectedValueOnce(new Error('Telegram failed'));
+      vi.mocked(sendSystemNotification).mockRejectedValueOnce(new Error('Telegram failed'));
 
       const txMock = createTxMock(
         [
@@ -640,7 +640,7 @@ describe('Server Actions - Quản lý Đơn hàng (Orders Module)', () => {
     });
 
     it('phải hoàn tất đơn hàng online thành công nhưng gặp lỗi gửi Telegram', async () => {
-      vi.mocked(sendTelegramNotification).mockRejectedValueOnce(new Error('Telegram failed'));
+      vi.mocked(sendSystemNotification).mockRejectedValueOnce(new Error('Telegram failed'));
 
       const txMock = createTxMock(
         [

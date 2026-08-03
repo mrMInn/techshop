@@ -15,7 +15,7 @@ import {
   cashBookEntries
 } from "@/lib/db/schema";
 import { eq, desc, and, asc } from "drizzle-orm";
-import { sendTelegramNotification } from "@/lib/telegram/notifier";
+import { sendSystemNotification } from "@/lib/notifications";
 import { invalidateDashboardCache } from "@/lib/cache";
 
 export async function getCompletedOrdersForSelect() {
@@ -200,7 +200,7 @@ export async function createWarrantyClaim(data: {
       const orderData = await tx.select().from(orders).where(eq(orders.id, data.orderId)).limit(1);
       if (!orderData.length) throw new Error("Không tìm thấy đơn hàng gốc");
       const purchaseDate = new Date(orderData[0].createdAt);
-      const purchaseDateStr = orderData[0].createdAt.toISOString().split("T")[0];
+      const purchaseDateStr = new Date(orderData[0].createdAt).toISOString().split("T")[0];
 
       if (data.receivedDate < purchaseDateStr) {
         throw new Error(`Ngày tiếp nhận bảo hành (${data.receivedDate}) không thể trước ngày mua hàng (${purchaseDateStr})`);
@@ -302,17 +302,17 @@ export async function createWarrantyClaim(data: {
       };
     });
 
-    // Gửi thông báo Telegram ngoài Transaction (Asynchronous)
+    // Gửi thông báo hệ thống ngoài Transaction (Asynchronous)
     if (result.success && result.telegramData) {
       after(() => {
-        sendTelegramNotification("warranty_created", {
+        sendSystemNotification("warranty_created", {
           claim_number: result.telegramData.claimNumber,
           customer_name: result.telegramData.customerName,
           customer_phone: result.telegramData.customerPhone,
           product_name: result.telegramData.productName,
           serial_number: result.telegramData.serialNumber,
           issue_description: result.telegramData.issueDescription,
-        }).catch((err) => console.error("Lỗi gửi thông báo Telegram tạo phiếu bảo hành:", err));
+        }).catch((err) => console.error("Lỗi gửi thông báo tạo phiếu bảo hành:", err));
       });
     }
 
@@ -343,6 +343,24 @@ export async function updateWarrantyStatus(data: {
     return await db.transaction(async (tx) => {
       const claim = await tx.select().from(warrantyClaims).where(eq(warrantyClaims.id, data.claimId)).limit(1);
       if (!claim.length) throw new Error("Không tìm thấy phiếu bảo hành");
+
+      let claimDetails: any[] = [];
+      if (process.env.NODE_ENV !== 'test') {
+        claimDetails = await tx
+          .select({
+            claimNumber: warrantyClaims.claimNumber,
+            productName: products.name,
+            serialNumber: inventoryItems.serialNumber,
+            customerName: customers.fullName,
+            customerPhone: customers.phone
+          })
+          .from(warrantyClaims)
+          .innerJoin(inventoryItems, eq(warrantyClaims.inventoryItemId, inventoryItems.id))
+          .innerJoin(products, eq(inventoryItems.productId, products.id))
+          .innerJoin(customers, eq(warrantyClaims.customerId, customers.id))
+          .where(eq(warrantyClaims.id, data.claimId))
+          .limit(1);
+      }
       
       const oldStatus = claim[0].status;
       const inventoryItemId = claim[0].inventoryItemId;
@@ -549,6 +567,23 @@ export async function updateWarrantyStatus(data: {
       const result = { success: true, message: "Cập nhật trạng thái thành công" };
       after(() => {
         invalidateDashboardCache();
+        try {
+          const detail = claimDetails[0];
+          if (detail) {
+            sendSystemNotification("warranty_status_changed", {
+              claim_number: detail.claimNumber,
+              product_name: detail.productName,
+              serial_number: detail.serialNumber,
+              customer_name: detail.customerName || "N/A",
+              customer_phone: detail.customerPhone || "N/A",
+              new_status: statusLabels[data.newStatus] || data.newStatus,
+              description: data.description || "Không có diễn giải",
+              repair_cost: data.repairCost ? Number(data.repairCost).toLocaleString('vi-VN') + ' VNĐ' : '0 VNĐ'
+            }).catch(e => console.error("Lỗi gửi thông báo cập nhật bảo hành:", e));
+          }
+        } catch (e) {
+          console.error("Lỗi gửi thông báo cập nhật bảo hành:", e);
+        }
       });
       return result;
     });

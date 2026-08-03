@@ -10,7 +10,7 @@ import {
   getWarrantyClaimDetail
 } from '@/app/actions/warranty';
 import { db } from '@/lib/db';
-import { sendTelegramNotification } from '@/lib/telegram/notifier';
+import { sendSystemNotification } from '@/lib/notifications';
 
 const { mockDb } = vi.hoisted(() => {
   return {
@@ -47,8 +47,8 @@ vi.mock('next/server', () => ({
   after: vi.fn((cb) => cb()),
 }));
 
-vi.mock('@/lib/telegram/notifier', () => ({
-  sendTelegramNotification: vi.fn().mockResolvedValue(true),
+vi.mock('@/lib/notifications', () => ({
+  sendSystemNotification: vi.fn().mockResolvedValue(true),
 }));
 
 describe('Server Actions - Quản lý Bảo hành (Warranty Module)', () => {
@@ -384,7 +384,7 @@ describe('Server Actions - Quản lý Bảo hành (Warranty Module)', () => {
       });
 
       it('xử lý lỗi khi gửi Telegram thất bại trong after()', async () => {
-        vi.mocked(sendTelegramNotification).mockRejectedValueOnce(new Error('Telegram error'));
+        vi.mocked(sendSystemNotification).mockRejectedValueOnce(new Error('Telegram error'));
         mockDb.limit.mockResolvedValueOnce([{ id: 'order-item-123', warrantyMonths: 12 }]);
         mockDb.limit.mockResolvedValueOnce([{ id: 'order-123', createdAt: '2026-05-01' }]);
         mockDb.limit.mockResolvedValueOnce([{ id: 'profile-1', fullName: 'Staff' }]);

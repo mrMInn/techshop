@@ -23,7 +23,7 @@ import {
   accessoryItems
 } from "@/lib/db/schema";
 import { eq, desc, and, sql, or, like, gte, lte, lt } from "drizzle-orm";
-import { sendTelegramNotification } from "@/lib/telegram/notifier";
+import { sendSystemNotification } from "@/lib/notifications";
 import { serverCache, invalidateDashboardCache } from "@/lib/cache";
 async function requireOwner() {
   // Bỏ qua kiểm tra quyền khi chạy ở chế độ không đăng nhập
@@ -939,14 +939,14 @@ export async function createExpense(data: {
       };
 
       after(() => {
-        sendTelegramNotification("expense_created", {
+        sendSystemNotification("expense_created", {
           expense_number: result.telegramData.expenseNumber,
           expense_date: result.telegramData.expenseDate,
           category_name: result.telegramData.categoryName,
           amount: result.telegramData.amount,
           payment_method: payMethods[result.telegramData.paymentMethod] || result.telegramData.paymentMethod,
           description: result.telegramData.description,
-        }).catch((err) => console.error("Lỗi gửi thông báo Telegram chi phí vận hành:", err));
+        }).catch((err) => console.error("Lỗi gửi thông báo chi phí vận hành:", err));
       });
     }
 
@@ -1595,14 +1595,14 @@ export async function createManualIncome(data: {
       };
 
       after(() => {
-        sendTelegramNotification("payment_received", {
+        sendSystemNotification("payment_received", {
           income_number: result.telegramData.entryNumber,
           income_date: result.telegramData.entryDate,
           category_name: result.telegramData.categoryName,
           amount: result.telegramData.amount,
           payment_method: payMethods[result.telegramData.paymentMethod] || result.telegramData.paymentMethod,
           description: result.telegramData.description,
-        }).catch((err) => console.error("Lỗi gửi thông báo Telegram phiếu thu:", err));
+        }).catch((err) => console.error("Lỗi gửi thông báo phiếu thu:", err));
       });
     }
 

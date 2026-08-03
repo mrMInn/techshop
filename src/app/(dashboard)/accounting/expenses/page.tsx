@@ -1250,8 +1250,18 @@ export default function ExpensesPage() {
                 <div className="pt-3 border-t border-slate-100 flex gap-2 justify-end">
                   <button
                     type="button"
+                    onClick={() => {
+                      setSelectedExpenseForDetail(null);
+                      setIsEditing(false);
+                    }}
+                    className="px-5 h-[34px] bg-[#fafafc] hover:bg-[#f5f5f7] border border-[#e0e0e0] text-slate-700 rounded-full text-[12px] font-semibold transition-all cursor-pointer active:scale-95 duration-200"
+                  >
+                    Đóng
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => handleStartEdit()}
-                    className="flex items-center gap-1.5 px-4 h-[34px] bg-[#0066cc] text-white hover:bg-blue-600 rounded-full text-[12px] font-semibold transition-all cursor-pointer active:scale-95 duration-200"
+                    className="flex items-center gap-1.5 px-5 h-[34px] bg-[#0066cc] text-white hover:bg-blue-600 rounded-full text-[12px] font-semibold transition-all cursor-pointer active:scale-95 duration-200"
                   >
                     <Pencil size={12} /> Hiệu chỉnh
                   </button>
@@ -1260,7 +1270,7 @@ export default function ExpensesPage() {
                     onClick={() => {
                       setExpenseToDelete(selectedExpenseForDetail);
                     }}
-                    className="flex items-center gap-1.5 px-4 h-[34px] bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-full text-[12px] font-semibold transition-all border border-rose-100 cursor-pointer active:scale-95 duration-200"
+                    className="flex items-center gap-1.5 px-5 h-[34px] bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-full text-[12px] font-semibold transition-all border border-rose-100 cursor-pointer active:scale-95 duration-200"
                   >
                     <Trash2 size={12} /> Xóa phiếu
                   </button>

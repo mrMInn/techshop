@@ -24,7 +24,7 @@ import {
   accessoryCatalog
 } from "@/lib/db/schema";
 import { eq, desc, inArray, and, or, ilike, sql } from "drizzle-orm";
-import { sendTelegramNotification } from "@/lib/telegram/notifier";
+import { sendSystemNotification } from "@/lib/notifications";
 import { invalidateDashboardCache, serverCache } from "@/lib/cache";
 
 // 1. Lấy danh sách đơn hàng có phân trang và lọc từ Backend
@@ -858,7 +858,7 @@ export async function createOrderAction(data: {
       };
 
       after(() => {
-        sendTelegramNotification(
+        sendSystemNotification(
           data.saleChannel === "online" ? "order_created" : "order_completed",
           {
             order_number: result.telegramData.orderNumber,
@@ -868,7 +868,7 @@ export async function createOrderAction(data: {
             payment_method: payMethods[result.telegramData.paymentMethod] || result.telegramData.paymentMethod,
             items_list: result.telegramData.itemsList,
           }
-        ).catch((err) => console.error("Lỗi gửi thông báo Telegram đơn hàng:", err));
+        ).catch((err) => console.error("Lỗi gửi thông báo đơn hàng:", err));
       });
     }
 
@@ -1015,12 +1015,12 @@ export async function cancelOrderAction(orderId: string) {
     // Gửi thông báo Telegram ngoài Transaction (Asynchronous, không block database)
     if (result.success && result.telegramData) {
       after(() => {
-        sendTelegramNotification("order_cancelled", {
+        sendSystemNotification("order_cancelled", {
           order_number: result.telegramData.orderNumber,
           customer_name: result.telegramData.customerName,
           total_amount: result.telegramData.totalAmount,
           reason: "Yêu cầu hoàn trả máy / Hủy giao dịch lập đơn",
-        }).catch((err) => console.error("Lỗi gửi thông báo Telegram hủy đơn hàng:", err));
+        }).catch((err) => console.error("Lỗi gửi thông báo hủy đơn hàng:", err));
       });
     }
 
@@ -1276,14 +1276,14 @@ export async function completeOnlineOrderAction(data: {
       };
 
       after(() => {
-        sendTelegramNotification("order_completed", {
+        sendSystemNotification("order_completed", {
           order_number: result.telegramData.orderNumber,
           customer_name: result.telegramData.customerName,
           customer_phone: result.telegramData.customerPhone,
           total_amount: result.telegramData.totalAmount,
           payment_method: payMethods[result.telegramData.paymentMethod] || result.telegramData.paymentMethod,
           items_list: result.telegramData.itemsList,
-        }).catch((err) => console.error("Lỗi gửi thông báo Telegram đơn hàng hoàn tất:", err));
+        }).catch((err) => console.error("Lỗi gửi thông báo đơn hàng hoàn tất:", err));
       });
     }
 

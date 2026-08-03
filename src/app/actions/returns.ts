@@ -80,7 +80,9 @@ export async function createReturn(data: {
       // 0. Kiểm tra ngày tháng so với đơn hàng gốc
       const orderData = await tx.select().from(orders).where(eq(orders.id, data.orderId)).limit(1);
       if (!orderData.length) throw new Error("Không tìm thấy đơn hàng gốc");
-      const orderDateStr = orderData[0].createdAt.toISOString().split("T")[0];
+      const orderDateStr = orderData[0].createdAt 
+        ? new Date(orderData[0].createdAt).toISOString().split("T")[0] 
+        : new Date().toISOString().split("T")[0];
       const todayStr = new Date().toISOString().split("T")[0];
       if (todayStr < orderDateStr) {
         throw new Error(`Ngày đổi trả (${todayStr}) không thể trước ngày mua hàng (${orderDateStr})`);

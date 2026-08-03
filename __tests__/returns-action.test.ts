@@ -159,6 +159,7 @@ describe('Server Actions - Quản lý Đổi/Trả (Return/Exchange Module)', ()
     it('phải báo lỗi nếu hệ thống chưa cấu hình tài khoản nhân viên (profile)', async () => {
       setMockData({
         profiles: [],
+        orders: [{ id: 'order-123', createdAt: '2026-05-01' }],
       });
 
       const result = await createReturn({
