@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Mail, Lock, LayoutDashboard, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { loginAction } from "@/app/actions/auth";
 import { toast } from "sonner";
 
@@ -27,7 +27,6 @@ export default function LoginPage() {
       const result = await loginAction({ email, password });
       if (result.success) {
         toast.success("Đăng nhập thành công!");
-        // Redirect to dashboard home
         router.push("/");
         router.refresh();
       } else {
@@ -41,67 +40,55 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="w-full bg-white/80 backdrop-blur-xl border border-slate-200/60 rounded-3xl p-8 shadow-xl shadow-slate-200/30 transition-all duration-300">
+    <div className="w-full bg-white/90 backdrop-blur-2xl border border-[#e0e0e0]/50 rounded-[22px] p-10 shadow-[0_2px_40px_rgba(0,0,0,0.06)] transition-all duration-300">
       
-      {/* Brand Header */}
-      <div className="flex flex-col items-center text-center mb-8">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#0066cc] to-[#0088ff] flex items-center justify-center shadow-[0_4px_12px_rgba(0,102,204,0.22)] mb-4">
-          <LayoutDashboard className="text-white" size={22} />
-        </div>
-        <h1 className="text-xl font-bold text-slate-800 tracking-tight">
-          Đăng nhập TechStore ERP
+      {/* Header — Apple minimal */}
+      <div className="text-center mb-9">
+        <h1 className="text-[28px] font-semibold text-[#1d1d1f] tracking-tight leading-tight">
+          Đăng nhập
         </h1>
-        <p className="text-[12px] font-semibold text-slate-400 mt-1 uppercase tracking-wider">
-          Hệ thống quản trị nội bộ
-        </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
         
         {/* Email Input */}
         <div className="space-y-1.5">
-          <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider pl-0.5">
+          <label className="text-[12px] font-semibold text-[#86868b] uppercase tracking-wider pl-0.5">
             Email
           </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-              <Mail size={16} />
-            </div>
-            <input
-              type="email"
-              disabled={isLoading}
-              placeholder="name@company.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full pl-10.5 pr-4 h-[44px] rounded-xl bg-[#f5f5f7] border border-slate-200 text-[14px] font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0066cc] focus:bg-white focus:ring-2 focus:ring-[#0066cc]/10 transition-all duration-200 disabled:opacity-60"
-            />
-          </div>
+          <input
+            type="email"
+            disabled={isLoading}
+            placeholder="name@company.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
+            className="w-full px-4 h-[48px] rounded-[14px] bg-[#f5f5f7] border border-[#d2d2d7] text-[15px] font-medium text-[#1d1d1f] placeholder-[#86868b]/60 focus:outline-none focus:border-[#0071e3] focus:bg-white focus:ring-[3px] focus:ring-[#0071e3]/12 transition-all duration-200 disabled:opacity-50"
+          />
         </div>
 
         {/* Password Input */}
         <div className="space-y-1.5">
-          <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider pl-0.5">
+          <label className="text-[12px] font-semibold text-[#86868b] uppercase tracking-wider pl-0.5">
             Mật khẩu
           </label>
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-              <Lock size={16} />
-            </div>
             <input
               type={showPassword ? "text" : "password"}
               disabled={isLoading}
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full pl-10.5 pr-10 h-[44px] rounded-xl bg-[#f5f5f7] border border-slate-200 text-[14px] font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0066cc] focus:bg-white focus:ring-2 focus:ring-[#0066cc]/10 transition-all duration-200 disabled:opacity-60"
+              autoComplete="current-password"
+              className="w-full px-4 pr-11 h-[48px] rounded-[14px] bg-[#f5f5f7] border border-[#d2d2d7] text-[15px] font-medium text-[#1d1d1f] placeholder-[#86868b]/60 focus:outline-none focus:border-[#0071e3] focus:bg-white focus:ring-[3px] focus:ring-[#0071e3]/12 transition-all duration-200 disabled:opacity-50"
             />
             <button
               type="button"
               disabled={isLoading}
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors disabled:opacity-60"
+              className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-[#86868b] hover:text-[#1d1d1f] transition-colors disabled:opacity-50"
             >
-              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
             </button>
           </div>
         </div>
@@ -110,11 +97,11 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full h-[44px] mt-6 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white text-[14px] font-bold shadow-md shadow-[0_4px_12px_rgba(0,102,204,0.18)] hover:scale-[1.01] active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-75 disabled:pointer-events-none"
+          className="w-full h-[48px] mt-3 rounded-[14px] bg-[#0071e3] hover:bg-[#0077ED] text-white text-[15px] font-semibold active:scale-[0.985] transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:pointer-events-none"
         >
           {isLoading ? (
             <>
-              <Loader2 className="animate-spin" size={16} />
+              <Loader2 className="animate-spin" size={17} />
               <span>Đang kết nối...</span>
             </>
           ) : (
@@ -123,13 +110,6 @@ export default function LoginPage() {
         </button>
 
       </form>
-
-      {/* Footer info */}
-      <div className="text-center mt-8 pt-4 border-t border-slate-100">
-        <p className="text-[11px] font-medium text-slate-400">
-          TechStore ERP &copy; 2026. Thiết kế bảo mật.
-        </p>
-      </div>
 
     </div>
   );

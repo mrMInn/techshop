@@ -152,4 +152,5 @@ export const accessoryItems = pgTable('accessory_items', {
   index('idx_acc_items_catalog').on(table.accessoryCatalogId),
   index('idx_acc_items_status').on(table.status),
   index('idx_acc_items_inv').on(table.inventoryItemId),
+  index('idx_acc_items_po').on(table.purchaseOrderId),
 ]);

@@ -1840,244 +1840,220 @@ export default function CashBookPage() {
       />
 
       {/* Elegant Add Manual Income Dialog Modal */}
-      {isCreateIncomeOpen && (
-        <div className="fixed inset-0 bg-[#1d1d1f]/40 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in p-4">
-          <div className="bg-white rounded-2xl border border-[#e0e0e0] w-full max-w-lg shadow-2xl overflow-visible animate-scale-up">
-            {/* Dialog Header */}
-            <div className="px-6 py-4 bg-[#f5f5f7] border-b border-[#e0e0e0] flex items-center justify-between rounded-t-2xl">
-              <h3 className="text-[16px] font-bold text-[#1d1d1f]">Tạo Phiếu Thu Thủ Công</h3>
+      <Dialog
+        isOpen={isCreateIncomeOpen}
+        onClose={() => setIsCreateIncomeOpen(false)}
+        title="Tạo Phiếu Thu Thủ Công"
+        size="lg"
+      >
+        <form onSubmit={handleCreateIncomeSubmit} className="space-y-4">
+          {/* Category Select */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between pl-0.5">
+              <label className="text-[11px] font-bold text-[#7a7a7a] uppercase">Danh mục thu nhập *</label>
               <button
                 type="button"
-                onClick={() => setIsCreateIncomeOpen(false)}
-                className="p-1 hover:bg-[#e0e0e0]/40 rounded-lg text-[#7a7a7a] hover:text-[#1d1d1f] transition-all cursor-pointer"
+                onClick={() => setIsIncomeCategoryDialogOpen(true)}
+                className="text-[11px] font-semibold text-[#0066cc] hover:underline hover:text-[#0071e3]"
               >
-                <X size={18} />
+                + Quản lý danh mục
               </button>
             </div>
-
-            {/* Dialog Form Body */}
-            <form onSubmit={handleCreateIncomeSubmit} className="p-6 space-y-4">
-              {/* Category Select */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between pl-0.5">
-                  <label className="text-[11px] font-bold text-[#7a7a7a] uppercase">Danh mục thu nhập *</label>
-                  <button
-                    type="button"
-                    onClick={() => setIsIncomeCategoryDialogOpen(true)}
-                    className="text-[11px] font-semibold text-[#0066cc] hover:underline hover:text-[#0071e3]"
-                  >
-                    + Quản lý danh mục
-                  </button>
-                </div>
-                <CustomSelect
-                  options={manualIncomeOptions}
-                  value={incomeCategory}
-                  onChange={setIncomeCategory}
-                  placeholder="Chọn danh mục thu..."
-                  dropdownWidth="full"
-                />
-              </div>
-
-              {/* Amount input formatted in VND */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-[#7a7a7a] uppercase pl-0.5">Số tiền thu (VND) *</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={formatVNDInput(incomeAmount)}
-                    onChange={(e) => {
-                      const rawValue = e.target.value.replace(/\D/g, "");
-                      setIncomeAmount(rawValue);
-                    }}
-                    placeholder="0"
-                    className="w-full pl-3 pr-12 py-2 rounded-xl bg-[#f5f5f7] border border-[#e0e0e0] text-[13px] font-semibold focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40"
-                    required
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] font-bold text-[#7a7a7a]">VNĐ</span>
-                </div>
-              </div>
-
-              {/* Income Date & Payment Method */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5 relative">
-                  <label className="text-[11px] font-bold text-[#7a7a7a] uppercase pl-0.5">Ngày thu *</label>
-                  <CustomDatePicker
-                    value={incomeDate}
-                    onChange={setIncomeDate}
-                    placeholder="Chọn ngày thu..."
-                    anchorDate="2026-05-30"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-[#7a7a7a] uppercase pl-0.5">Thanh toán bằng *</label>
-                  <CustomSelect
-                    options={[
-                      { value: "cash", label: "Tiền mặt" },
-                      { value: "bank_transfer", label: "Chuyển khoản" },
-                      { value: "card", label: "Thẻ ngân hàng" },
-                    ]}
-                    value={incomePaymentMethod}
-                    onChange={setIncomePaymentMethod}
-                    dropdownWidth="full"
-                  />
-                </div>
-              </div>
-
-              {/* Description */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-[#7a7a7a] uppercase pl-0.5">Diễn giải nội dung *</label>
-                <textarea
-                  value={incomeDescription}
-                  onChange={(e) => setIncomeDescription(e.target.value)}
-                  placeholder="Diễn giải chi tiết nội dung thu tiền..."
-                  className="w-full px-3 py-2 rounded-xl bg-[#f5f5f7] border border-[#e0e0e0] text-[13px] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40"
-                  rows={3}
-                  required
-                />
-              </div>
-
-              {/* Action buttons */}
-              <div className="pt-2 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateIncomeOpen(false)}
-                  disabled={createManualIncomeMutation.isPending}
-                  className="px-5 h-[40px] bg-gray-50 hover:bg-gray-100 border border-[#e0e0e0] text-[#1d1d1f] rounded-full text-[13px] font-semibold transition-all disabled:opacity-50 cursor-pointer active:scale-95 duration-200"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  disabled={createManualIncomeMutation.isPending}
-                  className="px-6 h-[40px] bg-[#0066cc] text-white hover:bg-[#0055b3] rounded-full text-[13px] font-semibold transition-all disabled:opacity-50 cursor-pointer active:scale-95 duration-200 shadow-sm"
-                >
-                  {createManualIncomeMutation.isPending ? "Đang ghi..." : "Ghi nhận"}
-                </button>
-              </div>
-            </form>
+            <CustomSelect
+              options={manualIncomeOptions}
+              value={incomeCategory}
+              onChange={setIncomeCategory}
+              placeholder="Chọn danh mục thu..."
+              dropdownWidth="full"
+            />
           </div>
-        </div>
-      )}
+
+          {/* Amount input formatted in VND */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold text-[#7a7a7a] uppercase pl-0.5">Số tiền thu (VND) *</label>
+            <div className="relative">
+              <input
+                type="text"
+                value={formatVNDInput(incomeAmount)}
+                onChange={(e) => {
+                  const rawValue = e.target.value.replace(/\D/g, "");
+                  setIncomeAmount(rawValue);
+                }}
+                placeholder="0"
+                className="w-full pl-3 pr-12 py-2 rounded-xl bg-[#f5f5f7] border border-[#e0e0e0] text-[13px] font-semibold focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40"
+                required
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] font-bold text-[#7a7a7a]">VNĐ</span>
+            </div>
+          </div>
+
+          {/* Income Date & Payment Method */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5 relative">
+              <label className="text-[11px] font-bold text-[#7a7a7a] uppercase pl-0.5">Ngày thu *</label>
+              <CustomDatePicker
+                value={incomeDate}
+                onChange={setIncomeDate}
+                placeholder="Chọn ngày thu..."
+                anchorDate="2026-05-30"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-[#7a7a7a] uppercase pl-0.5">Thanh toán bằng *</label>
+              <CustomSelect
+                options={[
+                  { value: "cash", label: "Tiền mặt" },
+                  { value: "bank_transfer", label: "Chuyển khoản" },
+                  { value: "card", label: "Thẻ ngân hàng" },
+                ]}
+                value={incomePaymentMethod}
+                onChange={setIncomePaymentMethod}
+                dropdownWidth="full"
+              />
+            </div>
+          </div>
+
+          {/* Description */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold text-[#7a7a7a] uppercase pl-0.5">Diễn giải nội dung *</label>
+            <textarea
+              value={incomeDescription}
+              onChange={(e) => setIncomeDescription(e.target.value)}
+              placeholder="Diễn giải chi tiết nội dung thu tiền..."
+              className="w-full px-3 py-2 rounded-xl bg-[#f5f5f7] border border-[#e0e0e0] text-[13px] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40"
+              rows={3}
+              required
+            />
+          </div>
+
+          {/* Action buttons */}
+          <div className="pt-2 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => setIsCreateIncomeOpen(false)}
+              disabled={createManualIncomeMutation.isPending}
+              className="px-5 h-[40px] bg-gray-50 hover:bg-gray-100 border border-[#e0e0e0] text-[#1d1d1f] rounded-full text-[13px] font-semibold transition-all disabled:opacity-50 cursor-pointer active:scale-95 duration-200"
+            >
+              Hủy
+            </button>
+            <button
+              type="submit"
+              disabled={createManualIncomeMutation.isPending}
+              className="px-6 h-[40px] bg-[#0066cc] text-white hover:bg-[#0055b3] rounded-full text-[13px] font-semibold transition-all disabled:opacity-50 cursor-pointer active:scale-95 duration-200 shadow-sm"
+            >
+              {createManualIncomeMutation.isPending ? "Đang ghi..." : "Ghi nhận"}
+            </button>
+          </div>
+        </form>
+      </Dialog>
 
       {/* Elegant Add Manual Expense Dialog Modal */}
-      {isCreateExpenseOpen && (
-        <div className="fixed inset-0 bg-[#1d1d1f]/40 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in p-4">
-          <div className="bg-white rounded-2xl border border-[#e0e0e0] w-full max-w-lg shadow-2xl overflow-visible animate-scale-up">
-            {/* Dialog Header */}
-            <div className="px-6 py-4 bg-[#f5f5f7] border-b border-[#e0e0e0] flex items-center justify-between rounded-t-2xl">
-              <h3 className="text-[16px] font-bold text-[#1d1d1f]">Tạo Phiếu Chi Thủ Công</h3>
+      <Dialog
+        isOpen={isCreateExpenseOpen}
+        onClose={() => setIsCreateExpenseOpen(false)}
+        title="Tạo Phiếu Chi Thủ Công"
+        size="lg"
+      >
+        <form onSubmit={handleCreateExpenseSubmit} className="space-y-4">
+          {/* Category Select */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between pl-0.5">
+              <label className="text-[11px] font-bold text-[#7a7a7a] uppercase">Danh mục chi phí *</label>
               <button
                 type="button"
-                onClick={() => setIsCreateExpenseOpen(false)}
-                className="p-1 hover:bg-[#e0e0e0]/40 rounded-lg text-[#7a7a7a] hover:text-[#1d1d1f] transition-all cursor-pointer"
+                onClick={() => setIsExpenseCategoryDialogOpen(true)}
+                className="text-[11px] font-semibold text-[#0066cc] hover:underline hover:text-[#0071e3]"
               >
-                <X size={18} />
+                + Quản lý danh mục
               </button>
             </div>
-
-            {/* Dialog Form Body */}
-            <form onSubmit={handleCreateExpenseSubmit} className="p-6 space-y-4">
-              {/* Category Select */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between pl-0.5">
-                  <label className="text-[11px] font-bold text-[#7a7a7a] uppercase">Danh mục chi phí *</label>
-                  <button
-                    type="button"
-                    onClick={() => setIsExpenseCategoryDialogOpen(true)}
-                    className="text-[11px] font-semibold text-[#0066cc] hover:underline hover:text-[#0071e3]"
-                  >
-                    + Quản lý danh mục
-                  </button>
-                </div>
-                <CustomSelect
-                  options={manualExpenseOptions}
-                  value={expenseCategoryId}
-                  onChange={setExpenseCategoryId}
-                  placeholder="Chọn danh mục chi..."
-                  dropdownWidth="full"
-                />
-              </div>
-
-              {/* Amount input formatted in VND */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-[#7a7a7a] uppercase pl-0.5">Số tiền chi (VND) *</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={formatVNDInput(expenseAmount)}
-                    onChange={(e) => {
-                      const rawValue = e.target.value.replace(/\D/g, "");
-                      setExpenseAmount(rawValue);
-                    }}
-                    placeholder="0"
-                    className="w-full pl-3 pr-12 py-2 rounded-xl bg-[#f5f5f7] border border-[#e0e0e0] text-[13px] font-semibold focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40"
-                    required
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] font-bold text-[#7a7a7a]">VNĐ</span>
-                </div>
-              </div>
-
-              {/* Expense Date & Payment Method */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5 relative">
-                  <label className="text-[11px] font-bold text-[#7a7a7a] uppercase pl-0.5">Ngày chi *</label>
-                  <CustomDatePicker
-                    value={expenseDate}
-                    onChange={setExpenseDate}
-                    placeholder="Chọn ngày chi..."
-                    anchorDate="2026-05-30"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-[#7a7a7a] uppercase pl-0.5">Thanh toán bằng *</label>
-                  <CustomSelect
-                    options={[
-                      { value: "cash", label: "Tiền mặt" },
-                      { value: "bank_transfer", label: "Chuyển khoản" },
-                      { value: "card", label: "Thẻ ngân hàng" },
-                    ]}
-                    value={expensePaymentMethod}
-                    onChange={setExpensePaymentMethod}
-                    dropdownWidth="full"
-                  />
-                </div>
-              </div>
-
-              {/* Description */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-[#7a7a7a] uppercase pl-0.5">Diễn giải nội dung *</label>
-                <textarea
-                  value={expenseDescription}
-                  onChange={(e) => setExpenseDescription(e.target.value)}
-                  placeholder="Diễn giải chi tiết nội dung chi tiền..."
-                  className="w-full px-3 py-2 rounded-xl bg-[#f5f5f7] border border-[#e0e0e0] text-[13px] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40"
-                  rows={3}
-                  required
-                />
-              </div>
-
-              {/* Action buttons */}
-              <div className="pt-2 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateExpenseOpen(false)}
-                  disabled={createExpenseMutation.isPending}
-                  className="px-5 h-[40px] bg-gray-50 hover:bg-gray-100 border border-[#e0e0e0] text-[#1d1d1f] rounded-full text-[13px] font-semibold transition-all disabled:opacity-50 cursor-pointer active:scale-95 duration-200"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  disabled={createExpenseMutation.isPending}
-                  className="px-6 h-[40px] bg-[#ff2d55] text-white hover:bg-[#d6001c] rounded-full text-[13px] font-semibold transition-all disabled:opacity-50 cursor-pointer active:scale-95 duration-200 shadow-sm"
-                >
-                  {createExpenseMutation.isPending ? "Đang ghi..." : "Ghi nhận"}
-                </button>
-              </div>
-            </form>
+            <CustomSelect
+              options={manualExpenseOptions}
+              value={expenseCategoryId}
+              onChange={setExpenseCategoryId}
+              placeholder="Chọn danh mục chi..."
+              dropdownWidth="full"
+            />
           </div>
-        </div>
-      )}
+
+          {/* Amount input formatted in VND */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold text-[#7a7a7a] uppercase pl-0.5">Số tiền chi (VND) *</label>
+            <div className="relative">
+              <input
+                type="text"
+                value={formatVNDInput(expenseAmount)}
+                onChange={(e) => {
+                  const rawValue = e.target.value.replace(/\D/g, "");
+                  setExpenseAmount(rawValue);
+                }}
+                placeholder="0"
+                className="w-full pl-3 pr-12 py-2 rounded-xl bg-[#f5f5f7] border border-[#e0e0e0] text-[13px] font-semibold focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40"
+                required
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] font-bold text-[#7a7a7a]">VNĐ</span>
+            </div>
+          </div>
+
+          {/* Expense Date & Payment Method */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5 relative">
+              <label className="text-[11px] font-bold text-[#7a7a7a] uppercase pl-0.5">Ngày chi *</label>
+              <CustomDatePicker
+                value={expenseDate}
+                onChange={setExpenseDate}
+                placeholder="Chọn ngày chi..."
+                anchorDate="2026-05-30"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-[#7a7a7a] uppercase pl-0.5">Thanh toán bằng *</label>
+              <CustomSelect
+                options={[
+                  { value: "cash", label: "Tiền mặt" },
+                  { value: "bank_transfer", label: "Chuyển khoản" },
+                  { value: "card", label: "Thẻ ngân hàng" },
+                ]}
+                value={expensePaymentMethod}
+                onChange={setExpensePaymentMethod}
+                dropdownWidth="full"
+              />
+            </div>
+          </div>
+
+          {/* Description */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold text-[#7a7a7a] uppercase pl-0.5">Diễn giải nội dung *</label>
+            <textarea
+              value={expenseDescription}
+              onChange={(e) => setExpenseDescription(e.target.value)}
+              placeholder="Diễn giải chi tiết nội dung chi tiền..."
+              className="w-full px-3 py-2 rounded-xl bg-[#f5f5f7] border border-[#e0e0e0] text-[13px] focus:outline-none focus:ring-2 focus:ring-[#0066cc]/40"
+              rows={3}
+              required
+            />
+          </div>
+
+          {/* Action buttons */}
+          <div className="pt-2 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => setIsCreateExpenseOpen(false)}
+              disabled={createExpenseMutation.isPending}
+              className="px-5 h-[40px] bg-gray-50 hover:bg-gray-100 border border-[#e0e0e0] text-[#1d1d1f] rounded-full text-[13px] font-semibold transition-all disabled:opacity-50 cursor-pointer active:scale-95 duration-200"
+            >
+              Hủy
+            </button>
+            <button
+              type="submit"
+              disabled={createExpenseMutation.isPending}
+              className="px-6 h-[40px] bg-[#ff2d55] text-white hover:bg-[#d6001c] rounded-full text-[13px] font-semibold transition-all disabled:opacity-50 cursor-pointer active:scale-95 duration-200 shadow-sm"
+            >
+              {createExpenseMutation.isPending ? "Đang ghi..." : "Ghi nhận"}
+            </button>
+          </div>
+        </form>
+      </Dialog>
 
       {/* Elegant Add Expense Category Dialog Modal */}
       <Dialog

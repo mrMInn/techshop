@@ -198,10 +198,10 @@ export default function DashboardLayout({
   // Build menu items list based on role
   const menuItems = [
     ...(isAdmin ? [{ href: "/", label: "Dashboard", icon: <LayoutDashboard size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-[#2ea1ff] to-[#0066cc]", match: (p: string) => p === "/" }] : []),
-    { href: "/inventory", label: "Quản lý kho", icon: <Package size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-[#34c759] to-[#28a745]", match: (p: string) => p.startsWith("/inventory") },
-    { href: "/orders", label: "Đơn hàng", icon: <ShoppingCart size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-[#ff2d55] to-[#d6001c]", match: (p: string) => p.startsWith("/orders") },
+    { href: "/inventory?tab=active&status=in_stock", label: "Quản lý kho", icon: <Package size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-[#34c759] to-[#28a745]", match: (p: string) => p.startsWith("/inventory") },
+    { href: "/orders?status=all", label: "Đơn hàng", icon: <ShoppingCart size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-[#ff2d55] to-[#d6001c]", match: (p: string) => p.startsWith("/orders") },
     { href: "/quotations", label: "Báo giá", icon: <FileText size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-[#ff9f0a] to-[#ff7b00]", match: (p: string) => p.startsWith("/quotations") },
-    { href: "/warranty", label: "Bảo hành", icon: <Wrench size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-[#af52de] to-[#7a2bc2]", match: (p: string) => p.startsWith("/warranty") },
+    { href: "/warranty?status=all", label: "Bảo hành", icon: <Wrench size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-[#af52de] to-[#7a2bc2]", match: (p: string) => p.startsWith("/warranty") },
     { href: "/returns", label: "Đổi trả", icon: <RefreshCcw size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-[#5ac8fa] to-[#0071e3]", match: (p: string) => p.startsWith("/returns") },
     { href: "/lookup", label: "Tra cứu", icon: <Search size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-[#ffcc00] to-[#ff9500]", match: (p: string) => p.startsWith("/lookup") },
     ...(isAdmin ? [{ href: "/accounting", label: "Sổ quỹ", icon: <Wallet size={13} strokeWidth={2.5} />, bgColor: "bg-gradient-to-br from-[#34c759] to-[#28a745]", match: (p: string) => p.startsWith("/accounting") }] : []),
@@ -495,199 +495,206 @@ function SidebarNavList({
 
   return (
     <div className="flex flex-col gap-1">
-      {menuItems.map((item) => (
-        <Fragment key={item.href}>
-          <SidebarLink
-            href={item.href}
-            bgColor={item.bgColor}
-            icon={item.icon}
-            label={item.label}
-            active={!!(pathname && item.match(pathname))}
-            hasSubmenu={item.href === "/orders" || item.href === "/inventory" || item.href === "/accounting" || item.href === "/warranty"}
-            isSubmenuExpanded={
-              item.href === "/orders"
-                ? ordersExpanded
-                : item.href === "/inventory" 
-                  ? inventoryExpanded 
-                  : item.href === "/accounting" 
-                    ? accountingExpanded 
-                    : item.href === "/warranty"
-                      ? warrantyExpanded
-                      : false
-            }
-            onClick={(e) => {
-              if (item.href === "/orders") {
-                if (pathname === "/orders") {
-                  e.preventDefault();
-                  setOrdersExpanded(!ordersExpanded);
-                } else {
-                  setOrdersExpanded(true);
+      {menuItems.map((item) => {
+        const isOrders = item.href.startsWith("/orders");
+        const isInventory = item.href.startsWith("/inventory");
+        const isAccounting = item.href.startsWith("/accounting");
+        const isWarranty = item.href.startsWith("/warranty");
+        const hasSubmenu = isOrders || isInventory || isAccounting || isWarranty;
+        const isSubmenuExpanded = isOrders
+          ? ordersExpanded
+          : isInventory
+            ? inventoryExpanded
+            : isAccounting
+              ? accountingExpanded
+              : isWarranty
+                ? warrantyExpanded
+                : false;
+
+        return (
+          <Fragment key={item.href}>
+            <SidebarLink
+              href={item.href}
+              bgColor={item.bgColor}
+              icon={item.icon}
+              label={item.label}
+              active={!!(pathname && item.match(pathname))}
+              hasSubmenu={hasSubmenu}
+              isSubmenuExpanded={isSubmenuExpanded}
+              onClick={(e) => {
+                if (isOrders) {
+                  if (pathname === "/orders") {
+                    e.preventDefault();
+                    setOrdersExpanded(!ordersExpanded);
+                  } else {
+                    setOrdersExpanded(true);
+                  }
+                } else if (isInventory) {
+                  if (pathname === "/inventory") {
+                    e.preventDefault();
+                    setInventoryExpanded(!inventoryExpanded);
+                  } else {
+                    setInventoryExpanded(true);
+                  }
+                } else if (isAccounting) {
+                  if (pathname === "/accounting") {
+                    e.preventDefault();
+                    setAccountingExpanded(!accountingExpanded);
+                  } else {
+                    setAccountingExpanded(true);
+                  }
+                } else if (isWarranty) {
+                  if (pathname === "/warranty") {
+                    e.preventDefault();
+                    setWarrantyExpanded(!warrantyExpanded);
+                  } else {
+                    setWarrantyExpanded(true);
+                  }
                 }
-              } else if (item.href === "/inventory") {
-                if (pathname === "/inventory") {
-                  e.preventDefault();
-                  setInventoryExpanded(!inventoryExpanded);
-                } else {
-                  setInventoryExpanded(true);
-                }
-              } else if (item.href === "/accounting") {
-                if (pathname === "/accounting") {
-                  e.preventDefault();
-                  setAccountingExpanded(!accountingExpanded);
-                } else {
-                  setAccountingExpanded(true);
-                }
-              } else if (item.href === "/warranty") {
-                if (pathname === "/warranty") {
-                  e.preventDefault();
-                  setWarrantyExpanded(!warrantyExpanded);
-                } else {
-                  setWarrantyExpanded(true);
-                }
-              }
-            }}
-          />
-          {item.href === "/orders" && ordersExpanded && (
-            <div className="mt-1 mb-2 ml-4 pl-3.5 flex flex-col gap-1.5 animate-in slide-in-from-top-2 duration-200">
-              <SubmenuLink 
-                href="/orders" 
-                label="Tất cả đơn" 
-                icon={<List size={13} />}
-                active={pathname === "/orders" && !searchParams.get("status") && !searchParams.get("channel")} 
-                badge={totalCount}
-              />
-              <SubmenuLink 
-                href="/orders?status=completed" 
-                label="Hoàn tất" 
-                icon={<CheckCircle size={13} />}
-                active={pathname === "/orders" && searchParams.get("status") === "completed"} 
-                badge={stats.completedCount}
-              />
-              <SubmenuLink 
-                href="/orders?status=processing" 
-                label="Đang giao" 
-                icon={<Truck size={13} />}
-                active={pathname === "/orders" && searchParams.get("status") === "processing"} 
-                badge={stats.processingCount}
-              />
-              <SubmenuLink 
-                href="/orders?channel=online" 
-                label="Kênh Online" 
-                icon={<Globe size={13} />}
-                active={pathname === "/orders" && searchParams.get("channel") === "online"} 
-                badge={stats.onlineCount}
-              />
-              <SubmenuLink 
-                href="/orders?status=cancelled" 
-                label="Đã hủy" 
-                icon={<XCircle size={13} />}
-                active={pathname === "/orders" && searchParams.get("status") === "cancelled"} 
-                badge={stats.cancelledCount}
-              />
-            </div>
-          )}
-          {item.href === "/inventory" && inventoryExpanded && (
-            <div className="mt-1 mb-2 ml-4 pl-3.5 flex flex-col gap-1.5 animate-in slide-in-from-top-2 duration-200">
-              <SubmenuLink 
-                href="/inventory?tab=active&status=in_stock" 
-                label="Kho bán" 
-                icon={<Boxes size={13} />}
-                active={(activeTab === "active" && searchParams.get("status") === "in_stock") || (pathname === "/inventory" && !searchParams.get("tab") && !searchParams.get("status"))} 
-                badge={invStats?.inStock}
-              />
-              <SubmenuLink 
-                href="/inventory?tab=active&status=incoming" 
-                label="Hàng đang về" 
-                icon={<Inbox size={13} />}
-                active={activeTab === "active" && searchParams.get("status") === "incoming"} 
-                badge={invStats?.incoming}
-              />
-              <SubmenuLink 
-                href="/inventory?tab=defective" 
-                label="Kho lỗi" 
-                icon={<AlertOctagon size={13} />}
-                active={activeTab === "defective"} 
-                badge={invStats?.defective}
-              />
-              <SubmenuLink 
-                href="/inventory?tab=purchase_orders" 
-                label="Đơn nhập hàng" 
-                icon={<ClipboardList size={13} />}
-                active={activeTab === "purchase_orders"} 
-                badge={poList?.purchaseOrders?.length}
-              />
-              <SubmenuLink 
-                href="/inventory?tab=returned" 
-                label="Trả NCC" 
-                icon={<CornerUpLeft size={13} />}
-                active={activeTab === "returned"} 
-                badge={invStats?.returned}
-              />
-              <SubmenuLink 
-                href="/inventory?tab=accessories" 
-                label="Kho phụ kiện" 
-                icon={<Cable size={13} />}
-                active={activeTab === "accessories"} 
-                badge={totalAccCount}
-              />
-            </div>
-          )}
-          {item.href === "/warranty" && warrantyExpanded && (
-            <div className="mt-1 mb-2 ml-4 pl-3.5 flex flex-col gap-1.5 animate-in slide-in-from-top-2 duration-200">
-              <SubmenuLink 
-                href="/warranty" 
-                label="Tất cả phiếu" 
-                icon={<List size={13} />}
-                active={pathname === "/warranty" && !searchParams.get("status")} 
-                badge={warrantyClaimsData?.length}
-              />
-              <SubmenuLink 
-                href="/warranty?status=pending" 
-                label="Tiếp nhận" 
-                icon={<Inbox size={13} />}
-                active={pathname === "/warranty" && searchParams.get("status") === "pending"} 
-                badge={warrantyPendingCount}
-              />
-              <SubmenuLink 
-                href="/warranty?status=processing" 
-                label="Đang xử lý" 
-                icon={<Wrench size={13} />}
-                active={pathname === "/warranty" && searchParams.get("status") === "processing"} 
-                badge={warrantyProcessingCount}
-              />
-              <SubmenuLink 
-                href="/warranty?status=completed" 
-                label="Hoàn tất" 
-                icon={<CheckCircle size={13} />}
-                active={pathname === "/warranty" && searchParams.get("status") === "completed"} 
-                badge={warrantyCompletedCount}
-              />
-            </div>
-          )}
-          {item.href === "/accounting" && accountingExpanded && (
-            <div className="mt-1 mb-2 ml-4 pl-3.5 flex flex-col gap-1.5 animate-in slide-in-from-top-2 duration-200">
-              <SubmenuLink 
-                href="/accounting" 
-                label="Nhật ký thu chi" 
-                icon={<Receipt size={13} />}
-                active={pathname === "/accounting"} 
-              />
-              <SubmenuLink 
-                href="/accounting/expenses" 
-                label="Chi phí vận hành" 
-                icon={<Landmark size={13} />}
-                active={pathname === "/accounting/expenses"} 
-              />
-              <SubmenuLink 
-                href="/accounting/reports" 
-                label="Báo cáo tài chính" 
-                icon={<BarChart3 size={13} />}
-                active={pathname === "/accounting/reports"} 
-              />
-            </div>
-          )}
-        </Fragment>
-      ))}
+              }}
+            />
+            {isOrders && ordersExpanded && (
+              <div className="mt-1 mb-2 ml-4 pl-3.5 flex flex-col gap-1.5 animate-in slide-in-from-top-2 duration-200">
+                <SubmenuLink 
+                  href="/orders?status=all" 
+                  label="Tất cả đơn" 
+                  icon={<List size={13} />}
+                  active={pathname === "/orders" && (!searchParams.get("status") || searchParams.get("status") === "all") && !searchParams.get("channel")} 
+                  badge={totalCount}
+                />
+                <SubmenuLink 
+                  href="/orders?status=completed" 
+                  label="Hoàn tất" 
+                  icon={<CheckCircle size={13} />}
+                  active={pathname === "/orders" && searchParams.get("status") === "completed"} 
+                  badge={stats.completedCount}
+                />
+                <SubmenuLink 
+                  href="/orders?status=processing" 
+                  label="Đang giao" 
+                  icon={<Truck size={13} />}
+                  active={pathname === "/orders" && searchParams.get("status") === "processing"} 
+                  badge={stats.processingCount}
+                />
+                <SubmenuLink 
+                  href="/orders?channel=online" 
+                  label="Kênh Online" 
+                  icon={<Globe size={13} />}
+                  active={pathname === "/orders" && searchParams.get("channel") === "online"} 
+                  badge={stats.onlineCount}
+                />
+                <SubmenuLink 
+                  href="/orders?status=cancelled" 
+                  label="Đã hủy" 
+                  icon={<XCircle size={13} />}
+                  active={pathname === "/orders" && searchParams.get("status") === "cancelled"} 
+                  badge={stats.cancelledCount}
+                />
+              </div>
+            )}
+            {isInventory && inventoryExpanded && (
+              <div className="mt-1 mb-2 ml-4 pl-3.5 flex flex-col gap-1.5 animate-in slide-in-from-top-2 duration-200">
+                <SubmenuLink 
+                  href="/inventory?tab=active&status=in_stock" 
+                  label="Kho bán" 
+                  icon={<Boxes size={13} />}
+                  active={(activeTab === "active" && searchParams.get("status") === "in_stock") || (pathname === "/inventory" && !searchParams.get("tab") && !searchParams.get("status"))} 
+                  badge={invStats?.inStock}
+                />
+                <SubmenuLink 
+                  href="/inventory?tab=active&status=incoming" 
+                  label="Hàng đang về" 
+                  icon={<Inbox size={13} />}
+                  active={activeTab === "active" && searchParams.get("status") === "incoming"} 
+                  badge={invStats?.incoming}
+                />
+                <SubmenuLink 
+                  href="/inventory?tab=defective" 
+                  label="Kho lỗi" 
+                  icon={<AlertOctagon size={13} />}
+                  active={activeTab === "defective"} 
+                  badge={invStats?.defective}
+                />
+                <SubmenuLink 
+                  href="/inventory?tab=purchase_orders" 
+                  label="Đơn nhập hàng" 
+                  icon={<ClipboardList size={13} />}
+                  active={activeTab === "purchase_orders"} 
+                  badge={poList?.purchaseOrders?.length}
+                />
+                <SubmenuLink 
+                  href="/inventory?tab=returned" 
+                  label="Trả NCC" 
+                  icon={<CornerUpLeft size={13} />}
+                  active={activeTab === "returned"} 
+                  badge={invStats?.returned}
+                />
+                <SubmenuLink 
+                  href="/inventory?tab=accessories" 
+                  label="Kho phụ kiện" 
+                  icon={<Cable size={13} />}
+                  active={activeTab === "accessories"} 
+                  badge={totalAccCount}
+                />
+              </div>
+            )}
+            {isWarranty && warrantyExpanded && (
+              <div className="mt-1 mb-2 ml-4 pl-3.5 flex flex-col gap-1.5 animate-in slide-in-from-top-2 duration-200">
+                <SubmenuLink 
+                  href="/warranty?status=all" 
+                  label="Tất cả phiếu" 
+                  icon={<List size={13} />}
+                  active={pathname === "/warranty" && (!searchParams.get("status") || searchParams.get("status") === "all")} 
+                  badge={warrantyClaimsData?.length}
+                />
+                <SubmenuLink 
+                  href="/warranty?status=pending" 
+                  label="Tiếp nhận" 
+                  icon={<Inbox size={13} />}
+                  active={pathname === "/warranty" && searchParams.get("status") === "pending"} 
+                  badge={warrantyPendingCount}
+                />
+                <SubmenuLink 
+                  href="/warranty?status=processing" 
+                  label="Đang xử lý" 
+                  icon={<Wrench size={13} />}
+                  active={pathname === "/warranty" && searchParams.get("status") === "processing"} 
+                  badge={warrantyProcessingCount}
+                />
+                <SubmenuLink 
+                  href="/warranty?status=completed" 
+                  label="Hoàn tất" 
+                  icon={<CheckCircle size={13} />}
+                  active={pathname === "/warranty" && searchParams.get("status") === "completed"} 
+                  badge={warrantyCompletedCount}
+                />
+              </div>
+            )}
+            {isAccounting && accountingExpanded && (
+              <div className="mt-1 mb-2 ml-4 pl-3.5 flex flex-col gap-1.5 animate-in slide-in-from-top-2 duration-200">
+                <SubmenuLink 
+                  href="/accounting" 
+                  label="Nhật ký thu chi" 
+                  icon={<Receipt size={13} />}
+                  active={pathname?.replace(/\/$/, "") === "/accounting"} 
+                />
+                <SubmenuLink 
+                  href="/accounting/expenses" 
+                  label="Chi phí vận hành" 
+                  icon={<Landmark size={13} />}
+                  active={pathname === "/accounting/expenses"} 
+                />
+                <SubmenuLink 
+                  href="/accounting/reports" 
+                  label="Báo cáo tài chính" 
+                  icon={<BarChart3 size={13} />}
+                  active={pathname === "/accounting/reports"} 
+                />
+              </div>
+            )}
+          </Fragment>
+        );
+      })}
     </div>
   );
 }

@@ -97,7 +97,7 @@ export function DefectiveActionsDialog({ isOpen, onClose, item, actionType }: De
 
   const repairOptions = [
     { value: "internal", label: "Sửa chữa nội bộ tại cửa hàng" },
-    { value: "supplier", label: "Gửi bảo hành của Nhà cung cấp (NCC)" },
+    { value: "supplier", label: "Gửi bảo hành của Nhà cung cấp" },
   ];
 
   const handleSubmit = async (e: React.FormEvent) => {

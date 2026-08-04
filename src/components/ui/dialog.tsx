@@ -90,7 +90,7 @@ export function Dialog({
       >
         <div className="flex items-center justify-between px-6 py-5 border-b border-[#e0e0e0]">
           <div>
-            <h2 className="text-[21px] font-semibold text-[#1d1d1f] tracking-tight leading-tight">{title}</h2>
+            <h2 className="text-[21px] font-semibold text-[#0066cc] tracking-tight leading-tight">{title}</h2>
             {description && (
               <div className="text-[14px] text-[#7a7a7a] mt-1.5 font-normal leading-none flex items-center gap-2 flex-wrap">
                 {description}
