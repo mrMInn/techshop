@@ -8,12 +8,17 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { useRealtimeSubscription } from "@/hooks/use-realtime";
 import { Dialog } from "@/components/ui/dialog";
 import { ReturnForm } from "@/components/returns/return-form";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export default function ReturnsPage() {
   const queryClient = useQueryClient();
+
+  // Kích hoạt Supabase Realtime cho trả hàng
+  useRealtimeSubscription("returns", [["returns"]]);
+
   const [search, setSearch] = useState("");
   const [mounted, setMounted] = useState(false);
   useEffect(() => {

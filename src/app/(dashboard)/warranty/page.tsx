@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useMemo, Suspense } from "react";
 import { toast } from "sonner";
+import { useRealtimeSubscription } from "@/hooks/use-realtime";
 import { Dialog } from "@/components/ui/dialog";
 import { WarrantyForm } from "@/components/warranty/warranty-form";
 import { WarrantyDetailDialog } from "@/components/warranty/warranty-detail-dialog";
@@ -53,6 +54,10 @@ export default function WarrantyPage() {
 
 function WarrantyPageContent() {
   const queryClient = useQueryClient();
+
+  // Kích hoạt Supabase Realtime cho bảo hành
+  useRealtimeSubscription("warranty_claims", [["warranty_claims"]]);
+
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();

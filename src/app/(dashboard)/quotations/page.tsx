@@ -9,12 +9,17 @@ import {
 } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
+import { useRealtimeSubscription } from "@/hooks/use-realtime";
 import { Dialog } from "@/components/ui/dialog";
 import { QuotationForm } from "@/components/quotations/quotation-form";
 import { QUOTATION_STATUS } from "@/lib/constants";
 
 export default function QuotationsPage() {
   const queryClient = useQueryClient();
+
+  // Kích hoạt Supabase Realtime cho báo giá
+  useRealtimeSubscription("quotations", [["quotations"]]);
+
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
