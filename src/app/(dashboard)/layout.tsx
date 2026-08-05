@@ -3,7 +3,7 @@
 import { Package, ShoppingCart, Users, Wrench, Settings, LayoutDashboard, RefreshCcw, Wallet, FileText, Search, LogOut, List, CheckCircle, Truck, Globe, XCircle, Boxes, Inbox, AlertOctagon, ClipboardList, CornerUpLeft, Cable, Receipt, Landmark, BarChart3 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect, useRef, Fragment } from "react";
+import { Suspense, useState, useEffect, useRef, Fragment } from "react";
 import { getCurrentUserAction, logoutAction } from "@/app/actions/auth";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
@@ -138,6 +138,18 @@ function getBreadcrumbs(path: string | null, searchParams?: any): { label: strin
 }
 
 export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <Suspense fallback={null}>
+      <DashboardLayoutContent>{children}</DashboardLayoutContent>
+    </Suspense>
+  );
+}
+
+function DashboardLayoutContent({
   children,
 }: {
   children: React.ReactNode;
