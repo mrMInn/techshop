@@ -23,8 +23,32 @@ import {
   accessoryItems
 } from "@/lib/db/schema";
 import { eq, desc, and, sql, or, like, gte, lte, lt } from "drizzle-orm";
+import type { InferSelectModel } from "drizzle-orm";
 import { sendSystemNotification } from "@/lib/notifications";
 import { serverCache, invalidateDashboardCache } from "@/lib/cache";
+
+type ExpenseCategory = InferSelectModel<typeof expenseCategories>;
+
+type ExpenseListItem = {
+  id: string;
+  expenseNumber: string;
+  categoryId: string;
+  amount: string;
+  description: string;
+  expenseDate: string;
+  paymentMethod: "cash" | "bank_transfer" | "card";
+  categoryName: string;
+  createdByName: string | null;
+  createdAt: Date;
+};
+
+type WarrantyClaimSelectItem = {
+  id: string;
+  claimNumber: string;
+  serialNumber: string;
+  customerName: string;
+  productName: string;
+};
 async function requireOwner() {
   // Bỏ qua kiểm tra quyền khi chạy ở chế độ không đăng nhập
   return;
@@ -750,10 +774,10 @@ export async function getCashBookEntries(filters?: {
 }
 
 // 4. Lấy danh sách Chi phí vận hành thực tế
-export async function getExpenses() {
+export async function getExpenses(): Promise<ExpenseListItem[]> {
   await requireOwner();
   const cacheKey = "expenses_list";
-  const cached = serverCache.get(cacheKey);
+  const cached = serverCache.get<ExpenseListItem[]>(cacheKey);
   if (cached) {
     console.log("CACHE HIT: getExpenses");
     return cached;
@@ -802,10 +826,10 @@ export async function getExpenseById(id: string) {
 }
 
 // 5. Lấy danh sách danh mục Chi phí
-export async function getExpenseCategories() {
+export async function getExpenseCategories(): Promise<ExpenseCategory[]> {
   await requireOwner();
   const cacheKey = "expense_categories";
-  const cached = serverCache.get(cacheKey);
+  const cached = serverCache.get<ExpenseCategory[]>(cacheKey);
   if (cached) {
     console.log("CACHE HIT: getExpenseCategories");
     return cached;
@@ -1129,10 +1153,10 @@ export async function deleteIncomeCategory(id: string) {
 }
 
 // 8. Lấy danh sách phiếu bảo hành cho dropdown chọn liên kết
-export async function getWarrantyClaimsForSelect() {
+export async function getWarrantyClaimsForSelect(): Promise<WarrantyClaimSelectItem[]> {
   await requireOwner();
   const cacheKey = "warranty_claims_select";
-  const cached = serverCache.get(cacheKey);
+  const cached = serverCache.get<WarrantyClaimSelectItem[]>(cacheKey);
   if (cached) {
     console.log("CACHE HIT: getWarrantyClaimsForSelect");
     return cached;

@@ -12,10 +12,31 @@ import {
 import { eq, and, sql, or, gte, lte, lt } from "drizzle-orm";
 import { serverCache } from "@/lib/cache";
 
+type IncomeStatementReport = {
+  salesRevenue: number;
+  costOfGoodsSold: number;
+  salesGrossMargin: number;
+  warrantyIncome: number;
+  salesRefunds: number;
+  netRevenue: number;
+  expenseBreakdown: { categoryName: string; amount: number }[];
+  totalOperatingExpenses: number;
+  netProfit: number;
+};
+
+type CashFlowStatementReport = {
+  operatingInflow: number;
+  operatingOutflow: number;
+  netOperatingCashFlow: number;
+  investingOutflow: number;
+  netInvestingCashFlow: number;
+  netCashFlow: number;
+  categoryBreakdown: { category: string; income: number; expense: number }[];
+};
 // 1. Lấy Báo cáo Kết quả Kinh doanh (P&L - Profit & Loss)
-export async function getIncomeStatementReport(startDate: string, endDate: string) {
+export async function getIncomeStatementReport(startDate: string, endDate: string): Promise<IncomeStatementReport> {
   const cacheKey = `income_statement_${startDate}_${endDate}`;
-  const cached = serverCache.get(cacheKey);
+  const cached = serverCache.get<IncomeStatementReport>(cacheKey);
   if (cached) {
     console.log(`CACHE HIT: getIncomeStatementReport (${startDate} - ${endDate})`);
     return cached;
@@ -130,9 +151,9 @@ export async function getIncomeStatementReport(startDate: string, endDate: strin
 }
 
 // 2. Lấy Báo cáo Lưu chuyển Tiền tệ (Cash Flow Statement)
-export async function getCashFlowStatementReport(startDate: string, endDate: string) {
+export async function getCashFlowStatementReport(startDate: string, endDate: string): Promise<CashFlowStatementReport> {
   const cacheKey = `cashflow_statement_${startDate}_${endDate}`;
-  const cached = serverCache.get(cacheKey);
+  const cached = serverCache.get<CashFlowStatementReport>(cacheKey);
   if (cached) {
     console.log(`CACHE HIT: getCashFlowStatementReport (${startDate} - ${endDate})`);
     return cached;

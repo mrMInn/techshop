@@ -1,12 +1,12 @@
-interface CacheEntry {
-  value: any;
+interface CacheEntry<T = any> {
+  value: T;
   expiresAt: number;
 }
 
 class MemoryCache {
   private cache = new Map<string, CacheEntry>();
 
-  get(key: string): any {
+  get<T = any>(key: string): T | null {
     if (process.env.NODE_ENV === 'test') return null;
     const entry = this.cache.get(key);
     if (!entry) return null;
@@ -14,10 +14,10 @@ class MemoryCache {
       this.cache.delete(key);
       return null;
     }
-    return entry.value;
+    return entry.value as T;
   }
 
-  set(key: string, value: any, ttlSeconds: number): void {
+  set<T>(key: string, value: T, ttlSeconds: number): void {
     this.cache.set(key, {
       value,
       expiresAt: Date.now() + ttlSeconds * 1000,
