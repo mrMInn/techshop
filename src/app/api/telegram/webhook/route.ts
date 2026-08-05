@@ -38,7 +38,7 @@ async function getOrCreateTelegramSetting() {
       botToken,
       chatId,
       isActive: true,
-      storeName: "TechStore",
+      storeName: "Nơi Bán Phụ Kiện",
     }).returning();
     return newSetting;
   }
@@ -289,7 +289,7 @@ async function handleGeminiAIResponse(chatId: string | number, text: string, mes
 
   // System instruction để định hình tính cách & bắt buộc định dạng Telegram HTML
   const systemInstruction = 
-    `Bạn là Trợ lý ảo AI chăm sóc cửa hàng thuộc hệ thống TechStore ERP. Hãy trả lời câu hỏi của người dùng bằng tiếng Việt một cách thân thiện, chuyên nghiệp, thông minh và súc tích dựa trên dữ liệu hệ thống thực tế được cung cấp.\n` +
+    `Bạn là Trợ lý ảo AI chăm sóc cửa hàng thuộc hệ thống Nơi Bán Phụ Kiện ERP. Hãy trả lời câu hỏi của người dùng bằng tiếng Việt một cách thân thiện, chuyên nghiệp, thông minh và súc tích dựa trên dữ liệu hệ thống thực tế được cung cấp.\n` +
     `LƯU Ý ĐỊNH DẠNG (BẮT BUỘC): Chỉ sử dụng các thẻ HTML được Telegram hỗ trợ bao gồm <b> (in đậm), <i> (in nghiêng), <code> ( monospace copy), và <a> (đường dẫn). KHÔNG dùng các định dạng markdown như **, *, \` hoặc các thẻ HTML không được hỗ trợ khác. Sử dụng icon cảm xúc sinh động.`;
 
   const prompt = 
@@ -524,7 +524,7 @@ async function handleLocalKeywordFallback(chatId: string | number, text: string,
 
   // 5. Phản hồi mặc định nếu không khớp từ khóa
   const defaultText = 
-    `🤖 <b>Hỗ trợ TechStore ERP Bot</b>\n\n` +
+    `🤖 <b>Hỗ trợ Nơi Bán Phụ Kiện ERP Bot</b>\n\n` +
     `Bạn có thể sử dụng các cú pháp chat nhanh sau để tương tác với hệ thống:\n` +
     `• Chat: <i>"bot ơi thống kê kho"</i> để xem số liệu kho hàng.\n` +
     `• Chat: <i>"bot ơi tài chính"</i> để xem báo cáo doanh thu, lời lãi.\n` +
@@ -586,7 +586,7 @@ export async function POST(request: Request) {
 
       if (command === "/start" || command === "/help") {
         const helpText = 
-          `🤖 <b>TechStore ERP Bot</b>\n\n` +
+          `🤖 <b>Nơi Bán Phụ Kiện ERP Bot</b>\n\n` +
           `Các lệnh hỗ trợ:\n` +
           `• <code>/stats</code>: Xem nhanh thống kê kho hàng.\n` +
           `• <code>/search &lt;từ khóa&gt;</code>: Tìm kiếm máy trong kho theo Serial hoặc Tên sản phẩm.\n\n` +

@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TechStore ERP",
+  title: "Nơi Bán Phụ Kiện - ERP",
   description: "Quản lý kho hàng & Bán hàng",
 };
 

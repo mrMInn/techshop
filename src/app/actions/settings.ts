@@ -218,7 +218,7 @@ export async function testTelegramConnectionAction(botToken: string, chatId: str
       return { success: false, message: "Vui lòng nhập đầy đủ Bot Token và Chat ID hoặc cấu hình file .env.local" };
     }
 
-    const testMessage = `<b>🔔 TechStore ERP — Kết nối kiểm thử thành công!</b>\n\nHệ thống thông báo real-time tự động đã thiết lập kết nối an toàn và sẵn sàng hoạt động.\n\n<i>Thời gian kiểm thử: ${new Date().toLocaleString("vi-VN")}</i>`;
+    const testMessage = `<b>🔔 Nơi Bán Phụ Kiện ERP — Kết nối kiểm thử thành công!</b>\n\nHệ thống thông báo real-time tự động đã thiết lập kết nối an toàn và sẵn sàng hoạt động.\n\n<i>Thời gian kiểm thử: ${new Date().toLocaleString("vi-VN")}</i>`;
 
     const url = `https://api.telegram.org/bot${cleanToken}/sendMessage`;
     const res = await fetch(url, {

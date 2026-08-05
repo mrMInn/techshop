@@ -152,7 +152,7 @@ export default function PublicQuotationSharePage({ params }: SharePageProps) {
                     <FileText className="text-white" size={13} />
                   </div>
                   <span className="text-[11px] font-black uppercase tracking-widest text-[#0066cc] leading-none">
-                    {storeSettings?.storeName || "TechStore ERP"}
+                    {storeSettings?.storeName || "Nơi Bán Phụ Kiện"}
                   </span>
                 </div>
                 <h2 className="text-[24px] font-black tracking-tight leading-none text-[#1d1d1f]">
@@ -559,7 +559,7 @@ export default function PublicQuotationSharePage({ params }: SharePageProps) {
           Bản báo giá điện tử bảo mật được khởi tạo bởi nhân viên {quotation.creatorName || "Cửa hàng"}.<br />
           {storeSettings?.storePhone && `Hotline: ${storeSettings.storePhone}`}
           {storeSettings?.storeEmail && ` • Email: ${storeSettings.storeEmail}`}
-          {!storeSettings?.storePhone && "Mọi thắc mắc vui lòng liên hệ hotline hỗ trợ."} TechStore ERP v1.0
+          {!storeSettings?.storePhone && "Mọi thắc mắc vui lòng liên hệ hotline hỗ trợ."} Nơi Bán Phụ Kiện ERP v1.0
         </p>
 
       </div>

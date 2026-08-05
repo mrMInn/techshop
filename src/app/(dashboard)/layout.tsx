@@ -58,7 +58,7 @@ function getPageTitle(path: string | null, searchParams?: any) {
   if (path.startsWith("/accounting/reports")) return "Báo cáo tài chính";
   if (path.startsWith("/accounting")) return "Sổ quỹ";
   if (path.startsWith("/settings")) return "Cấu hình Telegram";
-  return "TechStore ERP";
+  return "Nơi Bán Phụ Kiện - ERP";
 }
 
 function getBreadcrumbs(path: string | null, searchParams?: any): { label: string; href?: string }[] {
@@ -213,7 +213,7 @@ export default function DashboardLayout({
     <div className="flex h-screen overflow-hidden bg-[#f5f5f7] antialiased font-sans">
       
       {/* Apple Premium Flat Minimalist Sidebar */}
-      <aside className="w-64 bg-white border-r border-[#e3e3e8] hidden md:flex flex-col p-5 justify-between z-40 select-none">
+      <aside className="w-64 bg-[#f5f5f7] border-r border-[#e3e3e8] hidden md:flex flex-col p-5 justify-between z-40 select-none">
         
         <div className="space-y-6">
           {/* Logo Brand Title */}
@@ -222,11 +222,9 @@ export default function DashboardLayout({
             className="flex items-center gap-2.5 px-2 hover:opacity-80 transition-opacity mb-4 cursor-pointer select-none active:scale-[0.98]"
             scroll={false}
           >
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-[#2997ff] via-[#a855f7] to-[#ec4899] flex items-center justify-center text-white font-extrabold text-[15px] shadow-[0_2px_10px_rgba(0,102,204,0.15)]">
-              T
-            </div>
+            <img src="/logo-icon.svg" className="w-7 h-7 object-contain" alt="Logo" />
             <span className="text-[15px] font-bold text-slate-800 tracking-tight">
-              TechShop ERP
+              Nơi Bán Phụ Kiện
             </span>
           </Link>
 

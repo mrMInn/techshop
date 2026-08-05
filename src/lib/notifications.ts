@@ -52,14 +52,14 @@ export async function sendEmailNotification(
     const port = Number(process.env.SMTP_PORT) || 587;
     const user = process.env.SMTP_USER || "";
     const pass = process.env.SMTP_PASS || "";
-    const from = process.env.SMTP_FROM || `"TechStore ERP" <no-reply@techstore.vn>`;
+    const from = process.env.SMTP_FROM || `"Nơi Bán Phụ Kiện" <no-reply@noibanphukien.vn>`;
 
     // Xây dựng nội dung HTML email dựa trên sự kiện
-    const subject = EMAIL_SUBJECTS[eventType] || `[TechStore ERP] Sự kiện ${eventType}`;
+    const subject = EMAIL_SUBJECTS[eventType] || `[Nơi Bán Phụ Kiện ERP] Sự kiện ${eventType}`;
     let htmlContent = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e3e3e8; border-radius: 20px; padding: 24px; color: #1d1d1f;">
         <div style="border-bottom: 1px solid #e0e0e0; padding-bottom: 16px; margin-bottom: 20px;">
-          <h2 style="margin: 0; font-size: 18px; font-weight: 700; color: #0066cc;">TechStore ERP AI</h2>
+          <h2 style="margin: 0; font-size: 18px; font-weight: 700; color: #00cbd0;">Nơi Bán Phụ Kiện ERP AI</h2>
           <p style="margin: 4px 0 0 0; font-size: 13px; color: #7a7a7a;">Thông báo tự động từ hệ thống quản lý</p>
         </div>
         <div style="font-size: 14px; line-height: 1.6; color: #333;">
@@ -86,7 +86,7 @@ export async function sendEmailNotification(
         </div>
         <div style="border-top: 1px solid #e0e0e0; padding-top: 16px; margin-top: 20px; font-size: 11px; color: #7a7a7a; text-align: center;">
           <p style="margin: 0;">Đây là email tự động. Quý khách vui lòng không phản hồi trực tiếp email này.</p>
-          <p style="margin: 4px 0 0 0;">© ${new Date().getFullYear()} TechStore Laptop. All rights reserved.</p>
+          <p style="margin: 4px 0 0 0;">© ${new Date().getFullYear()} Nơi Bán Phụ Kiện. All rights reserved.</p>
         </div>
       </div>
     `;

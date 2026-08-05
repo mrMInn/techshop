@@ -182,7 +182,7 @@ export const DEFAULT_LEAD_SOURCES = [
 // ============================================================
 
 export const APP_CONFIG = {
-  name: 'TechStore',
+  name: 'Nơi Bán Phụ Kiện',
   description: 'Hệ thống quản lý kho & bán hàng',
   currency: 'VND',
   locale: 'vi-VN',
