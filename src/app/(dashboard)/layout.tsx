@@ -1,6 +1,6 @@
 "use client";
 
-import { Package, ShoppingCart, Users, Wrench, Settings, LayoutDashboard, RefreshCcw, Wallet, FileText, Search, LogOut, List, CheckCircle, Truck, Globe, XCircle, Boxes, Inbox, AlertOctagon, ClipboardList, CornerUpLeft, Cable, Receipt, Landmark, BarChart3 } from "lucide-react";
+import { Package, ShoppingCart, Users, Wrench, Settings, LayoutDashboard, RefreshCcw, Wallet, FileText, Search, LogOut, List, CheckCircle, Truck, Globe, XCircle, Boxes, Inbox, AlertOctagon, ClipboardList, CornerUpLeft, Cable, Receipt, Landmark, BarChart3, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState, useEffect, useRef, Fragment } from "react";
@@ -177,7 +177,18 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <DashboardLayoutContent>{children}</DashboardLayoutContent>;
+  return (
+    <DashboardLayoutContent>
+      <Suspense fallback={
+        <div className="flex flex-col items-center justify-center py-32 text-[#86868b]">
+          <Loader2 className="animate-spin mb-4 text-[#0066cc]" size={28} />
+          <p className="text-[16px] font-semibold text-[#1d1d1f]">Đang tải dữ liệu...</p>
+        </div>
+      }>
+        {children}
+      </Suspense>
+    </DashboardLayoutContent>
+  );
 }
 
 function DashboardLayoutContent({
