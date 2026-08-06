@@ -20,8 +20,7 @@ export const client = globalThis.postgresClient || postgres(connectionString, {
   prepare: false, 
   max: process.env.NODE_ENV === "production" ? 1 : 10,
   idle_timeout: 20,
-  connect_timeout: 10,
-  ssl: process.env.NODE_ENV === "production" ? "require" : false,
+  connect_timeout: 30,
 });
 
 if (process.env.NODE_ENV !== "production") {
