@@ -137,16 +137,47 @@ function getBreadcrumbs(path: string | null, searchParams?: any): { label: strin
   return crumbs;
 }
 
+function DashboardBreadcrumbs({ pathname }: { pathname: string | null }) {
+  const searchParams = useSearchParams();
+  const breadcrumbs = getBreadcrumbs(pathname, searchParams);
+  if (breadcrumbs.length <= 1) return null;
+  return (
+    <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400 select-none">
+      {breadcrumbs.map((crumb, idx) => (
+        <Fragment key={crumb.label}>
+          {idx > 0 && <span className="text-slate-300">/</span>}
+          {crumb.href ? (
+            <Link 
+              href={crumb.href} 
+              scroll={false}
+              className="hover:text-[#0066cc] transition-colors"
+            >
+              {crumb.label}
+            </Link>
+          ) : (
+            <span className="text-[#0066cc] font-extrabold">{crumb.label}</span>
+          )}
+        </Fragment>
+      ))}
+    </div>
+  );
+}
+
+function DashboardPageTitle({ pathname }: { pathname: string | null }) {
+  const searchParams = useSearchParams();
+  return (
+    <h1 className="text-[40px] font-semibold tracking-tight leading-normal py-1 bg-clip-text text-transparent select-none shrink-0" style={{ backgroundImage: "linear-gradient(90deg, #2997ff, #a855f7, #ec4899)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+      {getPageTitle(pathname, searchParams)}
+    </h1>
+  );
+}
+
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <Suspense fallback={null}>
-      <DashboardLayoutContent>{children}</DashboardLayoutContent>
-    </Suspense>
-  );
+  return <DashboardLayoutContent>{children}</DashboardLayoutContent>;
 }
 
 function DashboardLayoutContent({
@@ -156,8 +187,6 @@ function DashboardLayoutContent({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const breadcrumbs = getBreadcrumbs(pathname, searchParams);
   // Fetch profile via TanStack Query for automatic caching, deduplication, and resilience against DB locks
   const { data: profileData, isLoading: loading } = useQuery({
     queryKey: ["currentUserProfile"],
@@ -245,10 +274,12 @@ function DashboardLayoutContent({
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2 mb-2">Chọn chức năng</p>
             
             <nav className="relative space-y-1">
-              <SidebarNavList
-                menuItems={menuItems}
-                pathname={pathname}
-              />
+              <Suspense fallback={<div className="text-xs text-slate-400 p-2">Đang tải menu...</div>}>
+                <SidebarNavList
+                  menuItems={menuItems}
+                  pathname={pathname}
+                />
+              </Suspense>
             </nav>
           </div>
         </div>
@@ -279,30 +310,13 @@ function DashboardLayoutContent({
             <div className="flex items-center gap-6 min-w-0">
               <div className="flex flex-col gap-0.5 min-w-0">
                 {/* Breadcrumbs tree */}
-                {breadcrumbs.length > 1 && (
-                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400 select-none">
-                    {breadcrumbs.map((crumb, idx) => (
-                      <Fragment key={crumb.label}>
-                        {idx > 0 && <span className="text-slate-300">/</span>}
-                        {crumb.href ? (
-                          <Link 
-                            href={crumb.href} 
-                            scroll={false}
-                            className="hover:text-[#0066cc] transition-colors"
-                          >
-                            {crumb.label}
-                          </Link>
-                        ) : (
-                          <span className="text-[#0066cc] font-extrabold">{crumb.label}</span>
-                        )}
-                      </Fragment>
-                    ))}
-                  </div>
-                )}
+                <Suspense fallback={null}>
+                  <DashboardBreadcrumbs pathname={pathname} />
+                </Suspense>
                 
-                <h1 className="text-[40px] font-semibold tracking-tight leading-normal py-1 bg-clip-text text-transparent select-none shrink-0" style={{ backgroundImage: "linear-gradient(90deg, #2997ff, #a855f7, #ec4899)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-                  {getPageTitle(pathname, searchParams)}
-                </h1>
+                <Suspense fallback={<h1 className="text-[40px] font-semibold tracking-tight leading-normal py-1 select-none shrink-0 text-slate-800">Đang tải...</h1>}>
+                  <DashboardPageTitle pathname={pathname} />
+                </Suspense>
               </div>
               {/* Portal target for custom header components (like page stats) */}
               <div id="header-custom-portal" className="hidden lg:flex items-center gap-2.5" />
