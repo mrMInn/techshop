@@ -18,7 +18,7 @@ declare global {
 
 export const client = globalThis.postgresClient || postgres(connectionString, { 
   prepare: false, 
-  max: process.env.NODE_ENV === "production" ? 1 : 10,
+  max: process.env.NODE_ENV === "production" ? 5 : 10,
   idle_timeout: 20,
   connect_timeout: 30,
 });
